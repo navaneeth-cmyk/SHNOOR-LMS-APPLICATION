@@ -1,0 +1,251 @@
+import pool from "../db/postgres.js";
+
+export const getStudentCourseById = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    const { courseId } = req.params;
+
+    // 1️⃣ Check assignment
+    const assigned = await pool.query(
+      `SELECT 1
+       FROM course_assignments
+       WHERE student_id = $1 AND course_id = $2`,
+      [studentId, courseId],
+    );
+
+    if (assigned.rowCount === 0) {
+      return res.status(403).json({ message: "Not assigned to this course" });
+    }
+
+    // 2️⃣ Fetch course
+    const courseResult = await pool.query(
+      `SELECT
+         courses_id AS id,
+         title,
+         description,
+         difficulty,
+         prereq_description,
+         prereq_video_urls,
+         prereq_pdf_url
+       FROM courses
+       WHERE courses_id = $1 AND status = 'approved'`,
+      [courseId],
+    );
+
+    if (courseResult.rowCount === 0) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    // 3️⃣ Fetch modules (FIXED)
+    const modulesResult = await pool.query(
+      `SELECT
+         module_id AS id,
+         title,
+         type,
+         content_url AS url,
+         duration_mins AS duration
+       FROM modules
+       WHERE course_id = $1
+       ORDER BY module_order ASC`,
+      [courseId],
+    );
+    if (modulesResult.rows.length > 0) {
+      const firstModuleId = modulesResult.rows[0].id;
+
+      await pool.query(
+        `INSERT INTO module_progress (student_id, course_id, module_id, last_accessed_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (student_id, module_id)
+     DO UPDATE SET last_accessed_at = NOW()`,
+        [studentId, courseId, firstModuleId],
+      );
+    }
+    // 4️⃣ Fetch progress
+    const progressResult = await pool.query(
+      `SELECT module_id
+       FROM module_progress
+       WHERE student_id = $1 AND course_id = $2`,
+      [studentId, courseId],
+    );
+
+    const completedModules = progressResult.rows.map((r) => r.module_id);
+
+    res.json({
+      ...courseResult.rows[0],
+      modules: modulesResult.rows,
+      completedModules,
+    });
+  } catch (error) {
+    console.error("getStudentCourseById error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getInstructorStudentCount = async (req, res) => {
+  try {
+    const instructorId = req.user.id;
+
+    const { rows } = await pool.query(
+      `
+      SELECT COUNT(DISTINCT sc.student_id) AS total_students
+      FROM student_courses sc
+      JOIN courses c ON sc.course_id = c.courses_id
+      WHERE c.instructor_id = $1
+      `,
+      [instructorId],
+    );
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Instructor student count error:", err);
+    res.status(500).json({ message: "Failed to fetch students count" });
+  }
+};
+
+export const enrollStudent = async (req, res) => {
+  const studentId = req.user.id;
+  const { courseId } = req.params;
+  try {
+    // 1️⃣ Fetch course details
+    const courseResult = await pool.query(
+      `
+      SELECT 
+        status,
+        schedule_start_at,
+        price_type
+      FROM courses
+      WHERE courses_id = $1
+      `,
+      [courseId],
+    );
+
+    if (courseResult.rowCount === 0) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    const course = courseResult.rows[0];
+
+    // 2️⃣ Course must be approved
+    if (course.status !== "approved") {
+      return res.status(403).json({
+        message: "Course is not approved yet",
+      });
+    }
+
+    // 3️⃣ Schedule check
+    if (
+      course.schedule_start_at &&
+      new Date() < new Date(course.schedule_start_at)
+    ) {
+      return res.status(403).json({
+        message: "Course enrollment has not started yet",
+      });
+    }
+
+    // 4️⃣ Paid course → redirect to payment
+    if (course.price_type === "paid") {
+      return res.status(402).json({
+        redirectToPayment: true,
+        message: "Payment required to enroll",
+      });
+    }
+
+    await pool.query(
+      `INSERT INTO student_courses (student_id, course_id)
+     VALUES ($1, $2)
+     ON CONFLICT DO NOTHING`,
+      [studentId, courseId],
+    );
+
+    res.json({
+      success: true,
+      message: "Successfully enrolled in course",
+    });
+  } catch (error) {
+    console.error("Enroll error:", error);
+    res.status(500).json({ message: "Enrollment failed" });
+  }
+};
+
+export const checkEnrollmentStatus = async (req, res) => {
+  const studentId = req.user.id;
+  const { courseId } = req.params;
+
+  const { rowCount } = await pool.query(
+    `SELECT 1 FROM student_courses
+     WHERE student_id = $1 AND course_id = $2`,
+    [studentId, courseId],
+  );
+
+  res.json({ enrolled: rowCount > 0 });
+};
+
+export const getMyCourses = async (req, res) => {
+  const studentId = req.user.id;
+
+  const { rows } = await pool.query(
+    `
+    SELECT 
+      c.courses_id,
+      c.title,
+      c.description,
+      c.category,
+      c.difficulty,
+      c.thumbnail_url,
+      c.status,
+      c.created_at,
+      c.price_type,
+      c.price_amount,
+      c.instructor_id,
+      u.full_name AS instructor_name,
+      CASE WHEN ir.course_id IS NULL THEN false ELSE true END AS has_reviewed
+    FROM student_courses sc
+    JOIN courses c ON c.courses_id = sc.course_id
+    LEFT JOIN users u ON u.user_id = c.instructor_id
+    LEFT JOIN instructor_reviews ir
+      ON ir.course_id = c.courses_id AND ir.student_id = sc.student_id
+    WHERE sc.student_id = $1
+      AND c.status = 'approved'
+    `,
+    [studentId],
+  );
+
+  res.json(rows);
+};
+
+export const getRecommendedCourses = async (req, res) => {
+  const studentId = req.user.id;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        c.courses_id,
+        c.title,
+        c.description,
+        c.category,
+        c.difficulty,
+        c.thumbnail_url,
+        c.status,
+        c.created_at,
+        c.price_type,
+        c.price_amount
+      FROM courses c
+      WHERE c.status = 'approved'
+      AND (c.schedule_start_at IS NULL OR c.schedule_start_at <= NOW())
+      AND c.courses_id NOT IN (
+        SELECT sc.course_id
+        FROM student_courses sc
+        WHERE sc.student_id = $1
+      )
+      ORDER BY c.created_at DESC
+      `,
+      [studentId],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Fetch recommended courses error:", err);
+    res.status(500).json({ message: "Failed to fetch recommendations" });
+  }
+};
