@@ -1,5 +1,6 @@
+
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { auth } from "../../../auth/firebase";
 import ExamRunnerView from "./view.jsx";
@@ -8,7 +9,11 @@ import { onAuthStateChanged } from "firebase/auth";
 import useExamSecurity from "../../../hooks/useExamSecurity";
 import { io } from "socket.io-client";
 
-
+const SECTION_CONFIG = {
+  mcq: { label: "MCQ", color: "bg-indigo-600", ring: "ring-indigo-400", badge: "bg-indigo-100 text-indigo-700", icon: "📝" },
+  descriptive: { label: "Descriptive", color: "bg-emerald-600", ring: "ring-emerald-400", badge: "bg-emerald-100 text-emerald-700", icon: "✍️" },
+  coding: { label: "Coding", color: "bg-amber-600", ring: "ring-amber-400", badge: "bg-amber-100 text-amber-700", icon: "💻" },
+};
 
 const ExamRunner = () => {
   const { examId } = useParams();
@@ -40,6 +45,39 @@ const ExamRunner = () => {
 
   const answersRef = useRef(answers);
   answersRef.current = answers;
+
+  /* =========================
+     SECTION TABS STATE
+  ========================= */
+  const [activeSection, setActiveSection] = useState("mcq");
+  const [sectionIndex, setSectionIndex] = useState(0);
+
+  // Compute sections from exam questions
+  const sections = useMemo(() => {
+    if (!exam || !exam.questions) return { mcq: [], descriptive: [], coding: [] };
+    return {
+      mcq: exam.questions.filter(q => (q.type || q.question_type) === "mcq"),
+      descriptive: exam.questions.filter(q => (q.type || q.question_type) === "descriptive"),
+      coding: exam.questions.filter(q => (q.type || q.question_type) === "coding"),
+    };
+  }, [exam]);
+
+  const availableSections = useMemo(() => {
+    return ["mcq", "descriptive", "coding"].filter(t => sections[t].length > 0);
+  }, [sections]);
+
+  // Auto-select first available section when exam loads
+  useEffect(() => {
+    if (availableSections.length > 0 && !availableSections.includes(activeSection)) {
+      setActiveSection(availableSections[0]);
+      setSectionIndex(0);
+    }
+  }, [availableSections]);
+
+  const handleSectionChange = (section) => {
+    setActiveSection(section);
+    setSectionIndex(0);
+  };
 
   /* =========================
      LOAD EXAM FROM BACKEND
@@ -178,97 +216,86 @@ const ExamRunner = () => {
   };
 
   /* =========================
-   SOCKET CONNECTION
-========================= */
-useEffect(() => {
-  if (!exam || isSubmitted) return;
+     SOCKET CONNECTION
+  ========================= */
+  useEffect(() => {
+    if (!exam || isSubmitted) return;
 
-  const connectSocket = async () => {
-    try {
-      // Use cached token for socket connection
-      const token = await auth.currentUser.getIdToken(false);
+    const connectSocket = async () => {
+      try {
+        // Use cached token for socket connection
+        const token = await auth.currentUser.getIdToken(false);
 
-      const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-        auth: { token },
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: Infinity,
-        transports: ['websocket', 'polling'] // Try websocket first, fallback to polling
-      });
-
-      socketRef.current = socket;
-
-      console.log("🔧 Setting up socket listeners for exam:", examId);
-
-      // Handle auto-submit event from server (SET THIS UP FIRST!)
-      socket.on("exam:autoSubmitted", (data) => {
-        console.log("🚨🚨🚨 RECEIVED exam:autoSubmitted event:", data);
-        console.log("Current state - isSubmitted:", isSubmitted, "isExamLocked:", isExamLocked);
-        
-        // Set states first
-        setIsExamLocked(true);
-        setIsSubmitted(true);
-        fetchExamResult();
-        
-        // Show alert to user immediately
-        alert(data.message || "Exam auto-submitted due to disconnection.");
-      });
-
-      // Initial connection AND reconnection (connect fires on both)
-      socket.on("connect", () => {
-        console.log("🔌 Connected to server, socket ID:", socket.id);
-        console.log("📝 Emitting exam:start for examId:", examId);
-
-        socket.emit("exam:start", {
-          examId: examId
+        const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+          auth: { token },
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          reconnectionAttempts: Infinity,
+          transports: ['websocket', 'polling']
         });
 
-        checkExamStatus();
-      });
+        socketRef.current = socket;
 
-      // Handle disconnection
-      socket.on("disconnect", (reason) => {
-        console.warn("❌ Disconnected from server. Reason:", reason);
-        console.warn("⏰ Grace timer should start now on backend");
-        if (reason === "io server disconnect") {
-          // Server disconnected, need to reconnect manually
-          socket.connect();
-        }
-      });
+        console.log("🔧 Setting up socket listeners for exam:", examId);
 
-      // Handle connection error
-      socket.on("connect_error", (error) => {
-        console.error("🚫 Connection error:", error.message);
-      });
+        // Handle auto-submit event from server (SET THIS UP FIRST!)
+        socket.on("exam:autoSubmitted", (data) => {
+          console.log("🚨🚨🚨 RECEIVED exam:autoSubmitted event:", data);
+          console.log("Current state - isSubmitted:", isSubmitted, "isExamLocked:", isExamLocked);
 
-      // Log when reconnection is attempted
-      socket.io.on("reconnect_attempt", (attempt) => {
-        console.log("🔄 Reconnection attempt #", attempt);
-      });
+          setIsExamLocked(true);
+          setIsSubmitted(true);
+          fetchExamResult();
 
-      // Log successful reconnection
-      socket.io.on("reconnect", (attempt) => {
-        console.log("✅✅✅ Successfully reconnected after", attempt, "attempts");
-        console.log("📝 exam:start will be emitted via 'connect' event");
-      });
+          alert(data.message || "Exam auto-submitted due to disconnection.");
+        });
 
-    } catch (error) {
-      console.error("Socket connection error:", error);
-    }
-  };
+        // Initial connection AND reconnection
+        socket.on("connect", () => {
+          console.log("🔌 Connected to server, socket ID:", socket.id);
+          console.log("📝 Emitting exam:start for examId:", examId);
 
-  connectSocket();
+          socket.emit("exam:start", { examId });
 
-  return () => {
-    if (socketRef.current) {
-      console.log("🔌 Disconnecting socket...");
-      socketRef.current.disconnect();
-    }
-  };
+          checkExamStatus();
+        });
 
-}, [exam, examId, isSubmitted]);
+        socket.on("disconnect", (reason) => {
+          console.warn("❌ Disconnected from server. Reason:", reason);
+          console.warn("⏰ Grace timer should start now on backend");
+          if (reason === "io server disconnect") {
+            socket.connect();
+          }
+        });
 
+        socket.on("connect_error", (error) => {
+          console.error("🚫 Connection error:", error.message);
+        });
+
+        socket.io.on("reconnect_attempt", (attempt) => {
+          console.log("🔄 Reconnection attempt #", attempt);
+        });
+
+        socket.io.on("reconnect", (attempt) => {
+          console.log("✅✅✅ Successfully reconnected after", attempt, "attempts");
+          console.log("📝 exam:start will be emitted via 'connect' event");
+        });
+
+      } catch (error) {
+        console.error("Socket connection error:", error);
+      }
+    };
+
+    connectSocket();
+
+    return () => {
+      if (socketRef.current) {
+        console.log("🔌 Disconnecting socket...");
+        socketRef.current.disconnect();
+      }
+    };
+  }, [exam, examId, isSubmitted]);
 
   /* =========================
      VISIBILITY CHECK FOR AUTO-SUBMIT
@@ -285,7 +312,7 @@ useEffect(() => {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -302,7 +329,6 @@ useEffect(() => {
       const now = Date.now() + serverOffsetMs;
       const secondsRemaining = Math.floor((endTimeMs - now) / 1000);
 
-      // Log first 3 ticks for debugging
       if (tickCount < 3) {
         console.log(`⏱️ Timer Tick ${tickCount + 1}:`, {
           clientNow: Date.now(),
@@ -343,59 +369,47 @@ useEffect(() => {
      ANSWER HANDLING
      (KEYED BY QUESTION_ID)
   ========================= */
-const handleAnswer = async (question, value) => {
-  if (isExamLocked || isSubmitted) return;
+  const handleAnswer = async (question, value) => {
+    if (isExamLocked || isSubmitted) return;
 
-  setAnswers(prev => ({
-    ...prev,
-    [question.id]: value
-  }));
+    setAnswers(prev => ({
+      ...prev,
+      [question.id]: value
+    }));
 
-  try {
-    // Use cached token to avoid quota issues during answer saving
-    const token = await auth.currentUser.getIdToken(false);
+    try {
+      const token = await auth.currentUser.getIdToken(false);
 
-    if (question.type === "mcq") {
-      console.log("💾 Saving MCQ answer:", { questionId: question.id, optionId: value });
-      
-      const response = await api.post(
-        `/api/exams/${examId}/save-answer`,
-        {
-          questionId: question.id,
-          selectedOptionId: value
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      console.log("✅ MCQ answer saved:", response.data);
-    } else {
-      console.log("💾 Saving text answer:", { questionId: question.id, textLength: value?.length });
-      
-      const response = await api.post(
-        `/api/exams/${examId}/save-answer`,
-        {
-          questionId: question.id,
-          answerText: value
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      console.log("✅ Text answer saved:", response.data);
+      if (question.type === "mcq") {
+        console.log("💾 Saving MCQ answer:", { questionId: question.id, optionId: value });
+
+        const response = await api.post(
+          `/api/exams/${examId}/save-answer`,
+          { questionId: question.id, selectedOptionId: value },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        console.log("✅ MCQ answer saved:", response.data);
+      } else {
+        console.log("💾 Saving text answer:", { questionId: question.id, textLength: value?.length });
+
+        const response = await api.post(
+          `/api/exams/${examId}/save-answer`,
+          { questionId: question.id, answerText: value },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        console.log("✅ Text answer saved:", response.data);
+      }
+    } catch (error) {
+      console.error("❌ Failed to save answer:", {
+        questionId: question.id,
+        error: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
     }
-  } catch (error) {
-    console.error("❌ Failed to save answer:", {
-      questionId: question.id,
-      error: error.message,
-      status: error.response?.status,
-      data: error.response?.data
-    });
-    
-    // Don't block the UI, but log the error
-    // The answer is still stored locally in state
-  }
-};
-
-
+  };
 
   /* =========================
      SUBMIT EXAM (BACKEND)
@@ -404,7 +418,6 @@ const handleAnswer = async (question, value) => {
     try {
       if (isSubmitted) return;
 
-      // Use cached token to avoid Firebase quota issues
       const token = await auth.currentUser.getIdToken(false);
 
       console.log("📤 Submitting exam...", {
@@ -433,10 +446,8 @@ const handleAnswer = async (question, value) => {
         error: err
       });
 
-      // Show user-friendly error message
       const errorMessage = err.response?.data?.message || "Failed to submit exam. Please try again.";
-      
-      // If already submitted, allow them to rewrite
+
       if (err.response?.status === 400 && err.response?.data?.message === "Exam already submitted") {
         setIsSubmitted(true);
         setCanRewrite(true);
@@ -456,7 +467,6 @@ const handleAnswer = async (question, value) => {
     try {
       const token = await auth.currentUser.getIdToken(false);
 
-      // Call backend to reset answers and attempt status
       await api.post(
         `/api/exams/${examId}/rewrite`,
         {},
@@ -469,7 +479,9 @@ const handleAnswer = async (question, value) => {
       setAnswers({});
       setCurrentQIndex(0);
       setCanRewrite(false);
-      
+      // Also reset section to first available
+      setSectionIndex(0);
+
       if (exam?.duration > 0) {
         const token = await auth.currentUser.getIdToken(false);
         const attemptRes = await api.get(
@@ -496,7 +508,7 @@ const handleAnswer = async (question, value) => {
   ========================= */
   const [securityModal, setSecurityModal] = useState({
     open: false,
-    type: 'tab-switch', // 'tab-switch' | 'copy-paste'
+    type: 'tab-switch',
     count: 0
   });
 
@@ -510,13 +522,10 @@ const handleAnswer = async (question, value) => {
 
   const handleResumeExam = () => {
     setSecurityModal(prev => ({ ...prev, open: false }));
-    // Re-trigger fullscreen just in case
     triggerFullscreen();
   };
 
-  // Only enable security if exam is loaded and NOT submitted and NOT practice
   const { securityHandlers, triggerFullscreen, isTerminated } = useExamSecurity(handleSubmit, handleSecurityWarning);
-
 
   return (
     <ExamRunnerView
@@ -540,6 +549,14 @@ const handleAnswer = async (question, value) => {
       handleResumeExam={handleResumeExam}
       isExamLocked={isExamLocked}
       isTerminated={isTerminated}
+      // Section tab props
+      activeSection={activeSection}
+      sectionIndex={sectionIndex}
+      setSectionIndex={setSectionIndex}
+      sections={sections}
+      availableSections={availableSections}
+      handleSectionChange={handleSectionChange}
+      sectionConfig={SECTION_CONFIG}
     />
   );
 };
