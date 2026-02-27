@@ -17,7 +17,13 @@ const PracticeList = () => {
                 const res = await api.get('/api/practice', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setChallenges(res.data);
+                // Shuffle challenges randomly (Fisher-Yates)
+                const data = [...res.data];
+                for (let i = data.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [data[i], data[j]] = [data[j], data[i]];
+                }
+                setChallenges(data);
             } catch (err) {
                 console.error("Failed to fetch challenges", err);
             } finally {

@@ -69,7 +69,7 @@ export const getChallenges = async (req, res) => {
   try {
     // Assume we have a practice_challenges table. If not, I will create it.
     const result = await pool.query(
-      "SELECT * FROM practice_challenges ORDER BY difficulty ASC",
+      "SELECT * FROM practice_challenges ORDER BY RANDOM()",
     );
     res.json(result.rows);
   } catch (err) {
