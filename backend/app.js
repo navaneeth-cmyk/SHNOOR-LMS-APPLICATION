@@ -565,6 +565,7 @@ import contestQuestionRoutes from "./routes/contestQuestion.routes.js";
 import contestAdvancedRoutes from "./routes/contestAdvanced.routes.js";
 import { router as admingroupsRoutes } from "./routes/admingroups.routes.js";
 import courseCommentsRoutes from "./routes/courseComments.routes.js";
+import learningPathRoutes from "./routes/LearningPath.routes.js";
 
 
 const app = express();
@@ -654,6 +655,7 @@ app.use("/api/contests", contestQuestionRoutes);
 app.use("/api/contests", contestAdvancedRoutes);
 app.use("/api/admingroups", admingroupsRoutes);
 app.use("/api", courseCommentsRoutes);
+app.use("/api/learning-paths", learningPathRoutes); // Learning path routes
 
 
 app.get("/", (req, res) => {

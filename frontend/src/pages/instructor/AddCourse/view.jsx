@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React from "react";
 import {
   Plus,
@@ -62,6 +63,11 @@ const AddCourseView = ({
   closeModuleBulkUpload,
   previewModuleId,
   setPreviewModuleId,
+  // Learning Path
+  myLearningPaths,
+  isCreatingNewPath,
+  setIsCreatingNewPath,
+  setCourseData,
 }) => {
   if (loading)
     return (
@@ -74,40 +80,37 @@ const AddCourseView = ({
     <div className="min-h-screen bg-[#f8fafc] p-2 font-sans text-primary-900 flex flex-col">
       <div className="w-full max-w-none space-y-4 flex-1 flex flex-col">
         {/* --- Header Section --- */}
-        <div className="relative overflow-hidden rounded-2xl p-6 lg:p-8 shrink-0" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)' }}>
-          <div className="relative z-10 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">
-                {editCourseId ? "Edit Course" : "Create New Course"}
-              </h1>
-              <p className="text-slate-400 text-sm mt-1">
-                Configure course details and curriculum.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {[1, 2, 3].map((s) => (
-                <div key={s} className="flex items-center">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border transition-all ${step >= s
-                        ? "bg-indigo-500 text-white border-indigo-400"
-                        : "bg-white/10 text-slate-400 border-white/20"
-                      }`}
-                  >
-                    {s}
-                  </div>
-                  {s < 3 && (
-                    <div
-                      className={`w-8 h-0.5 mx-1 transition-all ${step > s ? "bg-indigo-400" : "bg-white/20"}`}
-                    ></div>
-                  )}
-                </div>
-              ))}
-            </div>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 border-b border-slate-200 pb-4 shrink-0 bg-white px-6 py-4 rounded-lg shadow-sm border">
+          <div>
+            <h1 className="text-2xl font-bold text-primary-900 tracking-tight">
+              {editCourseId ? "Edit Course" : "Create New Course"}
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">
+              Configure course details and curriculum.
+            </p>
           </div>
-          <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)' }}></div>
+          <div className="flex items-center gap-2">
+            {[1, 2, 3].map((s) => (
+              <div key={s} className="flex items-center">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border transition-all ${step >= s
+                      ? "bg-primary-900 text-white border-primary-900"
+                      : "bg-white text-slate-400 border-slate-200"
+                    }`}
+                >
+                  {s}
+                </div>
+                {s < 3 && (
+                  <div
+                    className={`w-8 h-0.5 mx-1 transition-all ${step > s ? "bg-primary-900" : "bg-slate-200"}`}
+                  ></div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
         {!editCourseId && (
-          <div className="bg-white rounded-xl border border-slate-100 px-6 py-2 flex justify-end">
+          <div className="bg-white border-b border-slate-200 px-6 py-2 flex justify-end">
             <button
               onClick={() => setShowBulkUpload(true)}
               className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-2"
@@ -118,7 +121,7 @@ const AddCourseView = ({
         )}
 
         {/* --- Main Content --- */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex-1 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 flex-1 p-6">
           {/* STEP 1: Course Details */}
           {step === 1 && (
             <div className="w-full">
@@ -417,10 +420,105 @@ const AddCourseView = ({
                 </div>
               </div>
 
+              {/* ── Learning Path Section ── */}
+              <div className="mt-6 border border-indigo-100 rounded-lg p-5 bg-indigo-50/40">
+                <div className="flex items-center gap-3 mb-4">
+                  <input
+                    type="checkbox"
+                    id="isLearningPath"
+                    checked={courseData.isLearningPath}
+                    onChange={(e) =>
+                      setCourseData((p) => ({
+                        ...p,
+                        isLearningPath: e.target.checked,
+                        learningPathId: "",
+                        newLearningPathName: "",
+                        learningPathOrder: 1,
+                      }))
+                    }
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <label
+                    htmlFor="isLearningPath"
+                    className="text-sm font-bold text-indigo-700 cursor-pointer select-none"
+                  >
+                    🛤️ Add this course to a Learning Path
+                  </label>
+                </div>
+
+                {courseData.isLearningPath && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-top-1">
+                    {/* Select existing path or create new */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                        Learning Path
+                      </label>
+                      <select
+                        value={isCreatingNewPath ? "__new__" : courseData.learningPathId}
+                        onChange={(e) => {
+                          if (e.target.value === "__new__") {
+                            setIsCreatingNewPath(true);
+                            setCourseData((p) => ({ ...p, learningPathId: "" }));
+                          } else {
+                            setIsCreatingNewPath(false);
+                            setCourseData((p) => ({ ...p, learningPathId: e.target.value }));
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-md focus:border-indigo-500 focus:ring-0 outline-none text-sm text-slate-700"
+                      >
+                        <option value="">— Select existing learning path —</option>
+                        {myLearningPaths.map((lp) => (
+                          <option key={lp.id} value={lp.id}>
+                            {lp.name} ({lp.course_count} course{lp.course_count !== 1 ? "s" : ""})
+                          </option>
+                        ))}
+                        <option value="__new__">+ Create New Learning Path</option>
+                      </select>
+                    </div>
+
+                    {/* New path name input */}
+                    {isCreatingNewPath && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
+                          New Learning Path Name
+                        </label>
+                        <input
+                          placeholder="e.g. AI & Machine Learning Path"
+                          value={courseData.newLearningPathName}
+                          onChange={(e) =>
+                            setCourseData((p) => ({ ...p, newLearningPathName: e.target.value }))
+                          }
+                          className="w-full px-4 py-2.5 bg-white border border-indigo-300 rounded-md focus:border-indigo-500 outline-none text-sm"
+                        />
+                      </div>
+                    )}
+
+                    {/* Order index */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                        Order in Learning Path
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="1"
+                        value={courseData.learningPathOrder}
+                        onChange={(e) =>
+                          setCourseData((p) => ({ ...p, learningPathOrder: e.target.value }))
+                        }
+                        className="w-28 px-4 py-2.5 bg-white border border-slate-200 rounded-md focus:border-indigo-500 outline-none text-sm"
+                      />
+                      <p className="text-xs text-slate-400">
+                        Position of this course in the learning path (1 = first)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="mt-10 flex justify-end">
                 <button
-                  className="text-white font-semibold py-2.5 px-6 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-lg shadow-indigo-500/20 hover:shadow-xl active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' }}
+                  className="bg-primary-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-6 rounded-md transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                   onClick={() => setStep(2)}
                   disabled={
                     !courseData.title ||
@@ -780,8 +878,7 @@ const AddCourseView = ({
                       Save Draft
                     </button>
                     <button
-                      className="px-6 py-2 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2 hover:shadow-xl active:scale-[0.98] transition-all"
-                      style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' }}
+                      className="px-6 py-2 bg-primary-900 hover:bg-slate-800 text-white font-bold rounded-md text-sm shadow-sm flex items-center gap-2"
                       onClick={() => handleSubmit("pending")}
                     >
                       <Check size={12} /> Submit Course

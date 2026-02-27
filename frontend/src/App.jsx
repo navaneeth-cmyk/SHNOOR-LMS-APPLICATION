@@ -29,6 +29,7 @@ import AddCourse from "./pages/instructor/AddCourse";
 import CourseList from "./pages/instructor/CourseList";
 import ExamBuilder from "./pages/instructor/ExamBuilder";
 import InstructorSettings from "./pages/instructor/InstructorSettings";
+import LearningPaths from "./pages/instructor/LearningPaths";
 
 import StudentDashboard from "./pages/student/StudentDashboard";
 import CoursePlayer from "./pages/student/CoursePlayer";
@@ -139,6 +140,7 @@ function App() {
               <Route path="contests/*" element={<ContestManagement />} />
               <Route path="contests/create" element={<CreateContest />} />
               <Route path="exams" element={<ExamBuilder />} />
+              <Route path="learning-paths" element={<LearningPaths />} />
               <Route path="performance" element={<StudentPerformance />} />
               <Route path="settings" element={<ProfileSettings />} />
               <Route path="chat" element={<InstructorChat />} />

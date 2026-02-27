@@ -1,3 +1,5 @@
+/* eslint-disable no-unused-vars */
+/* eslint-disable no-case-declarations */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../../auth/firebase";
@@ -17,8 +19,8 @@ const StudentCourses = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedLevel, setSelectedLevel] = useState("All");
   const [isFreeOnly, setIsFreeOnly] = useState(false); // NEW
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [learningPaths, setLearningPaths] = useState([]); // Learning Path search results
+  const [allLearningPaths, setAllLearningPaths] = useState([]); // All learning paths for tab
 
   // 🔑 derive enrolledIds for the VIEW
   const enrolledIds = myCourses.map((c) => c.courses_id || c.id);
@@ -63,31 +65,44 @@ const StudentCourses = () => {
     fetchCourses();
   }, []);
 
+  // Search learning paths when search term changes (debounced)
   useEffect(() => {
-    const performSearch = async () => {
-      if (!searchTerm.trim()) {
-        setSearchResults([]);
+    const searchLP = async () => {
+      if (!searchTerm.trim() || !auth.currentUser) {
+        setLearningPaths([]);
         return;
       }
-
       try {
-        setSearchLoading(true);
-        const token = await auth.currentUser.getIdToken(true);
-        const res = await api.get("/api/student/search-courses", {
-          params: { query: searchTerm },
+        const token = await auth.currentUser.getIdToken();
+        const res = await api.get(`/api/learning-paths/search?q=${encodeURIComponent(searchTerm.trim())}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setSearchResults(res.data || []);
+        setLearningPaths(res.data || []);
       } catch (err) {
-        console.error("Search failed:", err);
-        setSearchResults([]);
-      } finally {
-        setSearchLoading(false);
+        console.error("Learning path search error:", err);
+        setLearningPaths([]);
       }
     };
-
-    performSearch();
+    const timer = setTimeout(searchLP, 500);
+    return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Fetch all learning paths when tab is switched to "learning-paths"
+  useEffect(() => {
+    const fetchAllLP = async () => {
+      if (activeTab !== "learning-paths" || !auth.currentUser) return;
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await api.get("/api/learning-paths/all", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setAllLearningPaths(res.data || []);
+      } catch (err) {
+        console.error("Fetch all learning paths error:", err);
+      }
+    };
+    fetchAllLP();
+  }, [activeTab]);
 
   const getDisplayCourses = () => {
     switch (activeTab) {
@@ -104,15 +119,17 @@ const StudentCourses = () => {
         return allCourses.filter((c) => c.price_type === "paid");
 
       case "recommended":
-        const userCategories = myCourses.map((c) => c.category);
-        return allCourses.filter(
-          (c) =>
-            userCategories.includes(c.category) &&
-            !enrolledIds.includes(c.courses_id || c.id),
+        const userCategories = myCourses.map(c => c.category);
+        return allCourses.filter(c =>
+          userCategories.includes(c.category) &&
+          !enrolledIds.includes(c.courses_id || c.id)
         );
 
       case "upcoming":
         return upcomingCourses;
+
+      case "learning-paths":
+        return allCourses; // Show all courses so search filter works alongside learning paths
 
       default:
         return allCourses;
@@ -204,7 +221,8 @@ const StudentCourses = () => {
       navigate={navigate}
       isFreeOnly={isFreeOnly} // NEW
       setIsFreeOnly={setIsFreeOnly} // NEW
-      searchLoading={searchLoading}
+      learningPaths={learningPaths}
+      allLearningPaths={allLearningPaths}
     />
   );
 };

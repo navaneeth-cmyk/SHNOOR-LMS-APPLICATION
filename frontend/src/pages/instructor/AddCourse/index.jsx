@@ -30,6 +30,11 @@ export const AddCourse = () => {
     prereq_description: "",
     prereq_video_urls: [""], // Changed to array with one empty string
     prereq_pdf_url: "",
+    // Learning Path
+    isLearningPath: false,
+    learningPathId: "",       // existing path id
+    newLearningPathName: "", // or create new
+    learningPathOrder: 1,
   });
 
   const [moduleForm, setModuleForm] = useState({
@@ -52,6 +57,10 @@ export const AddCourse = () => {
   const [bulkUploadProgress, setBulkUploadProgress] = useState(0);
   const [bulkUploadResult, setBulkUploadResult] = useState(null);
 
+  // Learning Path State
+  const [myLearningPaths, setMyLearningPaths] = useState([]);
+  const [isCreatingNewPath, setIsCreatingNewPath] = useState(false);
+
   // Module Bulk Upload State
   const [showModuleBulkUpload, setShowModuleBulkUpload] = useState(false);
   const [moduleBulkFile, setModuleBulkFile] = useState(null);
@@ -59,6 +68,23 @@ export const AddCourse = () => {
   const [isModuleBulkUploading, setIsModuleBulkUploading] = useState(false);
   const [moduleBulkUploadProgress, setModuleBulkUploadProgress] = useState(0);
   const [moduleBulkUploadResult, setModuleBulkUploadResult] = useState(null);
+
+  // Fetch instructor's existing learning paths
+  useEffect(() => {
+    const fetchLearningPaths = async () => {
+      if (!auth.currentUser) return;
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await api.get("/api/learning-paths/my", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setMyLearningPaths(res.data || []);
+      } catch (err) {
+        console.error("Failed to fetch learning paths:", err);
+      }
+    };
+    fetchLearningPaths();
+  }, []);
 
 
   // Preview State
@@ -102,14 +128,8 @@ export const AddCourse = () => {
         validity_value: data.validity_value || "",
         validity_unit: data.validity_unit || "days",
         scheduledDate: data.scheduled_start_at || "",
-
-        prereq_description: data.prereq_description || "",
-        prereq_video_urls: data.prereq_video_urls && data.prereq_video_urls.length > 0
-          ? data.prereq_video_urls
-          : [""],
-        prereq_pdf_url: data.prereq_pdf_url || "",
+        isPaid: data.is_paid || false,
         price: data.price || "",
-        isPaid: data.price_type === 'paid' || data.is_paid === true, // Handle different casing/naming from DB
       });
     }
   }, [editCourseId, location.state]);
@@ -461,9 +481,38 @@ export const AddCourse = () => {
         );
       }
 
+      // ── Learning Path assignment ──────────────────────────────────
+      if (courseData.isLearningPath) {
+        let targetPathId = courseData.learningPathId;
+
+        // If instructor chose to create a new path
+        if (isCreatingNewPath && courseData.newLearningPathName.trim()) {
+          const lpRes = await api.post(
+            "/api/learning-paths",
+            { name: courseData.newLearningPathName.trim() },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          targetPathId = lpRes.data.id;
+        }
+
+        if (targetPathId) {
+          await api.post(
+            "/api/learning-paths/add-course",
+            {
+              learningPathId: targetPathId,
+              courseId,
+              orderIndex: Number(courseData.learningPathOrder) || 1,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      }
+
       navigate("/instructor/dashboard");
     } catch (err) {
       console.error("Save course error:", err);
+      const msg = err?.response?.data?.message || err?.message || "Unknown error";
+      alert(`Failed to save course.\n\nReason: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -523,6 +572,12 @@ export const AddCourse = () => {
       // Preview
       previewModuleId={previewModuleId}
       setPreviewModuleId={setPreviewModuleId}
+
+      // Learning Path
+      myLearningPaths={myLearningPaths}
+      isCreatingNewPath={isCreatingNewPath}
+      setIsCreatingNewPath={setIsCreatingNewPath}
+      setCourseData={setCourseData}
     />
   );
 };

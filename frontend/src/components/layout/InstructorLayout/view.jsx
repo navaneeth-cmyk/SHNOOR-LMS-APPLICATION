@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/static-components */
+/* eslint-disable no-unused-vars */
 import React from "react";
 import { Outlet } from "react-router-dom";
 import {
@@ -6,6 +8,7 @@ import {
     List,
     Trophy,
     Code,
+    Map,
     BookOpen,
     MessageSquare,
     Settings,
@@ -97,6 +100,7 @@ const InstructorLayoutView = ({
                         <NavItem path="courses" icon={List} label="My Courses" />
                         <NavItem path="contests" icon={Trophy} label="Manage Contests" />
                         <NavItem path="practice" icon={Code} label="Practice Arena" />
+                        <NavItem path="learning-paths" icon={Map} label="Learning Paths" handleNavigate={handleNavigate} location={location} setIsSidebarOpen={setIsSidebarOpen} />
                         <NavItem path="exams" icon={BookOpen} label="Exams" />
                         <NavItem path="chat" icon={MessageSquare} label="Messages" badgeCount={totalUnread} />
 

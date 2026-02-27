@@ -1,13 +1,6 @@
+/* eslint-disable no-unused-vars */
 import React, { useState } from "react";
-import {
-  BookOpen,
-  Search,
-  Filter,
-  ArrowRight,
-  Library,
-  Star,
-  Check,
-} from "lucide-react";
+import { BookOpen, Search, Filter, ArrowRight, Library, Star, Check } from "lucide-react";
 import ReviewModal from "../../../components/student/ReviewModal";
 
 const StudentCoursesView = ({
@@ -27,7 +20,8 @@ const StudentCoursesView = ({
   navigate,
   isFreeOnly, // NEW
   setIsFreeOnly, // NEW
-  searchLoading, // NEW
+  learningPaths, // Learning path search results
+  allLearningPaths, // All learning paths for tab
 }) => {
   const [reviewModal, setReviewModal] = useState({
     isOpen: false,
@@ -85,64 +79,67 @@ const StudentCoursesView = ({
           </h1>
           <div className="flex gap-6 mt-4 flex-wrap">
             <button
-              className={`pb-2 text-sm font-bold transition-all relative ${
-                activeTab === "my-learning"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`pb-2 text-sm font-bold transition-all relative ${activeTab === "my-learning"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
               onClick={() => setActiveTab("my-learning")}
             >
               My Learning
             </button>
             <button
-              className={`pb-2 text-sm font-bold transition-all relative ${
-                activeTab === "explore"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`pb-2 text-sm font-bold transition-all relative ${activeTab === "explore"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
               onClick={() => setActiveTab("explore")}
             >
               Explore Catalog
             </button>
             <button
-              className={`pb-2 text-sm font-bold transition-all relative ${
-                activeTab === "free-courses"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`pb-2 text-sm font-bold transition-all relative ${activeTab === "free-courses"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
               onClick={() => setActiveTab("free-courses")}
             >
               Free Courses
             </button>
             <button
-              className={`pb-2 text-sm font-bold transition-all relative ${
-                activeTab === "paid-courses"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`pb-2 text-sm font-bold transition-all relative ${activeTab === "paid-courses"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
               onClick={() => setActiveTab("paid-courses")}
             >
               Paid Courses
             </button>
             <button
-              className={`pb-2 text-sm font-bold transition-all relative ${
-                activeTab === "recommended"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`pb-2 text-sm font-bold transition-all relative ${activeTab === "recommended"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
               onClick={() => setActiveTab("recommended")}
             >
               Recommended
             </button>
             <button
-              className={`pb-2 text-sm font-bold transition-all relative ${
-                activeTab === "upcoming"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`pb-2 text-sm font-bold transition-all relative ${activeTab === "upcoming"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
               onClick={() => setActiveTab("upcoming")}
             >
               Upcoming
+            </button>
+            <button
+              className={`pb-2 text-sm font-bold transition-all relative ${activeTab === "learning-paths"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
+              onClick={() => setActiveTab("learning-paths")}
+            >
+              Learning Paths
             </button>
           </div>
         </div>
@@ -205,72 +202,195 @@ const StudentCoursesView = ({
         </div>
       </div>
 
-      {activeTab === "search" && searchTerm && (
-        <div className="space-y-3">
-          {searchLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : displayCourses.length > 0 ? (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {displayCourses.map((result) => (
-                <div
-                  key={result.id}
-                  className="bg-white border border-slate-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer"
-                  onClick={() => {
-                    if (result.type === "module") {
-                      navigate(`/student/course/${result.course_id}`);
-                    } else {
-                      navigate(`/student/course/${result.id}`);
-                    }
-                  }}
-                >
-                  <div className="flex gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                      <BookOpen className="text-indigo-600" size={24} />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm text-slate-900 truncate">
-                          {result.title}
-                        </h4>
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${result.type === "module" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}
-                        >
-                          {result.type === "module" ? "Module" : "Course"}
-                        </span>
-                      </div>
-
-                      {result.instructor_name && (
-                        <p className="text-xs text-indigo-600 font-medium mb-1">
-                          👤 {result.instructor_name}
-                        </p>
-                      )}
-
-                      {result.type === "module" && result.course_title && (
-                        <p className="text-xs text-slate-500 font-medium mb-1">
-                          📚 In Course: {result.course_title}
-                        </p>
-                      )}
-
-                      <p className="text-xs text-slate-600 line-clamp-2">
-                        {result.description || "No description available"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+      {/* Learning Paths Tab Content */}
+      {activeTab === "learning-paths" && (
+        <div className="space-y-6">
+          {(!allLearningPaths || allLearningPaths.length === 0) ? (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-16 text-center">
+              <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-300 border border-indigo-100">
+                <Library size={32} />
+              </div>
+              <h3 className="text-base font-bold text-primary-900 mb-1">
+                No learning paths available
+              </h3>
+              <p className="text-sm text-slate-500">
+                Learning paths will appear here when instructors create them.
+              </p>
             </div>
           ) : (
-            <div className="p-8 text-center text-slate-500 bg-slate-50 rounded-lg">
-              <p>No courses or modules found for "{searchTerm}"</p>
-            </div>
+            allLearningPaths.map((lp) => (
+              <div key={lp.id} className="bg-gradient-to-r from-indigo-50 via-white to-purple-50 border border-indigo-200 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="text-2xl">🛤️</span>
+                  <h3 className="text-lg font-bold text-indigo-900">
+                    {lp.name}
+                  </h3>
+                </div>
+                {lp.description && (
+                  <p className="text-sm text-slate-500 mb-4 ml-10">{lp.description}</p>
+                )}
+                <div className="text-xs text-indigo-600 font-semibold mb-4 ml-10">
+                  {lp.courses.length} course{lp.courses.length !== 1 ? "s" : ""} in this path
+                </div>
+
+                <div className="space-y-3 ml-4">
+                  {lp.courses.map((course, idx) => {
+                    const enrolled = course.is_enrolled;
+                    return (
+                      <div
+                        key={course.courses_id}
+                        className="flex items-center gap-4 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all p-4 group"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow">
+                          {course.order_index}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-primary-900 group-hover:text-indigo-600 transition-colors truncate">
+                              {course.title}
+                            </h4>
+                            <span className="flex-shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+                              {course.difficulty || "General"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-xs text-slate-500">{course.category}</span>
+                            <span className="text-xs text-slate-400">•</span>
+                            <span className="text-xs text-slate-500">By {course.instructor_name || "Instructor"}</span>
+                            <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${course.price_type === "paid" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                              }`}>
+                              {course.price_type === "paid" ? `₹${course.price_amount}` : "FREE"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {course.is_completed ? (
+                            <span className="px-4 py-2 bg-emerald-100 text-emerald-700 font-bold text-xs rounded-md flex items-center gap-1.5">
+                              <Check size={12} /> Completed
+                            </span>
+                          ) : enrolled ? (
+                            <button
+                              className="px-4 py-2 bg-primary-900 hover:bg-slate-800 text-white font-bold text-xs rounded-md transition-colors flex items-center gap-1.5"
+                              onClick={() => navigate(`/student/course/${course.courses_id}`)}
+                            >
+                              Resume <ArrowRight size={12} />
+                            </button>
+                          ) : (
+                            <button
+                              className="px-4 py-2 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold text-xs rounded-md transition-colors"
+                              onClick={() => handleEnroll(course.courses_id)}
+                            >
+                              Enroll
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
           )}
         </div>
       )}
+
+      {/* Learning Path Search Results (for other tabs) */}
+      {activeTab !== "learning-paths" && learningPaths && learningPaths.length > 0 && (
+        <div className="space-y-6 mb-8">
+          {learningPaths.map((lp) => (
+            <div key={lp.id} className="bg-gradient-to-r from-indigo-50 via-white to-purple-50 border border-indigo-200 rounded-xl p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-2xl">🛤️</span>
+                <h3 className="text-lg font-bold text-indigo-900">
+                  Learning Path: {lp.name}
+                </h3>
+              </div>
+              {lp.description && (
+                <p className="text-sm text-slate-500 mb-4 ml-10">{lp.description}</p>
+              )}
+              <div className="text-xs text-indigo-600 font-semibold mb-4 ml-10">
+                {lp.courses.length} course{lp.courses.length !== 1 ? "s" : ""} in this path
+              </div>
+
+              {/* Ordered course cards */}
+              <div className="space-y-3 ml-4">
+                {lp.courses.map((course, idx) => {
+                  const enrolled = course.is_enrolled;
+                  return (
+                    <div
+                      key={course.courses_id}
+                      className="flex items-center gap-4 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all p-4 group"
+                    >
+                      {/* Step number */}
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow">
+                        {course.order_index}
+                      </div>
+
+                      {/* Connector line */}
+                      {idx < lp.courses.length - 1 && (
+                        <div className="absolute left-9 top-14 w-0.5 h-6 bg-indigo-200" />
+                      )}
+
+                      {/* Course info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-primary-900 group-hover:text-indigo-600 transition-colors truncate">
+                            {course.title}
+                          </h4>
+                          <span className="flex-shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+                            {course.difficulty || "General"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-slate-500">
+                            {course.category}
+                          </span>
+                          <span className="text-xs text-slate-400">•</span>
+                          <span className="text-xs text-slate-500">
+                            By {course.instructor_name || "Instructor"}
+                          </span>
+                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${course.price_type === "paid"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-emerald-100 text-emerald-700"
+                            }`}>
+                            {course.price_type === "paid" ? `₹${course.price_amount}` : "FREE"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action */}
+                      <div className="flex-shrink-0">
+                        {course.is_completed ? (
+                          <span className="px-4 py-2 bg-emerald-100 text-emerald-700 font-bold text-xs rounded-md flex items-center gap-1.5">
+                            <Check size={12} /> Completed
+                          </span>
+                        ) : enrolled ? (
+                          <button
+                            className="px-4 py-2 bg-primary-900 hover:bg-slate-800 text-white font-bold text-xs rounded-md transition-colors flex items-center gap-1.5"
+                            onClick={() => navigate(`/student/course/${course.courses_id}`)}
+                          >
+                            Resume <ArrowRight size={12} />
+                          </button>
+                        ) : (
+                          <button
+                            className="px-4 py-2 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold text-xs rounded-md transition-colors"
+                            onClick={() => handleEnroll(course.courses_id)}
+                          >
+                            Enroll
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Grid */}
-      {displayCourses.length === 0 ? (
+      {displayCourses.length === 0 && (!learningPaths || learningPaths.length === 0) && activeTab !== "learning-paths" ? (
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-16 text-center">
           <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300 border border-slate-200">
             <Library size={32} />
@@ -282,7 +402,7 @@ const StudentCoursesView = ({
             Try adjusting your filters or search terms.
           </p>
         </div>
-      ) : (
+      ) : displayCourses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {displayCourses.map((courses) => {
             const isEnrolled = enrolledIds.includes(courses.courses_id);
@@ -304,11 +424,10 @@ const StudentCoursesView = ({
                     {courses.difficulty || "General"}
                   </div>
                   <div
-                    className={`absolute bottom-3 right-3 px-2 py-0.5 rounded text-[10px] font-bold uppercase shadow-sm ${
-                      courses.price_type
-                        ? "bg-amber-400 text-slate-900 border border-amber-500"
-                        : "bg-emerald-500 text-white border border-emerald-600"
-                    }`}
+                    className={`absolute bottom-3 right-3 px-2 py-0.5 rounded text-[10px] font-bold uppercase shadow-sm ${courses.price_type
+                      ? "bg-amber-400 text-slate-900 border border-amber-500"
+                      : "bg-emerald-500 text-white border border-emerald-600"
+                      }`}
                   >
                     {courses.price_type === "paid"
                       ? `₹${courses.price_amount}`
@@ -340,11 +459,10 @@ const StudentCoursesView = ({
                           Resume <ArrowRight size={14} />
                         </button>
                         <button
-                          className={`w-full font-bold py-2 px-4 rounded text-sm transition-colors flex items-center justify-center gap-2 ${
-                            courses.has_reviewed
-                              ? "bg-green-50 text-green-700 border border-green-200 cursor-not-allowed"
-                              : "bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-600"
-                          }`}
+                          className={`w-full font-bold py-2 px-4 rounded text-sm transition-colors flex items-center justify-center gap-2 ${courses.has_reviewed
+                            ? "bg-green-50 text-green-700 border border-green-200 cursor-not-allowed"
+                            : "bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-600"
+                            }`}
                           onClick={(e) =>
                             !courses.has_reviewed && openReviewModal(e, courses)
                           }
@@ -375,7 +493,7 @@ const StudentCoursesView = ({
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
