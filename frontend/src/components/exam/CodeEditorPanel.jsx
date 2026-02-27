@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 {/*import React, { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { FaCog, FaExpand, FaPlay, FaSave, FaPaperPlane } from 'react-icons/fa';

@@ -87,7 +87,7 @@ export const getExamForAttempt = async (req, res) => {
     );
 
     if (attemptCheck.rows.length > 0 && attemptCheck.rows[0].status === 'submitted') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "Exam already submitted",
         alreadySubmitted: true
       });
@@ -98,7 +98,7 @@ export const getExamForAttempt = async (req, res) => {
       INSERT INTO exam_attempts (exam_id, student_id, status, start_time, end_time)
       VALUES ($1, $2, 'in_progress', NOW(), NOW() + ($3 * INTERVAL '1 minute'))
       ON CONFLICT (exam_id, student_id)
-      DO UPDATE 
+      DO UPDATE
       SET status = 'in_progress',
           start_time = COALESCE(exam_attempts.start_time, EXCLUDED.start_time),
           end_time = COALESCE(exam_attempts.end_time, EXCLUDED.end_time),
@@ -109,7 +109,6 @@ export const getExamForAttempt = async (req, res) => {
       [examId, studentId, exam.duration],
     );
 
-    // DEBUG: Log the timestamps being set
     const debugAttempt = await pool.query(
       `SELECT start_time, end_time, NOW() as db_now FROM exam_attempts WHERE exam_id = $1 AND student_id = $2`,
       [examId, studentId]
@@ -126,6 +125,7 @@ export const getExamForAttempt = async (req, res) => {
 
     /* =========================
        4️⃣ FETCH QUESTIONS
+       (with coding question fields)
     ========================= */
     const { rows } = await pool.query(
       `
@@ -140,13 +140,27 @@ export const getExamForAttempt = async (req, res) => {
             json_build_object(
               'id', q.question_id,
               'text', q.question_text,
+              'title', COALESCE(cq.title, q.question_text),
+              'description', cq.description,
               'type', q.question_type,
               'marks', q.marks,
+              'starterCode', cq.starter_code,
               'options', (
-               SELECT json_agg(json_build_object('id', o.option_id, 'text', o.option_text) ORDER BY o.option_order)
-FROM exam_mcq_options o
-WHERE o.question_id = q.question_id
-  AND o.option_text IS NOT NULL
+                SELECT json_agg(json_build_object('id', o.option_id, 'text', o.option_text) ORDER BY o.option_order)
+                FROM exam_mcq_options o
+                WHERE o.question_id = q.question_id
+                  AND o.option_text IS NOT NULL
+              ),
+              'testCases', (
+                SELECT json_agg(
+                  json_build_object(
+                    'input', tc.input,
+                    'output', tc.expected_output,
+                    'isPublic', NOT tc.is_hidden
+                  )
+                )
+                FROM exam_test_cases tc
+                WHERE tc.coding_id = cq.coding_id
               )
             )
             ORDER BY q.question_order
@@ -156,6 +170,7 @@ WHERE o.question_id = q.question_id
 
       FROM exams e
       LEFT JOIN exam_questions q ON q.exam_id = e.exam_id
+      LEFT JOIN exam_coding_questions cq ON q.question_id = cq.question_id
       WHERE e.exam_id = $1
       GROUP BY e.exam_id
       `,
@@ -193,10 +208,8 @@ WHERE o.question_id = q.question_id
 
       const baseSeed = hashString(`${studentId}:${examId}`);
 
-      // ✅ Shuffle QUESTIONS safely (keeps objects intact)
       shuffleWithSeed(examPayload.questions, baseSeed);
 
-      // ✅ Shuffle OPTIONS per MCQ safely
       examPayload.questions.forEach((question, index) => {
         if (question.type === "mcq" && Array.isArray(question.options)) {
           const optionSeed = baseSeed + hashString(`${question.id}:${index}`);
@@ -254,12 +267,8 @@ export const submitExam = async (req, res) => {
     /* =========================
        1️⃣ CLEAR PREVIOUS ANSWERS (ALLOW REWRITE)
     ========================= */
-    // Delete previous answers to allow clean resubmission
     await client.query(
-      `
-      DELETE FROM exam_answers
-      WHERE exam_id = $1 AND student_id = $2
-      `,
+      `DELETE FROM exam_answers WHERE exam_id = $1 AND student_id = $2`,
       [examId, studentId]
     );
 
@@ -366,7 +375,7 @@ export const submitExam = async (req, res) => {
     }
 
     /* =========================
-       4️⃣ CALCULATE RESULT
+       4️⃣ CALCULATE & SAVE RESULT
     ========================= */
     const percentage =
       totalMarks === 0 ? 0 : Math.round((obtainedMarks / totalMarks) * 100);
@@ -378,9 +387,6 @@ export const submitExam = async (req, res) => {
 
     const passed = percentage >= rows[0].pass_percentage;
 
-    /* =========================
-       4️⃣ SAVE RESULT (UPSERT)
-    ========================= */
     await client.query(
       `
       INSERT INTO exam_results
@@ -399,13 +405,13 @@ export const submitExam = async (req, res) => {
 
     await client.query(
       `
-    UPDATE exam_attempts
-    SET status = 'submitted',
-      submitted_at = NOW(),
-      disconnected_at = NULL
-    WHERE exam_id = $1
-    AND student_id = $2
-    `,
+      UPDATE exam_attempts
+      SET status = 'submitted',
+          submitted_at = NOW(),
+          disconnected_at = NULL
+      WHERE exam_id = $1
+        AND student_id = $2
+      `,
       [examId, studentId],
     );
 
@@ -427,20 +433,17 @@ export const submitExam = async (req, res) => {
   }
 };
 
-
 export const autoSubmitExam = async (studentId, examId) => {
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
-    // Check if already submitted
     const { rows } = await client.query(
       `
       SELECT status
       FROM exam_attempts
-      WHERE exam_id = $1
-      AND student_id = $2
+      WHERE exam_id = $1 AND student_id = $2
       `,
       [examId, studentId]
     );
@@ -450,15 +453,13 @@ export const autoSubmitExam = async (studentId, examId) => {
       return;
     }
 
-    // Submit with whatever answers saved so far
     await client.query(
       `
       UPDATE exam_attempts
       SET status = 'submitted',
           submitted_at = NOW(),
           disconnected_at = NULL
-      WHERE exam_id = $1
-      AND student_id = $2
+      WHERE exam_id = $1 AND student_id = $2
       `,
       [examId, studentId]
     );
