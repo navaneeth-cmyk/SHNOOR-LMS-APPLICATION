@@ -1,9 +1,9 @@
+/* eslint-disable no-unused-vars */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../../auth/firebase";
 import api from "../../../api/axios";
 import AdminDashboardView from "./view";
-import DateRangeFilter from "../../../components/DateRangeFilter";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -13,22 +13,35 @@ const AdminDashboard = () => {
     totalStudents: 0,
     pendingCourses: 0,
     totalInstructors: 0,
+    certificates: 0,
   });
   const [error, setError] = useState("");
 
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [dateRange, setDateRange] = useState(null);
   const debounceTimer = useRef(null);
+
+  // Date range state
+  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
+  const [activeFilter, setActiveFilter] = useState(null);
 
   /* =========================
      FETCH DASHBOARD STATS
   ========================= */
   useEffect(() => {
-    fetchStats(dateRange);
+    fetchStats();
+  }, []);
+
+  // Re-fetch when date range changes
+  useEffect(() => {
+    if (dateRange.startDate && dateRange.endDate) {
+      fetchStats(dateRange.startDate, dateRange.endDate);
+    } else if (!dateRange.startDate && !dateRange.endDate) {
+      fetchStats();
+    }
   }, [dateRange]);
 
-  const fetchStats = async (range) => {
+  const fetchStats = async (startDate, endDate) => {
     try {
       setLoading(true);
 
@@ -38,11 +51,17 @@ const AdminDashboard = () => {
 
       const token = await auth.currentUser.getIdToken();
 
+      const params = {};
+      if (startDate && endDate) {
+        params.startDate = startDate;
+        params.endDate = endDate;
+      }
+
       const res = await api.get("/api/admin/dashboard-stats", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        params: range || {},
+        params,
       });
 
       setStats(res.data);
@@ -54,6 +73,72 @@ const AdminDashboard = () => {
     }
   };
 
+  /* =========================
+     DATE RANGE HANDLERS
+  ========================= */
+  const handleDateChange = (newDateRange) => {
+    setDateRange(newDateRange);
+    setActiveFilter(null); // Clear quick filter when manual date is set
+  };
+
+  const handleQuickFilter = (filter) => {
+    const today = new Date();
+    let startDate = '';
+    let endDate = today.toISOString().split('T')[0];
+
+    if (filter === null) {
+      // Reset to all-time
+      setDateRange({ startDate: '', endDate: '' });
+      setActiveFilter(null);
+      return;
+    }
+
+    if (filter === 'Today') {
+      startDate = endDate;
+    } else if (filter === 'This Week') {
+      const firstDay = new Date(today);
+      firstDay.setDate(today.getDate() - today.getDay());
+      startDate = firstDay.toISOString().split('T')[0];
+    } else if (filter === 'This Month') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      startDate = firstDay.toISOString().split('T')[0];
+    }
+
+    setActiveFilter(filter);
+    setDateRange({ startDate, endDate });
+  };
+
+  /* =========================
+     DOWNLOAD REPORT
+  ========================= */
+  const handleDownloadReport = () => {
+    const displayStats = stats?.filteredStats || stats;
+    const rows = [
+      ['Metric', 'Value'],
+      ['Students', displayStats?.totalStudents ?? 0],
+      ['Instructors', displayStats?.totalInstructors ?? 0],
+      ['Pending Courses', displayStats?.pendingCourses ?? 0],
+      ['Certificates', displayStats?.certificates ?? 0],
+    ];
+
+    if (dateRange.startDate && dateRange.endDate) {
+      rows.push(['Date Range', `${dateRange.startDate} to ${dateRange.endDate}`]);
+    } else {
+      rows.push(['Date Range', 'All Time']);
+    }
+
+    const csvContent = rows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `analytics_report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  /* =========================
+     SEARCH
+  ========================= */
   const performSearch = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -76,7 +161,7 @@ const AdminDashboard = () => {
       });
 
       setSearchResults(res.data || []);
-      
+
     } catch (err) {
       setSearchResults([]);
     } finally {
@@ -112,6 +197,7 @@ const AdminDashboard = () => {
       }
     };
   }, []);
+
   /* =========================
      NAVIGATION HANDLERS
   ========================= */
@@ -119,20 +205,27 @@ const AdminDashboard = () => {
   const goToApproveCourses = () => navigate("/admin/approve-courses");
   const goToAssignCourse = () => navigate("/admin/assign-course");
 
+  const showingAllTime = !dateRange.startDate && !dateRange.endDate;
+
   return (
     <AdminDashboardView
       loading={loading}
       error={error}
       stats={stats}
-      chartData={[]} // Add your actual chart data here if you have it
+      chartData={stats?.chartData || []}
+      recentActivity={stats?.recentActivity || []}
       onSearch={handleSearch}
       searchResults={searchResults}
       searchLoading={searchLoading}
+      dateRange={dateRange}
+      activeFilter={activeFilter}
+      onDateChange={handleDateChange}
+      onQuickFilter={handleQuickFilter}
+      onDownloadReport={handleDownloadReport}
+      showingAllTime={showingAllTime}
       goToAddInstructor={goToAddInstructor}
       goToApproveCourses={goToApproveCourses}
       goToAssignCourse={goToAssignCourse}
-      dateRange={dateRange}
-      setDateRange={setDateRange}
     />
   );
 };

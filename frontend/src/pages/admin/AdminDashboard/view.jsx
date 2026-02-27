@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/static-components */
+
 import React, { useState } from 'react';
 import {
     Users, BookOpen, Clock, Award, Search, X, Download, BarChart3,
@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const AdminDashboardView = ({
     stats,
     chartData,
+    recentActivity,
     loading,
     onSearch,
     searchResults,
@@ -68,10 +69,10 @@ const AdminDashboardView = ({
     ];
 
     const statCards = [
-        { label: 'Total Students', value: stats?.totalStudents ?? 0, icon: Users, change: '+12%', up: true, color: '#3b82f6', bg: '#eff6ff', spark: sparkData[0] },
-        { label: 'Total Instructors', value: stats?.totalInstructors ?? 0, icon: GraduationCap, change: '+5%', up: true, color: '#8b5cf6', bg: '#f5f3ff', spark: sparkData[1] },
-        { label: 'Pending Courses', value: stats?.pendingCourses ?? 0, icon: Clock, change: '-3%', up: false, color: '#f59e0b', bg: '#fffbeb', spark: sparkData[2] },
-        { label: 'Certificates Issued', value: stats?.certificates ?? 0, icon: Award, change: '+18%', up: true, color: '#10b981', bg: '#ecfdf5', spark: sparkData[3] },
+        { label: 'Total Students', value: stats?.totalStudents ?? 0, icon: Users, change: '+12%', up: true, color: '#6366f1', bg: '#eef2ff', iconColor: '#6366f1', spark: sparkData[0] },
+        { label: 'Total Instructors', value: stats?.totalInstructors ?? 0, icon: GraduationCap, change: '+5%', up: true, color: '#8b5cf6', bg: '#f5f3ff', iconColor: '#8b5cf6', spark: sparkData[1] },
+        { label: 'Pending Courses', value: stats?.pendingCourses ?? 0, icon: Clock, change: '-3%', up: false, color: '#f59e0b', bg: '#fffbeb', iconColor: '#f59e0b', spark: sparkData[2] },
+        { label: 'Certificates Issued', value: stats?.certificates ?? 0, icon: Award, change: '+18%', up: true, color: '#10b981', bg: '#ecfdf5', iconColor: '#10b981', spark: sparkData[3] },
     ];
 
     // Quick actions
@@ -82,14 +83,39 @@ const AdminDashboardView = ({
         { label: 'Download Report', icon: FileText, onClick: onDownloadReport, color: '#ef4444' },
     ];
 
-    // Dummy recent activity
-    const recentActivity = [
-        { action: 'New student registered', user: 'Ahmed Hassan', time: '2 min ago', icon: UserPlus, color: '#3b82f6' },
-        { action: 'Course submitted for review', user: 'Dr. Sarah Khan', time: '15 min ago', icon: BookOpen, color: '#8b5cf6' },
-        { action: 'Certificate generated', user: 'Priya Sharma', time: '1 hour ago', icon: Award, color: '#10b981' },
-        { action: 'New instructor added', user: 'Prof. Ali Ahmed', time: '3 hours ago', icon: GraduationCap, color: '#f59e0b' },
-        { action: 'Course approved', user: 'Admin', time: '5 hours ago', icon: CheckCircle, color: '#10b981' },
-    ];
+    // Helper to format date relative time
+    const timeAgo = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const seconds = Math.floor((Math.max(0, new Date() - date)) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + " years ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + " months ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + " days ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + " hrs ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + " mins ago";
+        return Math.floor(seconds) + " secs ago";
+    };
+
+    const getTypeIcon = (type) => {
+        switch (type) {
+            case 'student': return { icon: UserPlus, color: '#3b82f6' };
+            case 'instructor': return { icon: GraduationCap, color: '#f59e0b' };
+            case 'course_pending': return { icon: BookOpen, color: '#8b5cf6' };
+            case 'course_approved': return { icon: CheckCircle, color: '#10b981' };
+            default: return { icon: Activity, color: '#64748b' };
+        }
+    };
+
+    const displayActivity = (recentActivity || []).map(item => ({
+        ...item,
+        time: item.created_at ? timeAgo(item.created_at) : item.time || '',
+        ...getTypeIcon(item.type)
+    }));
 
     // Mini sparkline component
     const Sparkline = ({ data, color }) => {
@@ -100,7 +126,7 @@ const AdminDashboardView = ({
         const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(' ');
         return (
             <svg width={w} height={h} style={{ overflow: 'visible' }}>
-                <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
+                <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
             </svg>
         );
     };
@@ -109,21 +135,23 @@ const AdminDashboardView = ({
         <div className="space-y-6 font-sans max-w-[1440px] mx-auto">
 
             {/* ── WELCOME BANNER ── */}
-            <div className="relative overflow-visible rounded-2xl p-6 lg:p-8" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)' }}>
+            <div className="relative overflow-hidden rounded-2xl p-7 lg:p-9 shadow-2xl" style={{ background: 'linear-gradient(90deg, #0F172A 0%, #1E293B 50%, #312E81 100%)' }}>
                 <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <p className="text-indigo-300 text-sm font-medium mb-1">👋 {greeting}, Admin</p>
-                        <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Analytics Overview</h1>
-                        <p className="text-slate-400 mt-1 text-sm">Here's what's happening on your platform today.</p>
+                        <p className="text-sm font-bold mb-1.5 flex items-center gap-2">
+                            <span className="text-indigo-400">👋 {greeting}, Admin</span>
+                        </p>
+                        <h1 className="text-3xl lg:text-4xl font-black text-white tracking-tight">Analytics Overview</h1>
+                        <p className="text-[#CBD5E1] mt-1.5 text-sm font-medium">Here's what's happening on your platform today.</p>
                     </div>
 
                     {/* Search */}
                     <div className="relative z-50 w-full sm:w-auto">
                         <div className={`relative transition-all duration-300 ${isSearchExpanded ? 'w-full sm:w-96' : 'w-full sm:w-72'}`}>
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
-                                className="pl-10 pr-10 py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-sm w-full text-white
-                           focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400/50 focus:bg-white/15 transition-all placeholder:text-slate-400"
+                                className="pl-11 pr-11 py-3 bg-[#1e293b]/50 backdrop-blur-md border border-white/10 rounded-xl text-sm w-full text-white
+                           focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 focus:bg-white/10 transition-all placeholder:text-slate-500"
                                 placeholder="Search parameters..."
                                 value={searchQuery}
                                 onChange={handleSearchChange}
@@ -131,19 +159,19 @@ const AdminDashboardView = ({
                             />
                             {searchQuery && (
                                 <button onClick={handleClearSearch}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors">
-                                    <X size={16} />
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors">
+                                    <X size={18} />
                                 </button>
                             )}
                         </div>
 
                         {/* Search Dropdown */}
                         {isSearchExpanded && searchQuery && (
-                            <div className="absolute top-full left-0 mt-3 w-full bg-white border border-slate-200 rounded-xl shadow-2xl max-h-[500px] overflow-y-auto z-[100] pointer-events-auto">
+                            <div className="absolute top-full right-0 mt-2 w-full sm:w-96 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-96 overflow-y-auto z-[60]">
                                 {searchLoading ? (
                                     <div className="p-6 text-center text-slate-500 text-sm">Searching...</div>
                                 ) : searchResults && searchResults.length > 0 ? (
-                                    <div className="divide-y divide-slate-100 w-full">
+                                    <div className="divide-y divide-slate-100">
                                         {searchResults.map((result) => (
                                             <div key={result.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer">
                                                 <div className="flex items-start gap-3">
@@ -181,33 +209,35 @@ const AdminDashboardView = ({
                     </div>
                 </div>
 
-                {/* Decorative circles */}
-                <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)' }}></div>
-                <div className="absolute -left-8 -bottom-20 w-48 h-48 rounded-full" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)' }}></div>
+                {/* Decorative glows */}
+                <div className="absolute right-0 top-0 w-[400px] h-[400px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%)' }}></div>
+                <div className="absolute -left-20 -bottom-20 w-[300px] h-[300px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(79,70,229,0.08) 0%, transparent 70%)' }}></div>
             </div>
 
             {/* Click outside overlay */}
             {isSearchExpanded && <div className="fixed inset-0 z-40" onClick={() => setIsSearchExpanded(false)} />}
 
-            {/* ── STAT CARDS WITH SPARKLINES ── */}
+            {/* ── STAT CARDS WITH SPARKLINES (DOUBLE SHADE) ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 {statCards.map((card, i) => (
-                    <div key={i} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: card.bg }}>
-                                <card.icon size={20} style={{ color: card.color }} />
+                    <div key={i} className="bg-[#181F4D] rounded-[12px] p-6 border border-white/5 shadow-md hover:brightness-110 transition-all duration-300 group">
+                        <div className="flex items-start justify-between mb-5">
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: card.bg }}>
+                                <card.icon size={26} style={{ color: card.iconColor }} />
                             </div>
-                            <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${card.up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
-                                {card.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                            <div className={`flex items-center gap-1 text-[11px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider ${card.up ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {card.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
                                 {card.change}
                             </div>
                         </div>
                         <div className="flex items-end justify-between">
                             <div>
-                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{card.label}</p>
-                                <h3 className="text-2xl font-extrabold text-primary-900 tracking-tight">{card.value}</h3>
+                                <p className="text-[12px] font-bold text-[#94A3B8] uppercase tracking-widest mb-1.5">{card.label}</p>
+                                <h3 className="text-4xl font-black text-white tracking-tight">{card.value}</h3>
                             </div>
-                            <Sparkline data={card.spark} color={card.color} />
+                            <div className="pb-1 transition-transform group-hover:scale-110">
+                                <Sparkline data={card.spark} color={card.color} />
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -282,7 +312,7 @@ const AdminDashboardView = ({
                         <Activity size={16} className="text-slate-300" />
                     </div>
                     <div className="flex-1 overflow-y-auto px-4 py-3">
-                        {recentActivity.map((item, i) => (
+                        {displayActivity.length > 0 ? displayActivity.map((item, i) => (
                             <div key={i} className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-default">
                                 <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
                                     style={{ background: `${item.color}12` }}>
@@ -297,7 +327,11 @@ const AdminDashboardView = ({
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="flex flex-col items-center justify-center py-6 text-center h-full">
+                                <p className="text-xs text-slate-400 font-medium">No recent activity detected.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
