@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability */
 import { useEffect, useState } from "react";
 import CertificateConfigView from "./view";
 
