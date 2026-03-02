@@ -38,6 +38,7 @@ const StudentLayoutView = ({
   onRequestPermission,
 }) => {
   const [notifOpen, setNotifOpen] = React.useState(false);
+
   const NavItem = ({ path, icon: Icon, label, badgeCount }) => {
     const isActive =
       location.pathname.includes(path) &&
@@ -45,181 +46,162 @@ const StudentLayoutView = ({
 
     return (
       <li
-        className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200 mt-1
-                    ${
-                      isActive
-                        ? "bg-primary-900 text-white shadow-md"
-                        : "text-slate-600 hover:bg-slate-100"
-                    }`}
-        onClick={() => {
-          navigate(`/student/${path}`);
-          setIsSidebarOpen(false);
+        style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '10px 16px', borderRadius: '10px', cursor: 'pointer',
+          transition: 'all 0.2s ease', marginBottom: '2px',
+          background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+          color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
+          fontWeight: isActive ? 600 : 500, fontSize: '14px',
+          position: 'relative',
         }}
+        onClick={() => { navigate(`/student/${path}`); setIsSidebarOpen(false); }}
+        onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; } }}
+        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; } }}
       >
-        <div className="flex items-center gap-3 w-full">
-          <Icon className={isActive ? "text-white" : "text-slate-500"} />
-          <span className="font-medium flex-1">{label}</span>
-          {badgeCount > 0 && (
-            <span className="bg-primary-900 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
-              {badgeCount}
-            </span>
-          )}
-        </div>
+        {isActive && (
+          <div style={{ position: 'absolute', left: '-16px', top: '50%', transform: 'translateY(-50%)', width: '3px', height: '24px', borderRadius: '0 4px 4px 0', background: '#818cf8' }} />
+        )}
+        <Icon size={18} style={{ color: isActive ? '#818cf8' : 'rgba(255,255,255,0.45)', transition: 'color 0.2s', flexShrink: 0 }} />
+        <span style={{ flex: 1 }}>{label}</span>
+        {badgeCount > 0 && (
+          <span style={{ background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>
+            {badgeCount}
+          </span>
+        )}
       </li>
     );
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="flex min-h-screen font-sans" style={{ background: '#D8E2EB' }}>
       <NotificationToast notifications={toasts} onDismiss={onDismissToast} />
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
+      {/* DARK SIDEBAR */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 shadow-xl lg:shadow-none transform transition-transform duration-300 ease-in-out
-                ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-            `}
+        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        style={{ width: '260px', background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}
       >
-        <div className="flex flex-col h-full">
-          <div className="flex items-center gap-3 p-6 border-b border-slate-100">
-            <img
-              src={markLogo}
-              alt="SHNOOR International"
-              className="w-10 h-10 rounded-full object-cover shadow-sm"
-            />
-            <div className="flex flex-col">
-              <span className="text-lg font-bold text-primary-900 tracking-tight">
-                SHNOOR
-              </span>
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-widest">
-                International
-              </span>
-            </div>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <img src={markLogo} alt="SHNOOR" style={{ width: '40px', height: '40px', borderRadius: '10px', objectFit: 'cover' }} />
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>SHNOOR</div>
+            <div style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '2px' }}>International LLC</div>
           </div>
+        </div>
 
-          <div className="flex-1 overflow-y-auto py-6 px-4 scrollbar-thin scrollbar-thumb-slate-200">
-            <ul className="space-y-1">
-              <NavItem path="dashboard" icon={TrendingUp} label="Dashboard" />
-              <NavItem path="courses" icon={List} label="My Courses" />
-              <NavItem path="exams" icon={ClipboardList} label="Exams" />
-               <NavItem 
-                path="groups" 
-                icon={Users} 
-                label="My Groups" 
-              />
-              <NavItem path="certificates" icon={Trophy} label="Certificates" />
-              <NavItem path="practice" icon={Code} label="Practice Arena" />
-              <NavItem path="contests" icon={Trophy} label="Weekly Contests" />
-              <NavItem
-                path="chat"
-                icon={MessageSquare}
-                label="Messages"
-                badgeCount={totalUnread}
-              />
-              <NavItem path="settings" icon={Settings} label="Settings" />
-            </ul>
-          </div>
+        {/* Navigation */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px' }}>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            <NavItem path="dashboard" icon={TrendingUp} label="Dashboard" />
+            <NavItem path="courses" icon={List} label="My Courses" />
+            <NavItem path="exams" icon={ClipboardList} label="Exams" />
+            <NavItem path="groups" icon={Users} label="My Groups" />
+            <NavItem path="certificates" icon={Trophy} label="Certificates" />
+            <NavItem path="practice" icon={Code} label="Practice Arena" />
+            <NavItem path="contests" icon={Trophy} label="Weekly Contests" />
+            <NavItem path="chat" icon={MessageSquare} label="Messages" badgeCount={totalUnread} />
+            <NavItem path="settings" icon={Settings} label="Settings" />
+          </ul>
         </div>
       </div>
 
+      {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="bg-white border-b border-slate-200 h-16 px-4 lg:px-8 flex items-center justify-between shadow-sm sticky top-0 z-30">
-          <div className="flex items-center gap-4">
+        {/* Header */}
+        <header style={{
+          background: '#fff', borderBottom: '1px solid #e2e8f0', height: '64px', padding: '0 32px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          position: 'sticky', top: 0, zIndex: 30, boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button
-              className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+              className="lg:hidden"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              style={{ padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', borderRadius: '8px', display: 'flex' }}
             >
-              <Menu className="text-xl" />
+              <Menu size={20} />
             </button>
-            <h2 className="text-xl font-semibold text-primary-900 hidden sm:block">
+            <h2 className="hidden sm:block" style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
               Student Portal
             </h2>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Notifications */}
+            <div style={{ position: 'relative' }}>
               <button
-                className="p-2 text-slate-500 bg-yellow-100 hover:bg-yellow-200 rounded-full relative transition-colors border border-yellow-300"
                 onClick={() => setNotifOpen(!notifOpen)}
+                style={{
+                  padding: '8px', borderRadius: '50%', border: '1px solid #e2e8f0',
+                  background: '#f8fafc', cursor: 'pointer', display: 'flex', position: 'relative',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
               >
-                <div className="text-slate-600">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-                  </svg>
-                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
                 {notifications.length > 0 && (
-                  <span className="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                  <span style={{ position: 'absolute', top: '2px', right: '2px', width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%', border: '2px solid #fff' }} />
                 )}
               </button>
 
               {notifOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="p-4 border-b border-slate-50 bg-slate-50 flex flex-col gap-2">
-                    <div className="flex justify-between items-center w-full">
-                      <h3 className="font-bold text-slate-800">
-                        Notifications
-                      </h3>
-                      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                <div style={{
+                  position: 'absolute', right: 0, marginTop: '8px', width: '320px',
+                  background: '#fff', borderRadius: '16px', boxShadow: '0 12px 40px rgba(0,0,0,.12)',
+                  border: '1px solid #e2e8f0', overflow: 'hidden', zIndex: 50
+                }}>
+                  <div style={{ padding: '16px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', margin: 0 }}>Notifications</h3>
+                      <span style={{ fontSize: '11px', fontWeight: 700, background: '#eef2ff', color: '#4f46e5', padding: '2px 8px', borderRadius: '10px' }}>
                         {notifications.length} New
                       </span>
                     </div>
                     {notifPermission === "default" && (
                       <button
                         onClick={onRequestPermission}
-                        className="text-xs w-full py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition flex items-center justify-center gap-1 shadow-sm"
+                        style={{ fontSize: '12px', width: '100%', padding: '6px', background: '#4f46e5', color: '#fff', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s' }}
                       >
                         🔔 Enable Desktop Notifications
                       </button>
                     )}
-
                     {notifPermission === "denied" && (
-                      <div className="text-[10px] text-red-500 bg-red-50 px-2 py-1 rounded border border-red-100 text-center">
+                      <div style={{ fontSize: '11px', color: '#ef4444', background: '#fef2f2', padding: '4px 8px', borderRadius: '6px', border: '1px solid #fecaca', textAlign: 'center' }}>
                         ⚠️ System notifications blocked. Check browser settings.
                       </div>
                     )}
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
+                  <div style={{ maxHeight: '384px', overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400 text-sm">
-                        No new notifications
-                      </div>
+                      <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>No new notifications</div>
                     ) : (
                       notifications.map((notif) => (
                         <div
                           key={notif.id}
-                          onClick={() => {
-                            console.debug("Notification clicked:", notif);
-                            onDismiss(notif.id);
-                            if (notif.link) navigate(notif.link);
-                            setNotifOpen(false);
-                          }}
-                          className="p-4 border-b border-slate-50 hover:bg-indigo-50 transition-colors cursor-pointer flex gap-3 items-start"
+                          onClick={() => { onDismiss(notif.id); if (notif.link) navigate(notif.link); setNotifOpen(false); }}
+                          style={{ padding: '16px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start', transition: 'background 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          <div className="h-2 w-2 mt-2 rounded-full bg-indigo-500 shrink-0" />
+                          <div style={{ width: '8px', height: '8px', marginTop: '6px', borderRadius: '50%', background: '#4f46e5', flexShrink: 0 }} />
                           <div>
-                            <p className="text-sm text-slate-700 leading-snug">
-                              {notif.message}
-                            </p>
-                            <p className="text-xs text-slate-400 mt-1">
-                              {new Date(notif.created_at).toLocaleTimeString(
-                                [],
-                                { hour: "2-digit", minute: "2-digit" },
-                              )}
+                            <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.5, margin: 0 }}>{notif.message}</p>
+                            <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                              {new Date(notif.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </p>
                           </div>
                         </div>
@@ -229,63 +211,54 @@ const StudentLayoutView = ({
                 </div>
               )}
             </div>
-            <div className="hidden md:flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-0.5">
-                  Rank
-                </span>
-                <span className="text-primary-900 font-bold text-sm leading-none">
-                  {rank}
-                </span>
+
+            {/* Rank Badge */}
+            <div className="hidden md:flex" style={{ alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '6px 12px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', lineHeight: 1 }}>Rank</span>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>{rank}</span>
               </div>
-              <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-primary-900">
-                <Trophy size={14} />
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Trophy size={14} style={{ color: '#4f46e5' }} />
               </div>
             </div>
 
-            <div className="hidden md:flex items-center gap-2 bg-amber-50 text-amber-900 px-3 py-1.5 rounded-full border border-amber-200 font-bold text-sm">
-              <Star className="text-amber-500" size={14} fill="currentColor" />{" "}
-              {xp} XP
+            {/* XP Badge */}
+            <div className="hidden md:flex" style={{ alignItems: 'center', gap: '4px', background: '#fffbeb', color: '#92400e', padding: '6px 12px', borderRadius: '20px', border: '1px solid #fde68a', fontWeight: 700, fontSize: '13px' }}>
+              <Star size={14} style={{ color: '#f59e0b' }} fill="#f59e0b" /> {xp} XP
             </div>
 
-            <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-              <div className="text-right hidden md:block">
-                <div className="text-sm font-semibold text-primary-900">
-                  {studentName}
-                </div>
-                <div className="text-xs text-slate-500 font-medium">
-                  Student
-                </div>
+            {/* Profile */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px', borderLeft: '1px solid #e2e8f0' }}>
+              <div className="hidden md:block" style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{studentName}</div>
+                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Student</div>
               </div>
               <div
                 onClick={() => navigate("settings")}
-                className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center 
-                      text-slate-400 border border-slate-200 overflow-hidden 
-                      cursor-pointer hover:ring-2 hover:ring-indigo-500 transition"
+                style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' }}
               >
                 {photoURL ? (
-                  <img
-                    src={photoURL}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <UserCircle className="w-full h-full p-1" />
+                  <UserCircle style={{ width: '100%', height: '100%', padding: '4px', color: '#94a3b8' }} />
                 )}
               </div>
               <button
                 onClick={handleLogout}
-                className="p-2 text-slate-400 hover:text-primary-900 hover:bg-slate-100 rounded-lg transition-all duration-200"
                 title="Logout"
+                style={{ padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', borderRadius: '8px', display: 'flex', transition: 'all 0.2s' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.background = '#f1f5f9'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'none'; }}
               >
-                <LogOut className="text-lg" />
+                <LogOut size={18} />
               </button>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto bg-slate-50 p-4 lg:p-8">
-          <div className="w-full h-full">
+        <main style={{ flex: 1, overflow: 'auto', background: '#D8E2EB', padding: '32px' }}>
+          <div style={{ width: '100%', height: '100%' }}>
             <Outlet context={{ studentName, xp }} />
           </div>
         </main>
