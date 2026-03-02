@@ -154,6 +154,7 @@ const MyGroups = () => {
 export default MyGroups;*/}
 
 
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
@@ -300,7 +301,9 @@ const MyGroups = () => {
     );
   }
 
-  return (
+  // Replace the existing search div and grid with this:
+
+return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col gap-6 mb-8">
         <div className="flex items-center justify-between">
@@ -315,10 +318,12 @@ const MyGroups = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
-              placeholder="Search messages in your groups..."
+              placeholder="Search groups or messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowSearch(true)}
+              spellCheck={false}
+              autoComplete="off"
               className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
             />
             {searchQuery && (
@@ -342,93 +347,135 @@ const MyGroups = () => {
                 <div className="p-6 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-orange-500 mx-auto" />
                 </div>
-              ) : searchResults.length === 0 ? (
-                <div className="p-6 text-center text-gray-500">
-                  No messages found
-                </div>
               ) : (
-                <div className="border-t">
-                  {searchResults.map((result, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => {
-                        setShowSearch(false);
-                        setSearchQuery('');
-                        navigate(`/student/groups/${result.group_id}`);
-                      }}
-                      className="p-4 border-b cursor-pointer hover:bg-orange-50 transition-colors last:border-b-0"
-                    >
-                      <div className="flex flex-col gap-2">
-                        <div className="font-semibold text-gray-900 text-sm">{result.group_name}</div>
-                        <div className="text-gray-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
-                        <div className="text-xs text-gray-400">
-                          {new Date(result.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                <>
+                  {/* ── Group name matches ── */}
+                  {(() => {
+                    const matchedGroups = groups.filter(g =>
+                      g.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                    return matchedGroups.length > 0 ? (
+                      <>
+                        <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b">
+                          Groups
                         </div>
+                        {matchedGroups.map((group) => (
+                          <div
+                            key={group.group_id}
+                            onClick={() => {
+                              setShowSearch(false);
+                              setSearchQuery('');
+                              navigate(`/student/groups/${group.group_id}`);
+                            }}
+                            className="px-4 py-3 border-b cursor-pointer hover:bg-orange-50 transition-colors flex items-center gap-3"
+                          >
+                            <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">
+                              {group.name?.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900 text-sm">{group.name}</div>
+                              {group.description && (
+                                <div className="text-xs text-gray-500 line-clamp-1">{group.description}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    ) : null;
+                  })()}
+
+                  {/* ── Message matches ── */}
+                  {searchResults.length > 0 ? (
+                    <>
+                      <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b">
+                        Messages
                       </div>
+                      {searchResults.map((result, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setShowSearch(false);
+                            setSearchQuery('');
+                            navigate(`/student/groups/${result.group_id}`);
+                          }}
+                          className="p-4 border-b cursor-pointer hover:bg-orange-50 transition-colors last:border-b-0"
+                        >
+                          <div className="flex flex-col gap-1">
+                            <div className="font-semibold text-gray-900 text-sm">{result.group_name}</div>
+                            <div className="text-gray-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(result.created_at).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : null}
+
+                  {/* ── No results at all ── */}
+                  {groups.filter(g => g.name?.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 &&
+                   searchResults.length === 0 && (
+                    <div className="p-6 text-center text-gray-500 text-sm">
+                      No groups or messages found
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </div>
           )}
         </div>
       </div>
 
-      {!showSearch && searchQuery.trim() ? null : (
+      {/* Groups Grid — hide when actively searching */}
+      {!(showSearch && searchQuery.trim()) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {groups.map((group) => (
-          <div
-            key={group.group_id}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden"
-          >
-            <div className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    {group.name}
-                  </h3>
-                  {group.description && (
-                    <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                      {group.description}
-                    </p>
-                  )}
+          {groups.map((group) => (
+            <div
+              key={group.group_id}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      {group.name}
+                    </h3>
+                    {group.description && (
+                      <p className="text-sm text-gray-600 line-clamp-2 mb-4">
+                        {group.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <Calendar size={14} />
+                    {new Date(group.created_at).toLocaleDateString()}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-sm text-gray-500">
-                  <Calendar size={14} />
-                  {new Date(group.created_at).toLocaleDateString()}
+                <div className="flex items-center gap-2 mt-4 text-sm text-gray-600">
+                  <Users size={16} />
+                  <span>{group.member_count || '...'} members</span>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2 mt-4 text-sm text-gray-600">
-                <Users size={16} />
-                <span>{group.member_count || '...' } members</span>
+              <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
+                <Link
+                  to={`/student/groups/${group.group_id}`}
+                  className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <MessageSquare size={16} />
+                  Open Chat
+                </Link>
+                {group.unread_count > 0 && (
+                  <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                    {group.unread_count} new
+                  </span>
+                )}
               </div>
             </div>
-
-            <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
-              <Link
-                to={`/student/groups/${group.group_id}`}
-                className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
-              >
-                <MessageSquare size={16} />
-                Open Chat
-              </Link>
-
-              {group.unread_count > 0 && (
-                <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                  {group.unread_count} new
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
       )}
     </div>
   );
