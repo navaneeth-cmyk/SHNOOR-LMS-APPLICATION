@@ -68,7 +68,7 @@ const InstructorLayoutView = ({
     );
 
     return (
-        <div className="flex min-h-screen font-sans" style={{ background: '#f8fafc' }}>
+        <div className="flex min-h-screen font-sans" style={{ background: '#D8E2EB' }}>
             {isSidebarOpen && (
                 <div className="fixed inset-0 z-40 lg:hidden" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
                     onClick={() => setIsSidebarOpen(false)} />
@@ -78,14 +78,19 @@ const InstructorLayoutView = ({
             <div
                 className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
                 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
-                style={{ width: '260px', background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}
+                style={{
+                    width: '260px',
+                    background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+                    display: 'flex', flexDirection: 'column', flexShrink: 0,
+                    borderRight: '1px solid rgba(255,255,255,0.05)',
+                }}
             >
                 {/* Logo */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                     <img src={markLogo} alt="SHNOOR" style={{ width: '40px', height: '40px', borderRadius: '10px', objectFit: 'cover' }} />
                     <div>
                         <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>SHNOOR</div>
-                        <div style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '2px' }}>International</div>
+                        <div style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '2px' }}>International LLC</div>
                     </div>
                 </div>
 
@@ -100,7 +105,7 @@ const InstructorLayoutView = ({
                         <NavItem path="courses" icon={List} label="My Courses" />
                         <NavItem path="contests" icon={Trophy} label="Manage Contests" />
                         <NavItem path="practice" icon={Code} label="Practice Arena" />
-                        <NavItem path="learning-paths" icon={Map} label="Learning Paths" handleNavigate={handleNavigate} location={location} setIsSidebarOpen={setIsSidebarOpen} />
+                        <NavItem path="learning-paths" icon={Map} label="Learning Paths" />
                         <NavItem path="exams" icon={BookOpen} label="Exams" />
                         <NavItem path="chat" icon={MessageSquare} label="Messages" badgeCount={totalUnread} />
 
@@ -152,7 +157,7 @@ const InstructorLayoutView = ({
                     </div>
                 </header>
 
-                <main style={{ flex: 1, overflow: 'auto', background: '#f8fafc', padding: '32px' }}>
+                <main style={{ flex: 1, overflow: 'auto', background: '#D8E2EB', padding: '32px' }}>
                     <div style={{ width: '100%', height: '100%' }}>
                         <Outlet />
                     </div>
