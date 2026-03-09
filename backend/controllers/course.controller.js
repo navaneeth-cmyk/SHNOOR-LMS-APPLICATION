@@ -117,8 +117,6 @@ export const getInstructorCourses = async (req, res) => {
           'type', m.type,
           'duration', m.duration_mins,
           'order', m.module_order,
-          'notes', m.notes,
-          'pdf_filename', m.pdf_filename,
           'content_url', CASE 
             WHEN m.pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || m.module_id || '/pdf'
             ELSE m.content_url 
@@ -966,7 +964,7 @@ export const editModule = async (req, res) => {
     const instructorId = req.user.id;
 
     const ownerCheck = await pool.query(
-      `SELECT m.module_id, m.course_id, m.title, m.type, m.content_url, m.notes, m.duration_mins, m.module_order, m.pdf_filename
+      `SELECT m.module_id, m.course_id
        FROM modules m
        JOIN courses c ON c.courses_id = m.course_id
        WHERE m.module_id = $1 AND c.instructor_id = $2`,
@@ -977,96 +975,42 @@ export const editModule = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to edit this module" });
     }
 
-    const existing = ownerCheck.rows[0];
     const { title, type, content_url, notes, duration_mins } = req.body;
-    const hasField = (name) => Object.prototype.hasOwnProperty.call(req.body, name);
+
+    if (!title || !type) {
+      return res.status(400).json({ message: "Title and type are required" });
+    }
 
     const fields = [];
     const values = [];
     let idx = 1;
 
-    let nextType = existing.type;
-    let nextContentUrl = existing.content_url;
-    let shouldRechunk = false;
+    fields.push(`title = $${idx++}`); values.push(title);
+    fields.push(`type = $${idx++}`); values.push(type);
+    fields.push(`notes = $${idx++}`); values.push(notes || null);
 
-    if (hasField("title")) {
-      const trimmedTitle = String(title || "").trim();
-      if (!trimmedTitle) {
-        return res.status(400).json({ message: "Title cannot be empty" });
-      }
-      fields.push(`title = $${idx++}`); values.push(trimmedTitle);
+    if (duration_mins !== undefined && duration_mins !== "") {
+      fields.push(`duration_mins = $${idx++}`);
+      values.push(Number(duration_mins));
     }
 
-    if (hasField("type")) {
-      const normalizedType = String(type || "").trim().toLowerCase() === "text" ? "text_stream" : String(type || "").trim().toLowerCase();
-      if (!["video", "pdf", "text_stream"].includes(normalizedType)) {
-        return res.status(400).json({ message: "Invalid module type" });
-      }
-      nextType = normalizedType;
-      fields.push(`type = $${idx++}`); values.push(normalizedType);
-      shouldRechunk = normalizedType === "text_stream";
-    }
-
-    if (hasField("notes")) {
-      const nextNotes = String(notes || "").trim();
-      fields.push(`notes = $${idx++}`); values.push(nextNotes || null);
-    }
-
-    if (hasField("duration_mins")) {
-      if (duration_mins === "") {
-        fields.push(`duration_mins = $${idx++}`);
-        values.push(null);
-      } else {
-        const parsed = Number(duration_mins);
-        if (Number.isNaN(parsed) || parsed < 0) {
-          return res.status(400).json({ message: "duration_mins must be a non-negative number" });
-        }
-        fields.push(`duration_mins = $${idx++}`);
-        values.push(parsed);
-      }
-    }
-
-    if (hasField("content_url")) {
-      const nextUrl = String(content_url || "").trim();
-      nextContentUrl = nextUrl || null;
-      fields.push(`content_url = $${idx++}`); values.push(nextContentUrl);
-
-      // URL mode should clear stored binary module file.
+    if (content_url) {
+      // Link / URL mode — clear any stored file data
+      fields.push(`content_url = $${idx++}`); values.push(content_url);
       fields.push(`pdf_data = $${idx++}`); values.push(null);
       fields.push(`pdf_filename = $${idx++}`); values.push(null);
       fields.push(`pdf_mime = $${idx++}`); values.push(null);
-
-      shouldRechunk = shouldRechunk || nextType === "text_stream";
     } else if (req.file) {
-      // Upload mode stores binary content in module PDF columns.
+      // Upload mode — store binary, clear URL
       fields.push(`pdf_data = $${idx++}`); values.push(req.file.buffer);
       fields.push(`pdf_filename = $${idx++}`); values.push(req.file.originalname);
       fields.push(`pdf_mime = $${idx++}`); values.push(req.file.mimetype);
       fields.push(`content_url = $${idx++}`); values.push(null);
-      nextContentUrl = null;
     }
 
-    if (fields.length === 0) {
-      return res.status(200).json({
-        module_id: existing.module_id,
-        course_id: existing.course_id,
-        title: existing.title,
-        type: existing.type,
-        content_url: existing.pdf_filename ? `${baseUrl}/api/modules/${existing.module_id}/pdf` : existing.content_url,
-        duration: existing.duration_mins,
-        module_order: existing.module_order,
-        notes: existing.notes,
-        pdf_filename: existing.pdf_filename,
-      });
-    }
-
-    if (shouldRechunk && nextType === "text_stream") {
-      let streamContent = String(nextContentUrl || "").trim();
-      if (/^https?:\/\//i.test(streamContent)) {
-        streamContent = "This module contains a visual presentation or external document. Please refer to the content area below.";
-      }
-      const chunks = streamContent.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
-
+    // Re-chunk text_stream content when notes change
+    if (type === "text_stream" && notes) {
+      const chunks = notes.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
       await pool.query(`DELETE FROM module_text_chunks WHERE module_id = $1`, [moduleId]);
       if (chunks.length > 0) {
         const chunkVals = [];
@@ -1126,14 +1070,9 @@ export const addModule = async (req, res) => {
     }
 
     const { title, type, content_url, notes, duration_mins } = req.body;
-    const normalizedType = String(type || "").trim().toLowerCase() === "text" ? "text_stream" : String(type || "").trim().toLowerCase();
 
-    if (!title || !normalizedType) {
+    if (!title || !type) {
       return res.status(400).json({ message: "Title and type are required" });
-    }
-
-    if (!["video", "pdf", "text_stream"].includes(normalizedType)) {
-      return res.status(400).json({ message: "Invalid module type" });
     }
 
     const orderResult = await pool.query(
@@ -1164,7 +1103,7 @@ export const addModule = async (req, res) => {
                    WHEN pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
                    ELSE content_url 
                  END AS resolved_url`,
-      [courseId, title, normalizedType, finalContentUrl,
+      [courseId, title, type, finalContentUrl,
         duration_mins ? Number(duration_mins) : null,
         nextOrder, notes || null, pdfData, pdfFilename, pdfMime]
     );
@@ -1174,14 +1113,10 @@ export const addModule = async (req, res) => {
       newModule.content_url = newModule.resolved_url;
     }
 
-    // text_stream chunking from source content to match add-course flow.
-    if (normalizedType === "text_stream") {
+    // text_stream chunking
+    if (type === "text_stream" && notes) {
       const moduleId = result.rows[0].module_id;
-      let streamContent = String(finalContentUrl || "").trim();
-      if (/^https?:\/\//i.test(streamContent)) {
-        streamContent = "This module contains a visual presentation or external document. Please refer to the content area below.";
-      }
-      const chunks = streamContent.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
+      const chunks = notes.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
       if (chunks.length > 0) {
         const chunkVals = [];
         const chunkPlaceholders = [];
