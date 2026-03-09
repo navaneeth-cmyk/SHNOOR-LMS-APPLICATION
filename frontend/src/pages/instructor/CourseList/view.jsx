@@ -126,9 +126,11 @@ const CourseListView = ({
                 </div>
 
                 <div
-                  onClick={() =>
-                    window.open(m.content_url, "_blank", "noopener,noreferrer")
-                  }
+                  onClick={() => {
+                    if (m.content_url) {
+                      window.open(m.content_url, "_blank", "noopener,noreferrer");
+                    }
+                  }}
                   className="flex items-center gap-3 flex-1 cursor-pointer"
                 >
                   {m.type === "video" ? (
@@ -136,9 +138,24 @@ const CourseListView = ({
                   ) : (
                     <FileText size={16} className="text-indigo-500" />
                   )}
-                  <span className="text-sm font-semibold text-primary-900">
-                    {m.title}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-primary-900">{m.title}</span>
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                      {m.type}
+                    </span>
+                    {m.notes && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(m.notes, "_blank", "noopener,noreferrer");
+                        }}
+                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        title="Open optional notes"
+                      >
+                        Notes PDF
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <button
