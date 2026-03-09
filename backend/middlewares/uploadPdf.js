@@ -5,7 +5,7 @@ const storage = multer.memoryStorage();
 
 const uploadPdf = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
 });
 
 export default uploadPdf;

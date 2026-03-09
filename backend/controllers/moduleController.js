@@ -32,7 +32,7 @@ export const addModules = async (req, res) => {
       const m = modules[i];
       const pdf = pdfFiles[i] || null;
 
-      await pool.query(
+      const result = await pool.query(
         `
         INSERT INTO modules (
           course_id,
@@ -47,6 +47,7 @@ export const addModules = async (req, res) => {
           pdf_mime
         )
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        RETURNING module_id
         `,
         [
           courseId,
@@ -61,6 +62,26 @@ export const addModules = async (req, res) => {
           pdf ? pdf.mimetype : null,
         ]
       );
+
+      // Handle text_stream chunking for batch upload
+      if (m.type === "text_stream" && m.notes) {
+        const moduleId = result.rows[0].module_id;
+        const chunks = m.notes.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
+        if (chunks.length > 0) {
+          const chunkVals = [];
+          const chunkPlaceholders = [];
+          for (let k = 0; k < chunks.length; k++) {
+            chunkVals.push(moduleId, chunks[k], k, 1);
+            const o = k * 4;
+            chunkPlaceholders.push(`($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4})`);
+          }
+          await pool.query(
+            `INSERT INTO module_text_chunks (module_id, content, chunk_order, duration_seconds)
+             VALUES ${chunkPlaceholders.join(", ")}`,
+            chunkVals
+          );
+        }
+      }
     }
 
     res.status(201).json({
@@ -73,6 +94,8 @@ export const addModules = async (req, res) => {
   }
 };
 
+const baseUrl = process.env.BACKEND_URL;
+
 export const getModulesByCourse = async (req, res) => {
   const { courseId } = req.params;
 
@@ -83,7 +106,10 @@ export const getModulesByCourse = async (req, res) => {
         module_id,
         title,
         type,
-        content_url,
+        CASE 
+          WHEN type = 'pdf' OR pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
+          ELSE content_url 
+        END AS content_url,
         duration_mins,
         module_order,
         notes,
@@ -109,26 +135,58 @@ export const getModulePdf = async (req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT pdf_data, pdf_filename, pdf_mime
+      SELECT pdf_data, pdf_filename, pdf_mime, content_url, type
       FROM modules
       WHERE module_id = $1
       `,
       [moduleId]
     );
 
-    if (result.rows.length === 0 || !result.rows[0].pdf_data) {
-      return res.status(404).json({ message: "PDF not found" });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Module not found" });
     }
 
-    const pdf = result.rows[0];
+    const moduleData = result.rows[0];
 
-    res.setHeader("Content-Type", pdf.pdf_mime);
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${pdf.pdf_filename}"`
-    );
+    // ✅ Set security headers for iframe compatibility
+    res.removeHeader("X-Frame-Options");
+    res.setHeader("Content-Security-Policy", "frame-ancestors 'self' *");
+    res.setHeader("Access-Control-Allow-Origin", "*");
 
-    res.send(pdf.pdf_data);
+    // 1️⃣ Priority: Binary data in DB
+    if (moduleData.pdf_data) {
+      res.setHeader("Content-Type", moduleData.pdf_mime || "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${moduleData.pdf_filename || "document.pdf"}"`
+      );
+      return res.send(moduleData.pdf_data);
+    }
+
+    // 2️⃣ Fallback: File on disk (from content_url)
+    if (moduleData.content_url) {
+      // Check if it's a relative path to uploads
+      let filePath = "";
+      if (moduleData.content_url.includes("/uploads/")) {
+        const filename = moduleData.content_url.split("/uploads/").pop();
+        filePath = path.join(process.cwd(), "uploads", filename);
+      } else if (moduleData.content_url.startsWith("uploads/")) {
+        filePath = path.join(process.cwd(), moduleData.content_url);
+      }
+
+      if (filePath && fs.existsSync(filePath)) {
+        res.setHeader("Content-Type", "application/pdf");
+        return res.sendFile(filePath);
+      }
+
+      // If it's an external URL, we can't easily serve it through here with these headers 
+      // without proxying, but we can redirect.
+      if (moduleData.content_url.startsWith("http")) {
+        return res.redirect(moduleData.content_url);
+      }
+    }
+
+    res.status(404).json({ message: "PDF content not found" });
   } catch (error) {
     console.error("getModulePdf error:", error);
     res.status(500).json({ message: "Server error" });
@@ -313,5 +371,54 @@ export const advanceModuleStream = async (req, res) => {
   } catch (err) {
     console.error(`[AdvanceStream Error] Module: ${req.params?.moduleId} User: ${req.user?.id}`, err);
     res.status(500).json({ message: "Server error marking progress" });
+  }
+};
+
+export const updateModuleTime = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+    const { seconds } = req.body;
+    const studentId = req.user.id;
+
+    console.log(`[updateModuleTime] Received request for module ${moduleId} from student ${studentId} with ${seconds} seconds`);
+
+    if (isNaN(seconds) || seconds <= 0) {
+      console.log(`[updateModuleTime] Invalid seconds value: ${seconds}`);
+      return res.status(400).json({ message: "Invalid seconds value" });
+    }
+
+    // Update or insert progress with updated time
+    // We try to find the row first to get the course_id if it's missing
+    const progress = await pool.query(
+      `SELECT course_id FROM module_progress WHERE module_id = $1 AND student_id = $2`,
+      [moduleId, studentId]
+    );
+
+    if (progress.rows.length > 0) {
+      await pool.query(
+        `UPDATE module_progress 
+         SET time_spent_seconds = COALESCE(time_spent_seconds, 0) + $1, last_accessed_at = NOW()
+         WHERE module_id = $2 AND student_id = $3`,
+        [parseInt(seconds), moduleId, studentId]
+      );
+    } else {
+      // If no progress exists, we need course_id
+      const moduleRes = await pool.query(`SELECT course_id FROM modules WHERE module_id = $1`, [moduleId]);
+      if (moduleRes.rows.length === 0) {
+        return res.status(404).json({ message: "Module not found" });
+      }
+
+      const courseId = moduleRes.rows[0].course_id;
+      await pool.query(
+        `INSERT INTO module_progress (module_id, student_id, course_id, time_spent_seconds, last_accessed_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [moduleId, studentId, courseId, parseInt(seconds)]
+      );
+    }
+
+    res.json({ success: true, message: "Time updated" });
+  } catch (err) {
+    console.error("updateModuleTime error:", err);
+    res.status(500).json({ message: "Server error updating time" });
   }
 };

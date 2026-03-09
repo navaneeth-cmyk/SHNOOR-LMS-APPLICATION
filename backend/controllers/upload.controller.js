@@ -31,6 +31,11 @@ const fileFilter = (req, file, cb) => {
         "video/ogg",
         // PDFs
         "application/pdf",
+        "application/x-pdf",
+        // HTML and Text
+        "text/html",
+        "application/xhtml+xml",
+        "text/plain",
     ];
 
     const ext = path.extname(file.originalname || "").toLowerCase();
@@ -42,11 +47,15 @@ const fileFilter = (req, file, cb) => {
         ".avi",
         ".ogg",
         ".pdf",
+        ".html",
+        ".htm",
+        ".txt",
+        ".md",
     ];
 
     const isAllowedMime = allowedTypes.includes(file.mimetype);
     const isAllowedByExt =
-        file.mimetype === "application/octet-stream" &&
+        (file.mimetype === "application/octet-stream" || !file.mimetype) &&
         allowedExts.includes(ext);
 
     console.log(`[Upload Debug] Filename: ${file.originalname}, Mimetype: ${file.mimetype}, Ext: ${ext}`);
@@ -57,7 +66,7 @@ const fileFilter = (req, file, cb) => {
         console.error(`[Upload Debug] Rejected file: ${file.originalname} (${file.mimetype})`);
         cb(
             new Error(
-                `Invalid file type (${file.mimetype}). Only common video formats (MP4, MKV, WebM, MOV, AVI) and PDF are allowed.`
+                `Invalid file type (${file.mimetype}). Only common video formats, PDF, HTML, and Text files are allowed.`
             ),
             false
         );

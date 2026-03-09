@@ -5,7 +5,8 @@ import {
   deleteModule,
   getModulePdf,
   getModuleStream,
-  advanceModuleStream
+  advanceModuleStream,
+  updateModuleTime
 } from "../controllers/moduleController.js";
 
 import firebaseAuth from "../middlewares/firebaseAuth.js";
@@ -22,7 +23,12 @@ router.post(
   firebaseAuth,
   attachUser,
   roleGuard("instructor"),
-  uploadPdf.array("pdfs"),
+  (req, res, next) => {
+    if (req.headers["content-type"]?.includes("multipart/form-data")) {
+      return uploadPdf.array("pdfs")(req, res, next);
+    }
+    next();
+  },
   addModules
 );
 
@@ -43,7 +49,6 @@ router.delete(
 
 router.get(
   "/modules/:moduleId/pdf",
-  firebaseAuth,
   getModulePdf
 );
 
@@ -61,6 +66,14 @@ router.post(
   attachUser,
   roleGuard("student", "learner", "instructor"),
   advanceModuleStream
+);
+
+router.post(
+  "/modules/:moduleId/time",
+  firebaseAuth,
+  attachUser,
+  roleGuard("student", "learner", "instructor"),
+  updateModuleTime
 );
 
 router.post(

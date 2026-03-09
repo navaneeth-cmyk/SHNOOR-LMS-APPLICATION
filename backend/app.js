@@ -536,6 +536,8 @@ process.on("uncaughtException", (error) => {
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import pool from "./db/postgres.js";
 import admin from "firebase-admin";
 import { autoSubmitExam } from "./controllers/exams/exam.controller.js";
@@ -567,9 +569,13 @@ import { router as admingroupsRoutes } from "./routes/admingroups.routes.js";
 import courseCommentsRoutes from "./routes/courseComments.routes.js";
 import learningPathRoutes from "./routes/LearningPath.routes.js";
 import mocktestRoutes from "./routes/mocktest.routes.js";
+import { initializeDatabase } from "./db/dbInit.js";
 
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.set("trust proxy", 1);
 const server = http.createServer(app);
 const baseUrl = process.env.BACKEND_URL;
@@ -617,6 +623,7 @@ io.use(async (socket, next) => {
     next();
   }
 });
+
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -631,6 +638,19 @@ app.use(
 );
 
 app.use(express.json());
+
+// Serve static uploads with CORS headers
+app.use("/uploads", (req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Range");
+  res.header("Access-Control-Expose-Headers", "Content-Length, Content-Range");
+  res.header("Cross-Origin-Resource-Policy", "cross-origin");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+}, express.static(path.join(__dirname, "uploads")));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
@@ -649,16 +669,15 @@ app.use("/api/practice", practiceRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/bot", botRoutes);
-app.use("/api/reviews",reviewroutes)
-app.use("/api/certificate",certificateRoutes)
-app.use("/api/contests", contestRoutes)
+app.use("/api/reviews", reviewroutes);
+app.use("/api/certificate", certificateRoutes);
+app.use("/api/contests", contestRoutes);
 app.use("/api/contests", contestQuestionRoutes);
 app.use("/api/contests", contestAdvancedRoutes);
 app.use("/api/admingroups", admingroupsRoutes);
 app.use("/api", courseCommentsRoutes);
 app.use("/api/mocktest", mocktestRoutes);
-app.use("/api/learning-paths", learningPathRoutes); // Learning path routes
-
+app.use("/api/learning-paths", learningPathRoutes);
 
 app.get("/", (req, res) => {
   res.send("API is running 🚀");
@@ -684,6 +703,27 @@ io.on("connection", (socket) => {
   ========================= */
   socket.on("exam:start", async ({ examId }) => {
     const userId = socket.userId;
+
+    // 🔍 ATTEMPT-AWARE VIRTUAL ID RESOLUTION
+    if (examId && examId.startsWith("final_")) {
+      const courseId = examId.replace("final_", "");
+      const { rows: resolvedExams } = await pool.query(
+        `
+        SELECT e.exam_id 
+        FROM exams e
+        LEFT JOIN exam_attempts ea ON ea.exam_id = e.exam_id AND ea.student_id = $2
+        WHERE e.course_id = $1
+        ORDER BY (ea.exam_id IS NOT NULL) DESC, e.created_at DESC
+        LIMIT 1
+        `,
+        [courseId, userId]
+      );
+      if (resolvedExams.length) {
+        console.log(`🔍 RESOLVED socket examId from ${examId} to ${resolvedExams[0].exam_id}`);
+        examId = resolvedExams[0].exam_id;
+      }
+    }
+
     socket.examId = examId;
 
     console.log(`📝 User ${userId} started exam ${examId}`);
@@ -711,12 +751,12 @@ io.on("connection", (socket) => {
       if (rows.length > 0 && rows[0].status === 'submitted') {
         console.log(`🚨🚨🚨 Exam ${examId} was auto-submitted for user ${userId} during disconnection`);
         console.log(`📤 Emitting exam:autoSubmitted event to socket ${socket.id}`);
-        
+
         socket.emit("exam:autoSubmitted", {
           examId,
           message: "Exam was auto-submitted due to disconnection",
         });
-        
+
         console.log(`✅ Event emitted successfully`);
       } else if (rows.length > 0) {
         const disconnectedAt = rows[0].disconnected_at;
@@ -783,7 +823,6 @@ io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} joined group_${groupId}`);
   });
 
-  // ✅ CHANGE 3: Added callback parameter to send_message handler
   socket.on("send_message", async (data, callback) => {
 
     const {
@@ -807,10 +846,9 @@ io.on("connection", (socket) => {
           'SELECT 1 FROM admin_groups WHERE group_id = $1',
           [groupId]
         );
-        
+
         const isAdminGroup = groupCheck.rows.length > 0;
 
-        // ✅ CHANGE 1: Use if/else with correct tables instead of dynamic tableName
         let result;
 
         if (isAdminGroup) {
@@ -832,7 +870,7 @@ io.on("connection", (socket) => {
             ]
           );
         } else {
-          // ✅ College group → messages table (where frontend reads from!)
+          // College group → messages table (where frontend reads from!)
           result = await pool.query(
             `INSERT INTO messages (
                 group_id, sender_id, text,
@@ -856,7 +894,6 @@ io.on("connection", (socket) => {
         const savedMsg = result.rows[0];
         console.log(`✅ ${isAdminGroup ? 'Admin' : 'College'} group message saved:`, savedMsg);
 
-        // ✅ CHANGE 4: Removed sender_role fetch — not included in payload
         const payload = {
           ...savedMsg,
           text: savedMsg.text ?? savedMsg.message ?? text ?? "",
@@ -867,15 +904,13 @@ io.on("connection", (socket) => {
             : null,
         };
 
-        // ✅ CHANGE 2: emit "receive_message" instead of "group_message"
         console.log(
           "📨 Broadcasting receive_message to group_" +
-            groupId +
-            " (excluding sender)",
+          groupId +
+          " (excluding sender)",
         );
         socket.broadcast.to(`group_${groupId}`).emit("receive_message", payload);
 
-        // ✅ CHANGE 3: Confirm back to sender so temp message gets replaced
         if (callback) callback(payload);
 
         // Notify all group members except sender
@@ -903,7 +938,7 @@ io.on("connection", (socket) => {
         console.log(
           `✅ ${isAdminGroup ? 'Admin' : 'College'} group message handling complete`,
         );
-      } 
+      }
       // Handle DM messages
       else if (chatId && recipientId) {
         const result = await pool.query(
@@ -939,12 +974,11 @@ io.on("connection", (socket) => {
 
         console.log(
           "📨 Broadcasting receive_message to chat_" +
-            chatId +
-            " (excluding sender)",
+          chatId +
+          " (excluding sender)",
         );
         socket.broadcast.to(`chat_${chatId}`).emit("receive_message", payload);
 
-        // ✅ CHANGE 3: Confirm back to sender
         if (callback) callback(payload);
 
         console.log("📨 Emitting new_notification to user_" + recipientId);
@@ -1043,6 +1077,7 @@ pool
   .query("SELECT NOW()")
   .then(async () => {
     console.log("✅ Database connected successfully");
+    await initializeDatabase();
     await initChatTables();
     server.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);

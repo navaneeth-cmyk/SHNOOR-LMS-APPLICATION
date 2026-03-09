@@ -1,4 +1,5 @@
 import pool from "../db/postgres.js";
+const baseUrl = process.env.BACKEND_URL;
 
 export const getStudentCourseById = async (req, res) => {
   try {
@@ -8,7 +9,7 @@ export const getStudentCourseById = async (req, res) => {
     // 1️⃣ Check assignment
     const assigned = await pool.query(
       `SELECT 1
-       FROM course_assignments
+       FROM student_courses
        WHERE student_id = $1 AND course_id = $2`,
       [studentId, courseId],
     );
@@ -39,15 +40,20 @@ export const getStudentCourseById = async (req, res) => {
     // 3️⃣ Fetch modules (FIXED)
     const modulesResult = await pool.query(
       `SELECT
-         module_id AS id,
-         title,
-         type,
-         content_url AS url,
-         duration_mins AS duration
-       FROM modules
-       WHERE course_id = $1
-       ORDER BY module_order ASC`,
-      [courseId],
+         m.module_id AS id,
+         m.title,
+         m.type,
+         CASE 
+           WHEN m.type = 'pdf' OR m.pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || m.module_id || '/pdf'
+           ELSE m.content_url 
+         END AS url,
+         m.duration_mins AS duration,
+         COALESCE(mp.time_spent_seconds, 0) AS time_spent_seconds
+       FROM modules m
+       LEFT JOIN module_progress mp ON m.module_id = mp.module_id AND mp.student_id = $1
+       WHERE m.course_id = $2
+       ORDER BY m.module_order ASC`,
+      [studentId, courseId],
     );
     if (modulesResult.rows.length > 0) {
       const firstModuleId = modulesResult.rows[0].id;

@@ -2,6 +2,8 @@ import pool from "../db/postgres.js";
 import csv from "csv-parser";
 import { Readable } from "stream";
 
+const baseUrl = process.env.BACKEND_URL;
+
 export const addCourse = async (req, res) => {
   const instructor_id = req.user.id;
   const {
@@ -115,7 +117,10 @@ export const getInstructorCourses = async (req, res) => {
           'type', m.type,
           'duration', m.duration_mins,
           'order', m.module_order,
-          'content_url', m.content_url
+          'content_url', CASE 
+            WHEN m.pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || m.module_id || '/pdf'
+            ELSE m.content_url 
+          END
         )
         ORDER BY m.module_order
       ) FILTER (WHERE m.module_id IS NOT NULL),
@@ -702,10 +707,10 @@ export const searchInstructorCoursesAndModules = async (req, res) => {
     );
 
     res.json(result.rows);
-    
+
   } catch (error) {
     console.error('Instructor search error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to search courses and modules',
       message: error.message
     });
@@ -725,8 +730,8 @@ export const submitForReview = async (req, res) => {
     );
 
     if (courseCheck.rows.length === 0) {
-      return res.status(404).json({ 
-        message: "Course not found or you don't have permission" 
+      return res.status(404).json({
+        message: "Course not found or you don't have permission"
       });
     }
 
@@ -734,8 +739,8 @@ export const submitForReview = async (req, res) => {
 
     // Validate state transition
     if (course.status !== 'pending') {
-      return res.status(400).json({ 
-        message: `Cannot submit course in '${course.status}' status. Only draft courses can be submitted.` 
+      return res.status(400).json({
+        message: `Cannot submit course in '${course.status}' status. Only draft courses can be submitted.`
       });
     }
 
@@ -746,8 +751,8 @@ export const submitForReview = async (req, res) => {
     );
 
     if (Number(moduleCheck.rows[0].module_count) === 0) {
-      return res.status(400).json({ 
-        message: "Course must have at least one module before submission" 
+      return res.status(400).json({
+        message: "Course must have at least one module before submission"
       });
     }
 
@@ -787,8 +792,8 @@ export const publishCourse = async (req, res) => {
     const course = courseCheck.rows[0];
 
     if (course.status !== 'review') {
-      return res.status(400).json({ 
-        message: `Cannot approve course in '${course.status}' status. Only courses under review can be approved.` 
+      return res.status(400).json({
+        message: `Cannot approve course in '${course.status}' status. Only courses under review can be approved.`
       });
     }
 
@@ -829,8 +834,8 @@ export const rejectCourse = async (req, res) => {
     const course = courseCheck.rows[0];
 
     if (course.status !== 'review') {
-      return res.status(400).json({ 
-        message: `Cannot reject course in '${course.status}' status. Only courses under review can be rejected.` 
+      return res.status(400).json({
+        message: `Cannot reject course in '${course.status}' status. Only courses under review can be rejected.`
       });
     }
 
@@ -873,14 +878,14 @@ export const archiveCourse = async (req, res) => {
 
     // Check permission (admin or course owner)
     if (userRole !== 'admin' && course.instructor_id !== userId) {
-      return res.status(403).json({ 
-        message: "You don't have permission to archive this course" 
+      return res.status(403).json({
+        message: "You don't have permission to archive this course"
       });
     }
 
     if (course.status !== 'approved') {
-      return res.status(400).json({ 
-        message: `Cannot archive course in '${course.status}' status. Only approved courses can be archived.` 
+      return res.status(400).json({
+        message: `Cannot archive course in '${course.status}' status. Only approved courses can be archived.`
       });
     }
 
@@ -923,14 +928,14 @@ export const unarchiveCourse = async (req, res) => {
 
     // Check permission (admin or course owner)
     if (userRole !== 'admin' && course.instructor_id !== userId) {
-      return res.status(403).json({ 
-        message: "You don't have permission to unarchive this course" 
+      return res.status(403).json({
+        message: "You don't have permission to unarchive this course"
       });
     }
 
     if (course.status !== 'archived') {
-      return res.status(400).json({ 
-        message: `Cannot unarchive course in '${course.status}' status. Only archived courses can be unarchived.` 
+      return res.status(400).json({
+        message: `Cannot unarchive course in '${course.status}' status. Only archived courses can be unarchived.`
       });
     }
 
@@ -980,9 +985,9 @@ export const editModule = async (req, res) => {
     const values = [];
     let idx = 1;
 
-    fields.push(`title = $${idx++}`);   values.push(title);
-    fields.push(`type = $${idx++}`);    values.push(type);
-    fields.push(`notes = $${idx++}`);   values.push(notes || null);
+    fields.push(`title = $${idx++}`); values.push(title);
+    fields.push(`type = $${idx++}`); values.push(type);
+    fields.push(`notes = $${idx++}`); values.push(notes || null);
 
     if (duration_mins !== undefined && duration_mins !== "") {
       fields.push(`duration_mins = $${idx++}`);
@@ -991,16 +996,16 @@ export const editModule = async (req, res) => {
 
     if (content_url) {
       // Link / URL mode — clear any stored file data
-      fields.push(`content_url = $${idx++}`);   values.push(content_url);
-      fields.push(`pdf_data = $${idx++}`);       values.push(null);
-      fields.push(`pdf_filename = $${idx++}`);   values.push(null);
-      fields.push(`pdf_mime = $${idx++}`);       values.push(null);
+      fields.push(`content_url = $${idx++}`); values.push(content_url);
+      fields.push(`pdf_data = $${idx++}`); values.push(null);
+      fields.push(`pdf_filename = $${idx++}`); values.push(null);
+      fields.push(`pdf_mime = $${idx++}`); values.push(null);
     } else if (req.file) {
       // Upload mode — store binary, clear URL
-      fields.push(`pdf_data = $${idx++}`);       values.push(req.file.buffer);
-      fields.push(`pdf_filename = $${idx++}`);   values.push(req.file.originalname);
-      fields.push(`pdf_mime = $${idx++}`);       values.push(req.file.mimetype);
-      fields.push(`content_url = $${idx++}`);    values.push(null);
+      fields.push(`pdf_data = $${idx++}`); values.push(req.file.buffer);
+      fields.push(`pdf_filename = $${idx++}`); values.push(req.file.originalname);
+      fields.push(`pdf_mime = $${idx++}`); values.push(req.file.mimetype);
+      fields.push(`content_url = $${idx++}`); values.push(null);
     }
 
     // Re-chunk text_stream content when notes change
@@ -1027,11 +1032,20 @@ export const editModule = async (req, res) => {
     const result = await pool.query(
       `UPDATE modules SET ${fields.join(", ")} WHERE module_id = $${idx}
        RETURNING module_id, course_id, title, type, content_url,
-                 duration_mins AS duration, module_order, notes, pdf_filename, created_at`,
+                 duration_mins AS duration, module_order, notes, pdf_filename, created_at,
+                 CASE 
+                   WHEN type = 'pdf' OR pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
+                   ELSE content_url 
+                 END AS resolved_url`,
       values
     );
 
-    res.status(200).json(result.rows[0]);
+    const updatedModule = result.rows[0];
+    if (updatedModule.resolved_url) {
+      updatedModule.content_url = updatedModule.resolved_url;
+    }
+
+    res.status(200).json(updatedModule);
   } catch (error) {
     console.error("editModule error:", error);
     res.status(500).json({ message: "Failed to update module" });
@@ -1068,14 +1082,14 @@ export const addModule = async (req, res) => {
     const nextOrder = orderResult.rows[0].next_order;
 
     let finalContentUrl = content_url || null;
-    let pdfData     = null;
+    let pdfData = null;
     let pdfFilename = null;
-    let pdfMime     = null;
+    let pdfMime = null;
 
     if (req.file) {
-      pdfData       = req.file.buffer;
-      pdfFilename   = req.file.originalname;
-      pdfMime       = req.file.mimetype;
+      pdfData = req.file.buffer;
+      pdfFilename = req.file.originalname;
+      pdfMime = req.file.mimetype;
       finalContentUrl = null;
     }
 
@@ -1084,11 +1098,20 @@ export const addModule = async (req, res) => {
          (course_id, title, type, content_url, duration_mins, module_order, notes, pdf_data, pdf_filename, pdf_mime)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING module_id, course_id, title, type, content_url,
-                 duration_mins AS duration, module_order, notes, pdf_filename, created_at`,
+                 duration_mins AS duration, module_order, notes, pdf_filename, created_at,
+                 CASE 
+                   WHEN pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
+                   ELSE content_url 
+                 END AS resolved_url`,
       [courseId, title, type, finalContentUrl,
-       duration_mins ? Number(duration_mins) : null,
-       nextOrder, notes || null, pdfData, pdfFilename, pdfMime]
+        duration_mins ? Number(duration_mins) : null,
+        nextOrder, notes || null, pdfData, pdfFilename, pdfMime]
     );
+
+    const newModule = result.rows[0];
+    if (newModule.resolved_url) {
+      newModule.content_url = newModule.resolved_url;
+    }
 
     // text_stream chunking
     if (type === "text_stream" && notes) {
@@ -1110,7 +1133,7 @@ export const addModule = async (req, res) => {
       }
     }
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(newModule);
   } catch (error) {
     console.error("addModule error:", error);
     res.status(500).json({ message: "Failed to add module" });
