@@ -55,12 +55,15 @@ export const addInstructor = async (req, res) => {
   const { fullName, email, subject, phone, bio } = req.body;
 
   try {
+    console.log(`📝 Attempting to add instructor: ${email}`);
+
     // 1️⃣ Check duplicate email
     const existing = await pool.query("SELECT 1 FROM users WHERE email = $1", [
       email,
     ]);
 
     if (existing.rows.length > 0) {
+      console.log(`⚠️ Duplicate email detected: ${email}`);
       return res.status(409).json({
         message: "An account with this email already exists",
       });
@@ -72,6 +75,8 @@ export const addInstructor = async (req, res) => {
       displayName: fullName,
     });
 
+    console.log(`✅ Firebase user created: ${firebaseUser.uid}`);
+
     // 3️⃣ Insert user
     const userResult = await pool.query(
       `INSERT INTO users (firebase_uid, full_name, email, role, status)
@@ -81,6 +86,8 @@ export const addInstructor = async (req, res) => {
     );
 
     const instructorId = userResult.rows[0].user_id;
+
+    console.log(`✅ Instructor record created with ID: ${instructorId}`);
 
     // 4️⃣ Insert instructor profile
     await pool.query(
@@ -96,9 +103,11 @@ export const addInstructor = async (req, res) => {
 
     // 🔵 6️⃣ SEND EMAIL (DO NOT BREAK API IF IT FAILS)
     try {
+      console.log(`📧 Attempting to send instructor invite to: ${email}`);
       await sendInstructorInvite(email, fullName);
+      console.log(`✅ Instructor invite sent successfully to: ${email}`);
     } catch (mailError) {
-      console.error("SMTP failed:", mailError);
+      console.error(`❌ Instructor invite failed for ${email}:`, mailError?.message || mailError);
     }
   } catch (error) {
     console.error("addInstructor error:", error);
