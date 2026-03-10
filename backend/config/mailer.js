@@ -11,6 +11,18 @@ export const sendMail = async ({ to, subject, html }) => {
       subject,
       html,
     });
+
+    // Resend may return { data, error } without throwing.
+    if (response?.error) {
+      const resendError = new Error(response.error.message || "Resend rejected email send request");
+      resendError.name = response.error.name || "ResendError";
+      resendError.code = response.error.code;
+      resendError.statusCode = response.error.statusCode;
+      throw resendError;
+    }
+
+    const messageId = response?.data?.id || response?.id;
+    console.log("[mailer] Email accepted by Resend", { to, subject, messageId });
     return response;
   } catch (error) {
     console.error("Resend Email Error:", {

@@ -17,7 +17,7 @@ export const sendInstructorInvite = async (emailOrObj, name) => {
   }
 
   try {
-    await sendMail({
+    return await sendMail({
       to: email,
       subject: "You’ve been invited as an Instructor",
       html: `
@@ -55,7 +55,7 @@ export const sendStudentInvite = async (emailOrObj, name) => {
   }
 
   try {
-    await sendMail({
+    return await sendMail({
       to: email,
       subject: "You've been invited as a Student",
       html: `
