@@ -77,13 +77,20 @@ export const getMyContests = async (req, res) => {
 ========================= */
 export const getAvailableContests = async (req, res) => {
   try {
+    const studentId = req.user.id;
+
     const result = await pool.query(
       `
-      SELECT *
-      FROM exams
-      WHERE exam_type = 'contest'
-      ORDER BY created_at DESC
-      `
+      SELECT e.*,
+        CASE WHEN cs.submission_id IS NOT NULL THEN true ELSE false END AS is_submitted
+      FROM exams e
+      LEFT JOIN contest_submissions cs
+        ON cs.contest_id = e.exam_id
+        AND cs.student_id = $1
+      WHERE e.exam_type = 'contest'
+      ORDER BY e.created_at DESC
+      `,
+      [studentId]
     );
 
     res.json(result.rows);
@@ -353,7 +360,7 @@ export const submitContestAnswers = async (req, res) => {
 
     const already = await client.query(
       `
-      SELECT 1
+      SELECT submission_id
       FROM contest_submissions
       WHERE contest_id = $1
         AND student_id = $2
@@ -361,11 +368,17 @@ export const submitContestAnswers = async (req, res) => {
       [contestId, studentId]
     );
 
+    // If already submitted, delete old submission and answers so we can re-submit
     if (already.rowCount > 0) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        message: "You have already submitted this contest"
-      });
+      const oldSubId = already.rows[0].submission_id;
+      await client.query(
+        `DELETE FROM contest_submission_answers WHERE submission_id = $1`,
+        [oldSubId]
+      );
+      await client.query(
+        `DELETE FROM contest_submissions WHERE submission_id = $1`,
+        [oldSubId]
+      );
     }
 
     const subRes = await client.query(
@@ -458,13 +471,14 @@ export const submitContestAnswers = async (req, res) => {
 
       else if (q.question_type === "coding") {
 
+        // Store the student's code in descriptive_answer
         await client.query(
           `
           INSERT INTO contest_submission_answers
           (submission_id, question_id, descriptive_answer, marks_obtained)
           VALUES ($1,$2,$3,0)
           `,
-          [submissionId, q.question_id, null]
+          [submissionId, q.question_id, studentAnswer || null]
         );
       }
     }

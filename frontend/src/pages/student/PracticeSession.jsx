@@ -24,9 +24,6 @@ const PracticeSession = ({ question: propQuestion, value, onChange }) => {
     const switchTabRef = useRef(null);
 
     const question = isEmbedded ? propQuestion : fetchedQuestion;
-    const embeddedTestCases = isEmbedded
-        ? (propQuestion?.testCases || propQuestion?.test_cases || [])
-        : [];
 
     const languageTemplates = {
         javascript: '// Write your JavaScript code here\n',
@@ -88,36 +85,22 @@ const PracticeSession = ({ question: propQuestion, value, onChange }) => {
         setSubmitMessage(null);
 
         try {
-            const qId = isEmbedded ? (propQuestion?.id ?? propQuestion?.question_id) : challengeId;
+            const qId = isEmbedded ? propQuestion?.id : challengeId;
             const res = await api.post('/api/practice/run', {
                 code,
                 language: selectedLanguage,
-                challengeId: qId,
-                testCases: isEmbedded ? embeddedTestCases : undefined,
-                isExamMode: isEmbedded
+                challengeId: qId
             });
 
             const data = res.data;
-            const runResults = Array.isArray(data.results) ? data.results : [];
-            const normalizedResults = runResults.length > 0
-                ? runResults
-                : [{
-                    testCaseNumber: 1,
-                    passed: false,
-                    isPublic: true,
-                    input: '',
-                    expectedOutput: '',
-                    actualOutput: '',
-                    error: data?.message || 'Run failed: No test results returned',
-                }];
 
             // Store structured test results
             setTestResults({
-                results: normalizedResults,
+                results: data.results || [],
                 summary: data.summary || {
-                    total: normalizedResults.length,
-                    passed: normalizedResults.filter(r => r.passed).length,
-                    failed: normalizedResults.filter(r => !r.passed).length
+                    total: (data.results || []).length,
+                    passed: (data.results || []).filter(r => r.passed).length,
+                    failed: (data.results || []).filter(r => !r.passed).length
                 },
                 passed: data.passed
             });
@@ -132,23 +115,9 @@ const PracticeSession = ({ question: propQuestion, value, onChange }) => {
             }
 
         } catch (err) {
-            const errorMsg = err.response?.data?.message || err.message || 'Run failed';
             setConsoleOutput([
-                { type: 'error', msg: errorMsg }
+                { type: 'error', msg: err.response?.data?.message || err.message }
             ]);
-            setTestResults({
-                results: [{
-                    testCaseNumber: 1,
-                    passed: false,
-                    isPublic: true,
-                    input: '',
-                    expectedOutput: '',
-                    actualOutput: '',
-                    error: errorMsg,
-                }],
-                summary: { total: 1, passed: 0, failed: 1 },
-                passed: false,
-            });
         }
 
         setIsRunning(false);
@@ -160,14 +129,12 @@ const PracticeSession = ({ question: propQuestion, value, onChange }) => {
         setSubmitMessage(null);
 
         try {
-            const qId = isEmbedded ? (propQuestion?.id ?? propQuestion?.question_id) : challengeId;
+            const qId = isEmbedded ? propQuestion?.id : challengeId;
 
             const res = await api.post('/api/practice/submit', {
                 code,
                 language: selectedLanguage,
-                challengeId: qId,
-                testCases: isEmbedded ? embeddedTestCases : undefined,
-                isExamMode: isEmbedded
+                challengeId: qId
             });
 
             const data = res.data;

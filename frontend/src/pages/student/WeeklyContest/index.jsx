@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Search, Filter, Calendar, Trophy, Clock, ArrowRight } from "lucide-react";
+import { Search, Filter, Calendar, Trophy, Clock, ArrowRight, CheckCircle2 } from "lucide-react";
 import api from "../../../api/axios";
 import { useNavigate } from "react-router-dom";
 
@@ -22,8 +22,8 @@ const WeeklyContest = () => {
     return contest.start_at
       ? new Date(contest.start_at)
       : contest.created_at
-      ? new Date(contest.created_at)
-      : null;
+        ? new Date(contest.created_at)
+        : null;
   };
 
   const computeEndDate = (contest) => {
@@ -136,11 +136,10 @@ const WeeklyContest = () => {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all duration-200 ${
-                  activeTab === tab
-                    ? "bg-white text-primary-900 shadow-sm"
-                    : "text-slate-400 hover:text-white hover:bg-white/10"
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all duration-200 ${activeTab === tab
+                  ? "bg-white text-primary-900 shadow-sm"
+                  : "text-slate-400 hover:text-white hover:bg-white/10"
+                  }`}
               >
                 {tab}
               </button>
@@ -175,7 +174,10 @@ const WeeklyContest = () => {
           {filteredContests.map((contest) => (
             <div
               key={contest.exam_id}
-              className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-indigo-200 transition-all group"
+              className={`bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group ${contest.is_submitted
+                ? "border-emerald-200"
+                : "border-slate-100 hover:border-indigo-200"
+                }`}
             >
               {/* Card Header */}
               <div className="h-28 flex items-center justify-center relative" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
@@ -183,6 +185,11 @@ const WeeklyContest = () => {
                 <span className={`absolute top-3 right-3 text-[10px] px-2 py-1 rounded-lg font-bold uppercase border ${getStatusBadge(contest.status)}`}>
                   {contest.status}
                 </span>
+                {contest.is_submitted && (
+                  <span className="absolute top-3 left-3 text-[10px] px-2 py-1 rounded-lg font-bold uppercase border bg-emerald-50 text-emerald-600 border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 size={12} /> Completed
+                  </span>
+                )}
               </div>
 
               <div className="p-5 space-y-3">
@@ -202,10 +209,17 @@ const WeeklyContest = () => {
 
                 <div className="flex gap-2 pt-1">
                   <button
-                    className="flex-1 px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center justify-center gap-1"
+                    className={`flex-1 px-3 py-2 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1 ${contest.is_submitted
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                      : "border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
+                      }`}
                     onClick={() => navigate(`/student/contest/${contest.exam_id}`)}
                   >
-                    Join <ArrowRight size={12} />
+                    {contest.is_submitted ? (
+                      <><CheckCircle2 size={12} /> View</>
+                    ) : (
+                      <>Join <ArrowRight size={12} /></>
+                    )}
                   </button>
                   <button
                     className="px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 transition-all"
