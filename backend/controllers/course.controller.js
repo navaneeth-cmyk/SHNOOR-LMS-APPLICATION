@@ -975,7 +975,7 @@ export const editModule = async (req, res) => {
     const instructorId = req.user.id;
 
     const ownerCheck = await pool.query(
-      `SELECT m.module_id, m.course_id
+      `SELECT m.module_id, m.course_id, m.title, m.type
        FROM modules m
        JOIN courses c ON c.courses_id = m.course_id
        WHERE m.module_id = $1 AND c.instructor_id = $2`,
@@ -986,9 +986,15 @@ export const editModule = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to edit this module" });
     }
 
+    const existingModule = ownerCheck.rows[0];
     const { title, type, content_url, notes, duration_mins } = req.body;
 
-    if (!title || !type) {
+    const resolvedTitle =
+      typeof title === "string" ? title.trim() : existingModule.title;
+    const resolvedType =
+      typeof type === "string" ? type : existingModule.type;
+
+    if (!resolvedTitle || !resolvedType) {
       return res.status(400).json({ message: "Title and type are required" });
     }
 
@@ -996,9 +1002,13 @@ export const editModule = async (req, res) => {
     const values = [];
     let idx = 1;
 
-    fields.push(`title = $${idx++}`); values.push(title);
-    fields.push(`type = $${idx++}`); values.push(type);
-    fields.push(`notes = $${idx++}`); values.push(notes || null);
+    fields.push(`title = $${idx++}`); values.push(resolvedTitle);
+    fields.push(`type = $${idx++}`); values.push(resolvedType);
+
+    if (notes !== undefined) {
+      fields.push(`notes = $${idx++}`);
+      values.push(notes || null);
+    }
 
     if (duration_mins !== undefined && duration_mins !== "") {
       fields.push(`duration_mins = $${idx++}`);
@@ -1020,7 +1030,7 @@ export const editModule = async (req, res) => {
     }
 
     // Re-chunk text_stream content when notes change
-    if (type === "text_stream" && notes) {
+    if (resolvedType === "text_stream" && notes) {
       const chunks = notes.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
       await pool.query(`DELETE FROM module_text_chunks WHERE module_id = $1`, [moduleId]);
       if (chunks.length > 0) {
