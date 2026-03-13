@@ -26,9 +26,10 @@ const normalizeExternalUrl = (url) => {
 
 const buildPdfViewerUrl = (url, authToken) => {
   if (!url || typeof url !== "string") return "";
-  return authToken
+  const withToken = authToken
     ? `${url}${url.includes("?") ? "&" : "?"}token=${authToken}`
     : url;
+  return `https://docs.google.com/viewer?url=${encodeURIComponent(withToken)}&embedded=true`;
 };
 
 const SEEK_TOLERANCE_SECONDS = 1;
