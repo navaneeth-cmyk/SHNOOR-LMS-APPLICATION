@@ -22,6 +22,8 @@ const SECTION_CONFIG = {
   coding: { label: "Coding", color: "bg-amber-600", ring: "ring-amber-400", badge: "bg-amber-100 text-amber-700", icon: "💻" },
 };
 
+const EXAM_VIOLATIONS_DISABLED = true;
+
 const ExamRunner = () => {
   const { examId } = useParams();
   const navigate = useNavigate();
@@ -151,7 +153,7 @@ const ExamRunner = () => {
             lastDetected: isViolation ? new Date().toISOString() : null
           }
         });
-        if (isViolation && (now - (window._lastViolationLog || 0) > 10000)) {
+        if (!EXAM_VIOLATIONS_DISABLED && isViolation && (now - (window._lastViolationLog || 0) > 10000)) {
           window._lastViolationLog = now;
           let type = 'UNKNOWN';
           if (isSuspicious) {
@@ -688,7 +690,11 @@ const ExamRunner = () => {
     triggerFullscreen();
   };
 
-  const { securityHandlers, triggerFullscreen, isTerminated } = useExamSecurity(handleSubmit, handleSecurityWarning);
+  const { securityHandlers, triggerFullscreen, isTerminated } = useExamSecurity(
+    handleSubmit,
+    handleSecurityWarning,
+    { enabled: !EXAM_VIOLATIONS_DISABLED }
+  );
 
   return (
     <ExamRunnerView

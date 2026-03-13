@@ -7,9 +7,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  *
  * @param {Function} onAutoSubmit - Callback to trigger when violations delay limit is reached.
  * @param {Function} onWarning - Callback to handle warnings (show modal).
+ * @param {Object} options - Security options.
+ * @param {boolean} options.enabled - Enable/disable violation tracking.
  * @returns {Object} handlers - Event handlers to attach to the exam container.
  */
-const useExamSecurity = (onAutoSubmit, onWarning) => {
+const useExamSecurity = (onAutoSubmit, onWarning, options = {}) => {
+    const { enabled = true } = options;
     // Source of Truth for violation count inside Event Listeners
     const violationsRef = useRef(0);
     // UI State for rendering
@@ -36,8 +39,17 @@ const useExamSecurity = (onAutoSubmit, onWarning) => {
         onWarningRef.current = onWarning;
     }, [onAutoSubmit, onWarning]);
 
+    useEffect(() => {
+        if (!enabled) {
+            violationsRef.current = 0;
+            setViolationCount(0);
+            setIsTerminated(false);
+        }
+    }, [enabled]);
+
     // CORE LOGIC: Handle Violation
     const handleViolation = useCallback((type) => {
+        if (!enabled) return;
         // Increment Ref
         const newCount = violationsRef.current + 1;
         violationsRef.current = newCount;
@@ -68,7 +80,7 @@ const useExamSecurity = (onAutoSubmit, onWarning) => {
                 onAutoSubmitRef.current();
             }
         }
-    }, [isTerminated]);
+    }, [enabled, isTerminated]);
 
 
     // 1. VISIBILITY CHANGE HANDLER
@@ -109,6 +121,7 @@ const useExamSecurity = (onAutoSubmit, onWarning) => {
 
     // ATTACH LISTENERS
     useEffect(() => {
+        if (!enabled) return;
         document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("blur", handleWindowBlur);
 
@@ -116,11 +129,12 @@ const useExamSecurity = (onAutoSubmit, onWarning) => {
             document.removeEventListener("visibilitychange", handleVisibilityChange);
             window.removeEventListener("blur", handleWindowBlur);
         };
-    }, [handleVisibilityChange, handleWindowBlur]);
+    }, [enabled, handleVisibilityChange, handleWindowBlur]);
 
 
     // 2. Fullscreen Enforcement
     const triggerFullscreen = async () => {
+        if (!enabled) return;
         try {
             if (!document.fullscreenElement) {
                 if (document.documentElement.requestFullscreen) {
@@ -141,18 +155,20 @@ const useExamSecurity = (onAutoSubmit, onWarning) => {
 
     // Attempt on mount
     useEffect(() => {
+        if (!enabled) return;
         triggerFullscreen();
-    }, []);
+    }, [enabled]);
 
 
     // 3. Clipboard & Context Menu Blockers
     const preventAction = useCallback((e, message) => {
+        if (!enabled) return;
         e.preventDefault();
 
         if (onWarningRef.current) {
             onWarningRef.current('copy-paste', violationsRef.current);
         }
-    }, []);
+    }, [enabled]);
 
     const securityHandlers = {
         onCopy: (e) => preventAction(e, 'Copying is disabled during the exam'),
