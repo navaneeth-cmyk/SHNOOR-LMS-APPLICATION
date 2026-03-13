@@ -58,27 +58,9 @@ const StudentCourses = () => {
         }),
       ]);
 
-      const nextMyCourses = Array.isArray(myRes.data)
-        ? myRes.data
-        : Array.isArray(myRes.data?.courses)
-          ? myRes.data.courses
-          : [];
-
-      const nextAllCourses = Array.isArray(exploreRes.data)
-        ? exploreRes.data
-        : Array.isArray(exploreRes.data?.courses)
-          ? exploreRes.data.courses
-          : [];
-
-      const nextRecommendedCourses = Array.isArray(recRes.data)
-        ? recRes.data
-        : Array.isArray(recRes.data?.courses)
-          ? recRes.data.courses
-          : [];
-
-      setMyCourses(nextMyCourses);
-      setAllCourses(nextAllCourses);
-      setRecommendedCourses(nextRecommendedCourses);
+      setMyCourses(myRes.data || []);
+      setAllCourses(exploreRes.data || []);
+      setRecommendedCourses(recRes.data || []);
     } catch (err) {
       console.error("Failed to fetch courses:", err);
     } finally {
@@ -231,23 +213,17 @@ const StudentCourses = () => {
 
   // Apply filters
   const filteredCourses = displayCourses.filter((course) => {
-    const normalizedTitle = (course?.title || course?.name || "").toLowerCase();
-    const matchesSearch = normalizedTitle.includes(searchTerm.toLowerCase());
-
-    const applyCatalogFilters = activeTab !== "my-learning";
+    const matchesSearch = course.title
+      ?.toLowerCase()
+      .includes(searchTerm.toLowerCase());
 
     const matchesCategory =
-      !applyCatalogFilters ||
-      selectedCategory === "All" ||
-      course.category === selectedCategory;
+      selectedCategory === "All" || course.category === selectedCategory;
 
     const matchesLevel =
-      !applyCatalogFilters ||
-      selectedLevel === "All" ||
-      course.difficulty === selectedLevel;
+      selectedLevel === "All" || course.difficulty === selectedLevel;
 
-    const matchesPrice =
-      !applyCatalogFilters || (isFreeOnly ? course.price_type === "free" : true);
+    const matchesPrice = isFreeOnly ? course.price_type === "free" : true;
 
     return matchesSearch && matchesCategory && matchesLevel && matchesPrice;
   });
