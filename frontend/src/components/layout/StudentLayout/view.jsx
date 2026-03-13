@@ -86,8 +86,8 @@ const StudentLayoutView = ({
 
       {/* DARK SIDEBAR */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
-          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
         style={{ width: '260px', background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}
       >
         {/* Logo */}
@@ -117,7 +117,7 @@ const StudentLayoutView = ({
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'lg:ml-[260px]' : 'ml-0'}`}>
         {/* Header */}
         <header style={{
           background: '#fff', borderBottom: '1px solid #e2e8f0', height: '64px', padding: '0 32px',
@@ -126,11 +126,11 @@ const StudentLayoutView = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button
-              className="lg:hidden"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               style={{ padding: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', borderRadius: '8px', display: 'flex' }}
+              className="hover:bg-slate-100 transition-all duration-200"
             >
-              <Menu size={20} />
+              <Menu size={22} />
             </button>
             <h2 className="hidden sm:block" style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
               Student Portal

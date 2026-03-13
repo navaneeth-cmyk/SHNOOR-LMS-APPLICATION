@@ -10,13 +10,22 @@ const InstructorLayout = () => {
   const location = useLocation();
   const { logout, currentUser } = useAuth();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [instructor, setInstructor] = useState({
     name: "",
     photoURL: "",
   });
   const { unreadCounts } = useSocket();
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+
+  // Track screen size
+  useEffect(() => {
+    const handleResize = () => {
+      // Logic could be added here if we wanted to auto-open/close on resize
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleLogout = async () => {
     await logout();

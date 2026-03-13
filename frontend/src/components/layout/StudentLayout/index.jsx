@@ -19,7 +19,7 @@ const StudentLayout = () => {
   const [studentName, setStudentName] = useState("");
   const [xp, setXp] = useState(0);
   const [rank, setRank] = useState("Novice");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
 
   // Chat Unread Count
   const { unreadCounts } = useSocket();
@@ -234,6 +234,13 @@ const StudentLayout = () => {
   const handleDismissToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
+
+  // Track screen size
+  useEffect(() => {
+    const handleResize = () => {};
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleLogout = async () => {
     await logout();

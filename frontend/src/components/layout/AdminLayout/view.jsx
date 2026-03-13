@@ -108,8 +108,8 @@ const AdminLayoutView = ({
 
       {/* ═══ DARK SIDEBAR ═══ */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
-          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
         style={{
           width: '260px',
           background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
@@ -176,7 +176,7 @@ const AdminLayoutView = ({
             <NavItem path="approve-courses" icon={CheckCircle}  label="Approve Courses" />
             <NavItem path="assign-course"   icon={UserPlus}     label="Assign Courses" />
             <NavItem path="approve-users"   icon={UserCircle}   label="Approve Users" />
-            <NavItem path="exam-timers"     icon={Timer}        label="Exam Timers" />
+            <NavItem path="exam-timers"     icon={Timer}        label="Grace Timers" />
             <NavItem path="chat-students"   icon={MessageSquare} label="Chat with Students" />
             <NavItem path="certificates"    icon={Award}        label="Certificates" />
             <NavItem path="settings"        icon={Settings}     label="Settings" />
@@ -185,7 +185,9 @@ const AdminLayoutView = ({
       </div>
 
       {/* ═══ MAIN CONTENT AREA ═══ */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+      <div 
+        className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'lg:ml-[260px]' : 'ml-0'}`}
+      >
         {/* Top Header Bar */}
         <header style={{
           background: '#fff',
@@ -198,15 +200,16 @@ const AdminLayoutView = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button
-              className="lg:hidden"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               style={{
                 padding: '8px', background: 'none', border: 'none',
                 cursor: 'pointer', color: '#64748b',
                 borderRadius: '8px', display: 'flex',
+                transition: 'background 0.2s',
               }}
+              className="hover:bg-slate-100"
             >
-              <Menu size={20} />
+              <Menu size={22} />
             </button>
             <h2 className="hidden sm:block" style={{
               fontSize: '18px', fontWeight: 600, color: '#0f172a', margin: 0,

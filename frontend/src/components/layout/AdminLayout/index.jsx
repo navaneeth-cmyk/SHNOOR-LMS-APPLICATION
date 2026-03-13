@@ -9,8 +9,21 @@ const AdminLayout = () => {
   const location = useLocation();
   const { logout } = useAuth();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [adminName, setAdminName] = useState("");
+
+  // Track screen size
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        // Keep it as is or show it
+      } else {
+        // setIsSidebarOpen(false); // Close on mobile resize
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleLogout = async () => {
     await logout();

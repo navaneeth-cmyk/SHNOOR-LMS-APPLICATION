@@ -530,15 +530,12 @@ useEffect(() => {
 export default ChatWithStudents;*/}
 
 
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable no-unused-vars */
-// src/pages/admin/ChatWithStudents.jsx
-// src/pages/admin/ChatWithStudents.jsx
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable no-unused-vars */
-// src/pages/admin/ChatWithStudents.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { PlusCircle, X, Loader2, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { 
+  PlusCircle, X, Loader2, Search, MessageSquare, Users, 
+  BookOpen, Clock, Send, Hash, MoreVertical, Paperclip, 
+  ChevronRight, UserPlus, Info, CheckCircle, ShieldCheck
+} from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
 import ChatList from '../../components/chat/ChatList';
 import ChatWindow from '../../components/chat/ChatWindow';
