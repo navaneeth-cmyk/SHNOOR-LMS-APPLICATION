@@ -41,7 +41,10 @@ const StudentCourses = () => {
 
   const refreshCourses = useCallback(async (silent = false) => {
     try {
-      if (!auth.currentUser) return;
+      if (!auth.currentUser) {
+        if (!silent) setLoading(false);
+        return;
+      }
 
       if (!silent) setLoading(true);
       const token = await auth.currentUser.getIdToken(true);
@@ -89,6 +92,20 @@ const StudentCourses = () => {
   // Initial load
   useEffect(() => {
     refreshCourses(false);
+  }, [refreshCourses]);
+
+  // Re-fetch once auth state is ready (handles page reload timing)
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        refreshCourses(false);
+      } else {
+        setMyCourses([]);
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
   }, [refreshCourses]);
 
   // Real-time refresh via socket events

@@ -209,6 +209,31 @@ export const getMyCourses = async (req, res) => {
 
   const { rows } = await pool.query(
     `
+    WITH student_course_links AS (
+      SELECT
+        sc.course_id,
+        sc.enrolled_at AS linked_at,
+        1 AS source_priority
+      FROM student_courses sc
+      WHERE sc.student_id = $1
+
+      UNION ALL
+
+      SELECT
+        ca.course_id,
+        ca.assigned_at AS linked_at,
+        2 AS source_priority
+      FROM course_assignments ca
+      WHERE ca.student_id = $1
+    ),
+    dedup_links AS (
+      SELECT
+        scl.course_id,
+        MAX(scl.linked_at) AS linked_at,
+        MIN(scl.source_priority) AS source_priority
+      FROM student_course_links scl
+      GROUP BY scl.course_id
+    )
     SELECT 
       c.courses_id,
       c.title,
@@ -217,18 +242,23 @@ export const getMyCourses = async (req, res) => {
       c.difficulty,
       c.thumbnail_url,
       c.status,
-      sc.enrolled_at AS created_at,
+      dl.linked_at AS created_at,
       c.price_type,
       c.price_amount,
       c.instructor_id,
       u.full_name AS instructor_name,
       CASE WHEN ir.course_id IS NULL THEN false ELSE true END AS has_reviewed,
-      true AS is_enrolled,
+      EXISTS (
+        SELECT 1
+        FROM student_courses sc2
+        WHERE sc2.course_id = c.courses_id
+          AND sc2.student_id = $1
+      ) AS is_enrolled,
       EXISTS (
         SELECT 1
         FROM course_assignments ca
         WHERE ca.course_id = c.courses_id
-          AND ca.student_id = sc.student_id
+          AND ca.student_id = $1
       ) AS is_assigned,
       CASE WHEN c.price_type = 'paid' THEN true ELSE false END AS is_paid,
       CASE
@@ -236,17 +266,17 @@ export const getMyCourses = async (req, res) => {
           AND (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.courses_id)
               = (SELECT COUNT(*) FROM module_progress mp
                  WHERE mp.course_id = c.courses_id
-                   AND mp.student_id = sc.student_id
+                   AND mp.student_id = $1
                    AND mp.completed_at IS NOT NULL)
         THEN true ELSE false END AS is_completed
-    FROM student_courses sc
-    JOIN courses c ON c.courses_id = sc.course_id
+    FROM dedup_links dl
+    JOIN courses c ON c.courses_id = dl.course_id
     LEFT JOIN users u ON u.user_id = c.instructor_id
     LEFT JOIN instructor_reviews ir
-      ON ir.course_id = c.courses_id AND ir.student_id = sc.student_id
-    WHERE sc.student_id = $1
+      ON ir.course_id = c.courses_id AND ir.student_id = $1
+    WHERE dl.course_id IS NOT NULL
       AND c.status = 'approved'
-    ORDER BY sc.enrolled_at DESC
+    ORDER BY dl.linked_at DESC NULLS LAST
     `,
     [studentId],
   );
