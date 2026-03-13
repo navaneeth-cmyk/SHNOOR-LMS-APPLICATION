@@ -212,8 +212,7 @@ export const getMyCourses = async (req, res) => {
     WITH student_course_links AS (
       SELECT
         sc.course_id,
-        sc.enrolled_at AS linked_at,
-        1 AS source_priority
+        sc.enrolled_at AS linked_at
       FROM student_courses sc
       WHERE sc.student_id = $1
 
@@ -221,16 +220,14 @@ export const getMyCourses = async (req, res) => {
 
       SELECT
         ca.course_id,
-        ca.assigned_at AS linked_at,
-        2 AS source_priority
+        ca.assigned_at AS linked_at
       FROM course_assignments ca
       WHERE ca.student_id = $1
     ),
     dedup_links AS (
       SELECT
         scl.course_id,
-        MAX(scl.linked_at) AS linked_at,
-        MIN(scl.source_priority) AS source_priority
+        MAX(scl.linked_at) AS linked_at
       FROM student_course_links scl
       GROUP BY scl.course_id
     )
@@ -275,7 +272,15 @@ export const getMyCourses = async (req, res) => {
     LEFT JOIN instructor_reviews ir
       ON ir.course_id = c.courses_id AND ir.student_id = $1
     WHERE dl.course_id IS NOT NULL
-      AND c.status = 'approved'
+      AND (
+        c.status = 'approved'
+        OR EXISTS (
+          SELECT 1
+          FROM course_assignments ca3
+          WHERE ca3.course_id = c.courses_id
+            AND ca3.student_id = $1
+        )
+      )
     ORDER BY dl.linked_at DESC NULLS LAST
     `,
     [studentId],
@@ -306,8 +311,7 @@ export const getRecommendedCourses = async (req, res) => {
           ON ca.course_id = c.courses_id AND ca.student_id = $1
         WHERE c.status = 'approved'
           AND (c.schedule_start_at IS NULL OR c.schedule_start_at <= NOW())
-          AND sc.student_id IS NULL
-          AND ca.student_id IS NULL
+          AND (sc.student_id IS NOT NULL OR ca.student_id IS NOT NULL)
       )
       SELECT 
         c.courses_id,
@@ -320,8 +324,6 @@ export const getRecommendedCourses = async (req, res) => {
         c.created_at,
         c.price_type,
         c.price_amount,
-        c.instructor_id,
-        u.full_name AS instructor_name,
         CASE WHEN sc.course_id IS NOT NULL THEN true ELSE false END AS is_enrolled,
         CASE WHEN ca.course_id IS NOT NULL THEN true ELSE false END AS is_assigned,
         CASE WHEN c.price_type = 'paid' THEN true ELSE false END AS is_paid,
@@ -335,7 +337,6 @@ export const getRecommendedCourses = async (req, res) => {
           THEN true ELSE false END AS is_completed
       FROM courses c
       JOIN eligible_courses ec ON ec.courses_id = c.courses_id
-      LEFT JOIN users u ON u.user_id = c.instructor_id
       LEFT JOIN student_courses sc
         ON sc.course_id = c.courses_id AND sc.student_id = $1
       LEFT JOIN course_assignments ca
@@ -346,7 +347,6 @@ export const getRecommendedCourses = async (req, res) => {
           ELSE 1
         END,
         c.created_at DESC
-      LIMIT 20
       `,
       [studentId],
     );

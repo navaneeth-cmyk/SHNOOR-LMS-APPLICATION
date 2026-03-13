@@ -444,8 +444,6 @@ export const assignCourses = async (req, res) => {
 export const updateCourseStatus = async (req, res) => {
   const { courses_id } = req.params;
   const { status } = req.body;
-  const feedbackRaw = req.body?.feedback ?? req.body?.comment_text ?? "";
-  const feedback = String(feedbackRaw || "").trim();
 
   const allowedStatuses = ["approved", "rejected", "pending"];
 
@@ -455,16 +453,10 @@ export const updateCourseStatus = async (req, res) => {
     });
   }
 
-  if (status === "rejected" && !feedback) {
-    return res.status(400).json({
-      message: "Feedback is required when rejecting a course",
-    });
-  }
-
   try {
     // ✅ Check if course exists
     const courseCheck = await pool.query(
-      `SELECT courses_id, instructor_id FROM courses WHERE courses_id = $1`,
+      `SELECT courses_id FROM courses WHERE courses_id = $1`,
       [courses_id],
     );
 
@@ -479,18 +471,9 @@ export const updateCourseStatus = async (req, res) => {
       `UPDATE courses
        SET status = $1
        WHERE courses_id = $2
-       RETURNING courses_id, title, status, instructor_id`,
+       RETURNING courses_id, title, status`,
       [status, courses_id],
     );
-
-    if (feedback) {
-      const statusLabel = status === "approved" ? "APPROVED" : status === "rejected" ? "REJECTED" : "UPDATED";
-      await pool.query(
-        `INSERT INTO course_comments (course_id, user_id, comment_text, parent_comment_id)
-         VALUES ($1, $2, $3, NULL)`,
-        [courses_id, req.user.id, `[Admin ${statusLabel}] ${feedback}`]
-      );
-    }
 
     res.status(200).json({
       message: `Course ${status} successfully`,
@@ -1154,3 +1137,115 @@ function generateRecommendations(diagnostics) {
 
   return recommendations;
 }
+
+export const getAllViolations = async (req, res) => {
+  try {
+    console.log(`\n--- [ADMIN] Fetching All Violations (User: ${req.user?.email}) ---`);
+    const result = await pool.query(
+      `SELECT 
+        v.violation_id,
+        v.violation_type,
+        v.details,
+        v.created_at,
+        v.student_id,
+        v.exam_id,
+        u.full_name AS student_name,
+        u.email AS student_email,
+        COALESCE(e.title, v.exam_id) AS exam_title,
+        er.obtained_marks,
+        er.total_marks,
+        er.percentage AS exam_score,
+        er.passed AS exam_status
+      FROM exam_violations v
+      LEFT JOIN users u ON v.student_id = u.user_id
+      LEFT JOIN exams e ON v.exam_id::text = e.exam_id::text
+      LEFT JOIN exam_results er ON v.student_id = er.student_id AND v.exam_id::text = er.exam_id::text
+      ORDER BY v.created_at DESC`
+    );
+
+    console.log(`✅ Found ${result.rows.length} violations in database.`);
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("❌ getAllViolations error:", error.message);
+    res.status(500).json({ message: "Failed to fetch violations" });
+  }
+};
+
+export const getViolationsSummary = async (req, res) => {
+  try {
+    console.log("\n--- [ADMIN] Fetching Violations Summary ---");
+    const result = await pool.query(
+      `SELECT 
+        u.user_id,
+        u.full_name AS student_name,
+        u.email AS student_email,
+        COUNT(CASE WHEN v.violation_type IN ('NO_FACE', 'no_face') THEN 1 END) AS no_face_count,
+        COUNT(CASE WHEN v.violation_type IN ('MULTIPLE_FACES', 'multiple_faces') THEN 1 END) AS multiple_faces_count,
+        COUNT(CASE WHEN v.violation_type IN ('PHONE_DETECTED', 'OBJECT_DETECTION', 'phone_detected', 'object_detection') THEN 1 END) AS phone_detected_count,
+        COUNT(CASE WHEN v.violation_type IN ('LOUD_NOISE', 'loud_noise') THEN 1 END) AS loud_noise_count,
+        COUNT(CASE WHEN v.violation_type IN ('VOICE_DETECTION', 'voice_detection') THEN 1 END) AS voice_detected_count,
+        COUNT(CASE WHEN v.violation_type NOT IN ('NO_FACE', 'no_face', 'MULTIPLE_FACES', 'multiple_faces', 'PHONE_DETECTED', 'phone_detected', 'OBJECT_DETECTION', 'object_detection', 'LOUD_NOISE', 'loud_noise', 'VOICE_DETECTION', 'voice_detection') THEN 1 END) AS others_count,
+        COUNT(v.violation_id) AS total_count
+      FROM users u
+      JOIN exam_violations v ON u.user_id = v.student_id
+      WHERE u.role = 'student'
+      GROUP BY u.user_id, u.full_name, u.email
+      ORDER BY total_count DESC`
+    );
+
+    console.log(`✅ Found ${result.rows.length} students with violations.`);
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("❌ getViolationsSummary error:", error.message);
+    res.status(500).json({ message: "Failed to fetch violations summary" });
+  }
+};
+
+export const getDetailedViolationsReport = async (req, res) => {
+  try {
+    console.log("\n--- [ADMIN] Fetching Detailed Violations Report ---");
+    const result = await pool.query(
+      `SELECT 
+          u.user_id AS student_id,
+          u.full_name AS student_name,
+          u.email,
+          COALESCE(e.title, v.exam_id) AS exam_name,
+          er.evaluated_at AS exam_date,
+          COALESCE(er.obtained_marks, 0) AS marks_obtained,
+          COALESCE(er.total_marks, 0) AS total_marks,
+          COALESCE(er.percentage, 0) AS percentage,
+          CASE WHEN er.passed IS TRUE THEN 'Pass' WHEN er.passed IS FALSE THEN 'Fail' ELSE '---' END AS status,
+          COALESCE(v.no_face_count, 0) AS no_face,
+          COALESCE(v.multiple_faces_count, 0) AS multiple_faces,
+          COALESCE(v.phone_detected_count, 0) AS phone_detected,
+          COALESCE(v.loud_noise_count, 0) AS loud_noise,
+          COALESCE(v.voice_detected_count, 0) AS voice_detected,
+          COALESCE(v.total_count, 0) AS total_violations,
+          CASE WHEN v.total_count > 0 THEN 'Yes' ELSE 'No' END AS flagged
+      FROM users u
+      JOIN (
+          SELECT 
+              student_id, 
+              exam_id,
+              COUNT(CASE WHEN violation_type IN ('NO_FACE', 'no_face') THEN 1 END) AS no_face_count,
+              COUNT(CASE WHEN violation_type IN ('MULTIPLE_FACES', 'multiple_faces') THEN 1 END) AS multiple_faces_count,
+              COUNT(CASE WHEN violation_type IN ('PHONE_DETECTED', 'OBJECT_DETECTION', 'phone_detected', 'object_detection') THEN 1 END) AS phone_detected_count,
+              COUNT(CASE WHEN violation_type IN ('LOUD_NOISE', 'loud_noise') THEN 1 END) AS loud_noise_count,
+              COUNT(CASE WHEN violation_type IN ('VOICE_DETECTION', 'voice_detection') THEN 1 END) AS voice_detected_count,
+              COUNT(*) AS total_count
+          FROM exam_violations
+          GROUP BY student_id, exam_id
+      ) v ON u.user_id = v.student_id
+      LEFT JOIN exams e ON v.exam_id::text = e.exam_id::text
+      LEFT JOIN exam_results er ON u.user_id = er.student_id AND v.exam_id::text = er.exam_id::text
+      WHERE u.role = 'student'
+      ORDER BY u.full_name, exam_name`
+    );
+
+    console.log(`✅ Generated report with ${result.rows.length} records.`);
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("❌ getDetailedViolationsReport error:", error.message);
+    res.status(500).json({ message: "Failed to fetch detailed report" });
+  }
+};
