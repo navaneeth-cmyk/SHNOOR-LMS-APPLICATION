@@ -19,28 +19,6 @@ const TextStreamPlayer = ({ moduleId, url }) => {
     // If URL indicates HTML or Gamma, render iframe instead of text stream
     // Check this immediately to avoid unnecessary fetch or loading state
     // If URL indicates Gamma, render a professional "Presentation Card"
-    // If URL is an HTML file served from the backend, render it in an iframe directly
-    if (url && /\.html?($|\?)/i.test(url)) {
-        return (
-            <div className="w-full h-full relative bg-slate-900 overflow-hidden">
-                <iframe
-                    src={url}
-                    style={{ width: "100%", height: "100%", border: "none" }}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    title="HTML Content"
-                />
-                <div className="absolute bottom-4 right-4 bg-slate-900/80 p-2 rounded text-xs text-slate-400 z-10">
-                    <span className="mr-2">Not loading?</span>
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-white underline">
-                        Open in new tab
-                    </a>
-                </div>
-            </div>
-        );
-    }
-
-    // If URL indicates Gamma, render a professional "Presentation Card"
     if (url && (url.includes("gamma.app"))) {
         return (
             <div className="h-full flex items-center justify-center bg-slate-900 p-6">
