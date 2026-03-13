@@ -1,5 +1,5 @@
 import React from "react";
-import { ClipboardList, Play, Clock, Trophy } from "lucide-react";
+import { ClipboardList, Play, Clock, Trophy, CheckCircle2 } from "lucide-react";
 
 const StudentExamsView = ({ loading, exams, navigate }) => {
 
@@ -70,13 +70,19 @@ const StudentExamsView = ({ loading, exams, navigate }) => {
                   </div>
                 </div>
 
-                <button
-                  className="mt-auto w-full text-white font-bold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 hover:shadow-xl active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' }}
-                  onClick={() => navigate(`/student/exam/${exam.exam_id}`)}
-                >
-                  <Play size={14} fill="currentColor" /> Start Exam
-                </button>
+                {exam.is_completed ? (
+                  <div className="mt-auto w-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
+                    <CheckCircle2 size={15} /> Completed
+                  </div>
+                ) : (
+                  <button
+                    className="mt-auto w-full text-white font-bold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 hover:shadow-xl active:scale-[0.98]"
+                    style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' }}
+                    onClick={() => navigate(`/student/exam/${exam.exam_id}`)}
+                  >
+                    <Play size={14} fill="currentColor" /> Start Exam
+                  </button>
+                )}
               </div>
             </div>
           ))}
