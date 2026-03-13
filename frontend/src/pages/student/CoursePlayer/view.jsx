@@ -23,6 +23,24 @@ const normalizeExternalUrl = (url) => {
   if (/^(www\.|youtube\.com|youtu\.be|m\.youtube\.com)/i.test(trimmed)) return `https://${trimmed}`;
   return trimmed;
 };
+
+const buildPdfViewerUrl = (url, authToken) => {
+  if (!url || typeof url !== "string") return "";
+
+  // Check on the raw URL BEFORE appending token
+  const isCloudinaryRawPdf = /res\.cloudinary\.com\/.+\/raw\/upload\//i.test(url);
+  
+  if (isCloudinaryRawPdf) {
+    return `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(url)}`;
+  }
+
+  const withToken = authToken
+    ? `${url}${url.includes("?") ? "&" : "?"}token=${authToken}`
+    : url;
+
+  return withToken;
+};
+
 const SEEK_TOLERANCE_SECONDS = 1;
 const COMPLETE_EPSILON_SECONDS = 0.25;
 
@@ -408,7 +426,7 @@ const CoursePlayerView = ({
 
               /* PDF */
               <iframe
-                src={authToken ? `${currentModule.url}${currentModule.url.includes('?') ? '&' : '?'}token=${authToken}` : currentModule.url}
+                src={buildPdfViewerUrl(currentModule.url, authToken)}
                 className="absolute inset-0 w-full h-full border-0"
                 title={currentModule.title || "PDF Document"}
                 allow="fullscreen"
@@ -477,7 +495,7 @@ const CoursePlayerView = ({
 
                 <div className="rounded-2xl border border-slate-700 overflow-hidden shadow-2xl h-[800px] bg-slate-800">
                   <iframe
-                    src={authToken ? `${currentModule.notes}${currentModule.notes.includes('?') ? '&' : '?'}token=${authToken}` : currentModule.notes}
+                    src={buildPdfViewerUrl(currentModule.notes, authToken)}
                     className="w-full h-full"
                     title="Module Notes PDF"
                     allow="fullscreen"
