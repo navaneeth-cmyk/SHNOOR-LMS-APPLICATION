@@ -17,7 +17,10 @@ const StudentDashboardView = ({
     onViewChange,
     onSearch,
     searchResults = [],
-    searchLoading = false
+    searchLoading = false,
+    freeCourses = [],
+    paidCourses = [],
+    recommendedCourses = []
 }) => {
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -77,6 +80,44 @@ const StudentDashboardView = ({
         { label: 'XP Earned', value: gamification?.xp || 0, icon: Zap, color: '#f59e0b', spark: sparkData[2], sub: `${(gamification?.nextLevelXP || 100) - (gamification?.xp || 0)} to next` },
         { label: 'Enrolled', value: enrolledCount, icon: BookOpen, color: '#10b981', spark: sparkData[3], sub: 'Active courses' },
     ];
+
+    const CourseMiniList = ({ title, courses, tone = "indigo", emptyText }) => {
+        const toneMap = {
+            indigo: "bg-indigo-50 text-indigo-600",
+            amber: "bg-amber-50 text-amber-600",
+            emerald: "bg-emerald-50 text-emerald-600"
+        };
+
+        return (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-primary-900 uppercase tracking-wide">{title}</h3>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded ${toneMap[tone] || toneMap.indigo}`}>
+                        {courses.length}
+                    </span>
+                </div>
+                {courses.length > 0 ? (
+                    <div className="space-y-2">
+                        {courses.slice(0, 4).map((course) => (
+                            <button
+                                key={course.courses_id || course.id}
+                                onClick={() => navigate(`/student/course/${course.courses_id || course.id}`)}
+                                className="w-full text-left p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all"
+                            >
+                                <p className="text-sm font-semibold text-primary-900 truncate">{course.title}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{course.category || "General"}</p>
+                                {course.instructor_name && (
+                                    <p className="text-xs text-indigo-600 mt-1 font-medium">Instructor: {course.instructor_name}</p>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-sm text-slate-400 py-4">{emptyText}</div>
+                )}
+            </div>
+        );
+    };
 
     return (
         <div className="space-y-6 font-sans max-w-[1440px] mx-auto">
@@ -387,6 +428,28 @@ const StudentDashboardView = ({
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* COURSE BUCKETS */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <CourseMiniList
+                    title="Free Courses"
+                    courses={freeCourses}
+                    tone="emerald"
+                    emptyText="No free courses available right now."
+                />
+                <CourseMiniList
+                    title="Paid Courses"
+                    courses={paidCourses}
+                    tone="amber"
+                    emptyText="No paid courses available right now."
+                />
+                <CourseMiniList
+                    title="For You"
+                    courses={recommendedCourses}
+                    tone="indigo"
+                    emptyText="No recommendations yet. Start learning to get personalized picks."
+                />
             </div>
         </div>
     );

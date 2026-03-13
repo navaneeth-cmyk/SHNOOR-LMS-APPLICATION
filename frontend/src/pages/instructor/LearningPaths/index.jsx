@@ -91,7 +91,8 @@ const LearningPaths = () => {
             await fetchData();
         } catch (err) {
             console.error("Create path error:", err);
-            alert("Failed to create learning path");
+            const message = err?.response?.data?.message || "Failed to create learning path";
+            alert(message);
         } finally {
             setCreatingPath(false);
         }

@@ -410,20 +410,76 @@ export const getInstructorEnrolledStudents = async (req, res) => {
 
     const { rows } = await pool.query(
       `
+      WITH enrollments AS (
+        SELECT student_id, course_id FROM course_assignments
+        UNION
+        SELECT student_id, course_id FROM student_courses
+      )
       SELECT
         u.user_id AS student_id,
         u.full_name AS student_name,
-        c.title AS course_title
-      FROM course_assignments ca
-      JOIN users u ON ca.student_id = u.user_id
-      JOIN courses c ON ca.course_id = c.courses_id
+        c.courses_id AS course_id,
+        c.title AS course_title,
+        COUNT(DISTINCT m.module_id) AS total_modules,
+        COUNT(DISTINCT CASE WHEN mp.completed_at IS NOT NULL THEN mp.module_id END) AS completed_modules,
+        COALESCE(
+          ROUND(
+            (
+              COUNT(DISTINCT CASE WHEN mp.completed_at IS NOT NULL THEN mp.module_id END)::numeric
+              / NULLIF(COUNT(DISTINCT m.module_id), 0)::numeric
+            ) * 100,
+            0
+          ),
+          0
+        ) AS progress,
+        COALESCE(ROUND(AVG(er.percentage)::numeric, 1), 0) AS avg_score,
+        COUNT(DISTINCT ea.exam_id) AS submitted_exam_count
+      FROM enrollments e
+      JOIN users u ON e.student_id = u.user_id
+      JOIN courses c ON e.course_id = c.courses_id
+      LEFT JOIN modules m ON m.course_id = c.courses_id
+      LEFT JOIN module_progress mp
+        ON mp.course_id = c.courses_id
+       AND mp.student_id = u.user_id
+       AND mp.module_id = m.module_id
+      LEFT JOIN exams ex ON ex.course_id = c.courses_id
+      LEFT JOIN exam_results er
+        ON er.exam_id = ex.exam_id
+       AND er.student_id = u.user_id
+      LEFT JOIN exam_attempts ea
+        ON ea.exam_id = ex.exam_id
+       AND ea.student_id = u.user_id
+       AND ea.status = 'submitted'
       WHERE c.instructor_id = $1
-      ORDER BY u.full_name ASC
+      GROUP BY u.user_id, u.full_name, c.courses_id, c.title
+      ORDER BY u.full_name ASC, c.title ASC
       `,
       [instructorId]
     );
 
-    res.json(rows);
+    const normalized = rows.map((row) => {
+      const progress = Number(row.progress || 0);
+      const avgScore = Number(row.avg_score || 0);
+      const submittedExamCount = Number(row.submitted_exam_count || 0);
+      const totalModules = Number(row.total_modules || 0);
+      const completedModules = Number(row.completed_modules || 0);
+      const isCourseCompleted = totalModules > 0 && completedModules >= totalModules;
+      let status = "Not Started";
+      if (isCourseCompleted || progress >= 100 || submittedExamCount > 0) status = "Completed";
+      else if (progress > 0) status = "In Progress";
+
+      return {
+        ...row,
+        progress,
+        avg_score: avgScore,
+        submitted_exam_count: submittedExamCount,
+        total_modules: totalModules,
+        completed_modules: completedModules,
+        status,
+      };
+    });
+
+    res.json(normalized);
   } catch (err) {
     console.error("Fetch instructor students error:", err);
     res.status(500).json({ message: "Failed to fetch enrolled students" });

@@ -46,11 +46,14 @@ const ApproveCourses = () => {
     setModules([]);
   };
 
-  const updateStatus = async (courseId, status) => {
+  const updateStatus = async (courseId, status, feedback = "") => {
     if (!window.confirm(`Are you sure you want to ${status}?`)) return;
 
     try {
-      await api.patch(`/api/admin/courses/${courseId}/status`, { status });
+      await api.patch(`/api/admin/courses/${courseId}/status`, {
+        status,
+        feedback,
+      });
 
       setPendingCourses((prev) =>
         prev.filter((c) => c.courses_id !== courseId),

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
     Users, BookOpen, Clock, Award, Search, X, Download, BarChart3,
@@ -27,6 +26,8 @@ const AdminDashboardView = ({
 }) => {
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const themePrimary = 'var(--color-primary)';
+    const themePrimaryLight = 'var(--color-primary-light)';
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[500px]">
@@ -77,7 +78,7 @@ const AdminDashboardView = ({
 
     // Quick actions
     const quickActions = [
-        { label: 'Add Instructor', icon: UserPlus, onClick: goToAddInstructor, color: '#6366f1' },
+        { label: 'Add Instructor', icon: UserPlus, onClick: goToAddInstructor, color: '#5558e1ff' },
         { label: 'Approve Courses', icon: CheckCircle, onClick: goToApproveCourses, color: '#10b981' },
         { label: 'Assign Course', icon: BookMarked, onClick: goToAssignCourse, color: '#f59e0b' },
         { label: 'Download Report', icon: FileText, onClick: onDownloadReport, color: '#ef4444' },
@@ -269,26 +270,50 @@ const AdminDashboardView = ({
                             <p className="text-xs text-slate-400 mt-0.5">Weekly engagement overview</p>
                         </div>
                         <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-                            <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: themePrimary }}></div>
                             Lessons
                         </div>
                     </div>
                     <div className="flex-1 p-5">
                         {chartData && chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
+                                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                                     <defs>
-                                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#6366f1" stopOpacity={0.2} />
-                                            <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                                        <linearGradient id="lessonsBarGradient" x1="0" y1="0" x2="1" y2="0">
+                                            <stop offset="0%" stopColor="#172743" />
+                                            <stop offset="100%" stopColor="#2B2B72" />
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} dy={8} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} width={28} />
-                                    <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: '13px' }} />
-                                    <Area type="monotone" dataKey="lessons" stroke="#6366f1" strokeWidth={2.5} fill="url(#chartGradient)" />
-                                </AreaChart>
+                                    <XAxis 
+                                        dataKey="name" 
+                                        axisLine={false} 
+                                        tickLine={false} 
+                                        tick={{ fill: '#94a3b8', fontSize: 11 }} 
+                                        dy={8} 
+                                    />
+                                    <YAxis 
+                                        axisLine={false} 
+                                        tickLine={false} 
+                                        tick={{ fill: '#94a3b8', fontSize: 11 }} 
+                                        width={28} 
+                                    />
+                                    <Tooltip 
+                                        cursor={{ fill: '#f8fafc' }}
+                                        contentStyle={{ 
+                                            borderRadius: '12px', 
+                                            border: `1px solid ${themePrimaryLight}`, 
+                                            boxShadow: '0 4px 12px rgba(0,0,0,.08)', 
+                                            fontSize: '13px' 
+                                        }} 
+                                    />
+                                    <Bar 
+                                        dataKey="lessons" 
+                                        fill="url(#lessonsBarGradient)"
+                                        radius={[4, 4, 0, 0]} 
+                                        barSize={32}
+                                    />
+                                </BarChart>
                             </ResponsiveContainer>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-center">

@@ -1,6 +1,7 @@
 import pool from "../db/postgres.js";
 import csv from "csv-parser";
 import { Readable } from "stream";
+import { uploadBufferToCloudinary } from "../config/cloudinary.js";
 
 const baseUrl = process.env.BACKEND_URL;
 
@@ -280,6 +281,15 @@ export const getInstructorCourseStats = async (req, res) => {
   try {
     const instructorId = req.user.id;
     let { startDate, endDate } = req.query;
+    const performanceDataRes = await pool.query(
+      `SELECT TO_CHAR(CURRENT_DATE - gs.day, 'Mon DD') as name, COUNT(DISTINCT mp.student_id) as students 
+       FROM generate_series(6, 0, -1) as gs(day) 
+       LEFT JOIN module_progress mp ON DATE(COALESCE(mp.last_accessed_at, mp.completed_at)) = (CURRENT_DATE - gs.day) 
+         AND mp.course_id IN (SELECT courses_id FROM courses WHERE instructor_id = $1) 
+       GROUP BY gs.day 
+       ORDER BY gs.day DESC`,
+      [instructorId]
+    );
 
     // If no date filters provided, return all-time totals
     if (!startDate || !endDate) {
@@ -297,7 +307,8 @@ export const getInstructorCourseStats = async (req, res) => {
       return res.json({
         total_courses: rows[0].total_courses || 0,
         avg_rating: Number(rows[0].avg_rating || 5.0).toFixed(1),
-        coursesChange: 0
+        coursesChange: 0,
+        performanceData: performanceDataRes.rows
       });
     }
 
@@ -329,16 +340,6 @@ export const getInstructorCourseStats = async (req, res) => {
     const currentCourses = Number(currentStats[0].total_courses) || 0;
     const prevCourses = Number(prevStats[0].total_courses) || 0;
     const coursesChange = prevCourses > 0 ? ((currentCourses - prevCourses) / prevCourses * 100).toFixed(2) : 0;
-
-    const performanceDataRes = await pool.query(
-      `SELECT TO_CHAR(CURRENT_DATE - gs.day, 'Mon DD') as name, COUNT(DISTINCT mp.student_id) as students 
-       FROM generate_series(6, 0, -1) as gs(day) 
-       LEFT JOIN module_progress mp ON DATE(COALESCE(mp.last_accessed_at, mp.completed_at)) = (CURRENT_DATE - gs.day) 
-         AND mp.course_id IN (SELECT courses_id FROM courses WHERE instructor_id = $1) 
-       GROUP BY gs.day 
-       ORDER BY gs.day DESC`,
-      [instructorId]
-    );
 
     return res.json({
       total_courses: currentCourses,
@@ -400,7 +401,7 @@ export const exploreCourses = async (req, res) => {
 
     const { rows } = await pool.query(
       `
-      SELECT
+      SELECT DISTINCT
         c.courses_id,
         c.title,
         c.description,
@@ -412,19 +413,17 @@ export const exploreCourses = async (req, res) => {
         c.thumbnail_url,
         c.instructor_id,
         u.full_name AS instructor_name,
-        true AS is_assigned,
+        CASE WHEN ca.student_id IS NOT NULL THEN true ELSE false END AS is_assigned,
         false AS is_enrolled,
         CASE WHEN c.price_type = 'paid' THEN true ELSE false END AS is_paid,
         false AS is_completed
       FROM courses c
       LEFT JOIN users u ON u.user_id = c.instructor_id
+      LEFT JOIN course_assignments ca
+        ON ca.course_id = c.courses_id
+       AND ca.student_id = $1
       WHERE c.status = 'approved'
-      AND EXISTS (
-        SELECT 1
-        FROM course_assignments ca
-        WHERE ca.course_id = c.courses_id
-          AND ca.student_id = $1
-      )
+      AND ca.student_id IS NOT NULL
       AND c.courses_id NOT IN (
         SELECT course_id
         FROM student_courses
@@ -975,7 +974,7 @@ export const editModule = async (req, res) => {
     const instructorId = req.user.id;
 
     const ownerCheck = await pool.query(
-      `SELECT m.module_id, m.course_id, m.title, m.type
+      `SELECT m.module_id, m.course_id
        FROM modules m
        JOIN courses c ON c.courses_id = m.course_id
        WHERE m.module_id = $1 AND c.instructor_id = $2`,
@@ -986,15 +985,18 @@ export const editModule = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to edit this module" });
     }
 
-    const existingModule = ownerCheck.rows[0];
     const { title, type, content_url, notes, duration_mins } = req.body;
+    let finalContentUrl = content_url || null;
 
-    const resolvedTitle =
-      typeof title === "string" ? title.trim() : existingModule.title;
-    const resolvedType =
-      typeof type === "string" ? type : existingModule.type;
+    if (req.file) {
+      const uploadResult = await uploadBufferToCloudinary(req.file.buffer, {
+        folder: `${process.env.CLOUDINARY_UPLOAD_FOLDER || "shnoor-lms"}/modules`,
+        originalname: req.file.originalname,
+      });
+      finalContentUrl = uploadResult.secure_url;
+    }
 
-    if (!resolvedTitle || !resolvedType) {
+    if (!title || !type) {
       return res.status(400).json({ message: "Title and type are required" });
     }
 
@@ -1002,35 +1004,24 @@ export const editModule = async (req, res) => {
     const values = [];
     let idx = 1;
 
-    fields.push(`title = $${idx++}`); values.push(resolvedTitle);
-    fields.push(`type = $${idx++}`); values.push(resolvedType);
-
-    if (notes !== undefined) {
-      fields.push(`notes = $${idx++}`);
-      values.push(notes || null);
-    }
+    fields.push(`title = $${idx++}`); values.push(title);
+    fields.push(`type = $${idx++}`); values.push(type);
+    fields.push(`notes = $${idx++}`); values.push(notes || null);
 
     if (duration_mins !== undefined && duration_mins !== "") {
       fields.push(`duration_mins = $${idx++}`);
       values.push(Number(duration_mins));
     }
 
-    if (content_url) {
-      // Link / URL mode — clear any stored file data
-      fields.push(`content_url = $${idx++}`); values.push(content_url);
-      fields.push(`pdf_data = $${idx++}`); values.push(null);
-      fields.push(`pdf_filename = $${idx++}`); values.push(null);
-      fields.push(`pdf_mime = $${idx++}`); values.push(null);
-    } else if (req.file) {
-      // Upload mode (Cloudinary) — store remote URL, clear binary data
-      fields.push(`content_url = $${idx++}`); values.push(req.file.path || null);
+    if (finalContentUrl) {
+      fields.push(`content_url = $${idx++}`); values.push(finalContentUrl);
       fields.push(`pdf_data = $${idx++}`); values.push(null);
       fields.push(`pdf_filename = $${idx++}`); values.push(null);
       fields.push(`pdf_mime = $${idx++}`); values.push(null);
     }
 
     // Re-chunk text_stream content when notes change
-    if (resolvedType === "text_stream" && notes) {
+    if (type === "text_stream" && notes) {
       const chunks = notes.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
       await pool.query(`DELETE FROM module_text_chunks WHERE module_id = $1`, [moduleId]);
       if (chunks.length > 0) {
@@ -1055,7 +1046,7 @@ export const editModule = async (req, res) => {
        RETURNING module_id, course_id, title, type, content_url,
                  duration_mins AS duration, module_order, notes, pdf_filename, created_at,
                  CASE 
-                   WHEN pdf_data IS NOT NULL OR pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
+                   WHEN type = 'pdf' OR pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
                    ELSE content_url 
                  END AS resolved_url`,
       values
@@ -1091,6 +1082,15 @@ export const addModule = async (req, res) => {
     }
 
     const { title, type, content_url, notes, duration_mins } = req.body;
+    let finalContentUrl = content_url || null;
+
+    if (req.file) {
+      const uploadResult = await uploadBufferToCloudinary(req.file.buffer, {
+        folder: `${process.env.CLOUDINARY_UPLOAD_FOLDER || "shnoor-lms"}/modules`,
+        originalname: req.file.originalname,
+      });
+      finalContentUrl = uploadResult.secure_url;
+    }
 
     if (!title || !type) {
       return res.status(400).json({ message: "Title and type are required" });
@@ -1101,15 +1101,6 @@ export const addModule = async (req, res) => {
       [courseId]
     );
     const nextOrder = orderResult.rows[0].next_order;
-
-    let finalContentUrl = content_url || null;
-    let pdfData = null;
-    let pdfFilename = null;
-    let pdfMime = null;
-
-    if (req.file) {
-      finalContentUrl = req.file.path || null;
-    }
 
     const result = await pool.query(
       `INSERT INTO modules
@@ -1123,7 +1114,7 @@ export const addModule = async (req, res) => {
                  END AS resolved_url`,
       [courseId, title, type, finalContentUrl,
         duration_mins ? Number(duration_mins) : null,
-        nextOrder, notes || null, pdfData, pdfFilename, pdfMime]
+        nextOrder, notes || null, null, null, null]
     );
 
     const newModule = result.rows[0];

@@ -13,6 +13,9 @@ const StudentDashboard = () => {
   const [studentName, setStudentName] = useState("");
   const [deadlines, setDeadlines] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
+  const [freeCourses, setFreeCourses] = useState([]);
+  const [paidCourses, setPaidCourses] = useState([]);
+  const [recommendedCourses, setRecommendedCourses] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const debounceTimer = useRef(null);
@@ -71,6 +74,34 @@ const StudentDashboard = () => {
     };
 
     fetchDashboard();
+  }, []);
+
+  // Fetch course buckets for dashboard sections
+  useEffect(() => {
+    const fetchCourseBuckets = async () => {
+      try {
+        if (!auth.currentUser) return;
+        const token = await auth.currentUser.getIdToken(true);
+
+        const [exploreRes, recRes] = await Promise.all([
+          api.get("/api/courses/explore", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          api.get("/api/student/recommendations", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        const exploreCourses = exploreRes.data || [];
+        setFreeCourses(exploreCourses.filter((c) => c.price_type === "free"));
+        setPaidCourses(exploreCourses.filter((c) => c.price_type === "paid"));
+        setRecommendedCourses(recRes.data || []);
+      } catch (err) {
+        console.error("Course bucket fetch failed:", err);
+      }
+    };
+
+    fetchCourseBuckets();
   }, []);
 
 
@@ -162,6 +193,9 @@ const StudentDashboard = () => {
       onSearch={handleSearch}
       searchResults={searchResults}
       searchLoading={searchLoading}
+      freeCourses={freeCourses}
+      paidCourses={paidCourses}
+      recommendedCourses={recommendedCourses}
     />
   );
 };

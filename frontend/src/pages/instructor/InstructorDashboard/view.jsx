@@ -11,18 +11,8 @@ import {
   Search,
   X,
   Download,
-  BarChart3,
   Activity,
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import DateRangeFilter from "../../../components/DateRangeFilter";
 import Papa from "papaparse";
 
@@ -30,6 +20,7 @@ const InstructorDashboardView = ({
   loading,
   userName,
   stats,
+  studentRows = [],
   navigate,
   onSearch,
   searchResults = [],
@@ -37,11 +28,14 @@ const InstructorDashboardView = ({
   dateRange = null,
   setDateRange = () => {},
 }) => {
-  const performanceData = [];
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [attentionOnly, setAttentionOnly] = useState(false);
+  const [sortBy, setSortBy] = useState("progress");
   const debounceRef = useRef(null);
+  const matrixRef = useRef(null);
 
   useEffect(() => {
     const handleEsc = (e) => {
@@ -130,29 +124,110 @@ const InstructorDashboardView = ({
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
 
-  // — file1 sparkline —
   const sparkData = [[3, 5, 4, 7, 6, 8, 9], [2, 4, 3, 5, 7, 6, 8], [1, 2, 3, 4, 5, 6, 8]];
-  const Sparkline = ({ data, color }) => {
-    const max = Math.max(...data);
-    const min = Math.min(...data);
-    const range = max - min || 1;
-    const w = 80, h = 28;
-    const points = data
-      .map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`)
-      .join(" ");
-    return (
-      <svg width={w} height={h} style={{ overflow: "visible" }}>
-        <polyline
-          points={points}
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.6"
-        />
-      </svg>
-    );
+
+  const normalizedRows = Array.isArray(studentRows) ? studentRows : [];
+  const studentSummary = normalizedRows.reduce(
+    (acc, row) => {
+      const status = String(row.status || "").toLowerCase();
+      const progress = Math.max(0, Math.min(100, Number(row.progress || 0)));
+
+      acc.progressTotal += progress;
+
+      if (status === "completed") acc.completed += 1;
+      else if (status === "in progress") acc.inProgress += 1;
+      else acc.notStarted += 1;
+
+      return acc;
+    },
+    { completed: 0, inProgress: 0, notStarted: 0, progressTotal: 0 }
+  );
+  const averageProgress = normalizedRows.length
+    ? Math.round(studentSummary.progressTotal / normalizedRows.length)
+    : 0;
+  const needsAttentionRows = normalizedRows
+    .filter((row) => {
+      const progress = Number(row.progress || 0);
+      const avgScore = Number(row.avg_score || 0);
+      return progress < 30 || avgScore < 40;
+    })
+    .slice(0, 5);
+  const activeCourses = Object.entries(
+    normalizedRows.reduce((acc, row) => {
+      const title = row.course_title || "Untitled Course";
+      acc[title] = (acc[title] || 0) + 1;
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+  const topPerformer = normalizedRows.reduce((best, row) => {
+    const score = Number(row.avg_score || 0);
+    if (!best || score > best.score) {
+      return { name: row.student_name || "N/A", score };
+    }
+    return best;
+  }, null);
+
+  const filteredStudentRows = normalizedRows
+    .filter((row) => {
+      const q = searchTerm.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        String(row.student_name || "").toLowerCase().includes(q) ||
+        String(row.course_title || "").toLowerCase().includes(q) ||
+        String(row.status || "").toLowerCase().includes(q);
+
+      const status = String(row.status || "Not Started");
+      const matchesStatus = statusFilter === "All" ? true : status === statusFilter;
+
+      const progress = Number(row.progress || 0);
+      const avgScore = Number(row.avg_score || 0);
+      const isAttention = progress < 30 || avgScore < 40;
+      const matchesAttention = attentionOnly ? isAttention : true;
+
+      return matchesSearch && matchesStatus && matchesAttention;
+    })
+    .sort((a, b) => {
+      if (sortBy === "score") return Number(b.avg_score || 0) - Number(a.avg_score || 0);
+      if (sortBy === "name") return String(a.student_name || "").localeCompare(String(b.student_name || ""));
+      return Number(b.progress || 0) - Number(a.progress || 0);
+    });
+
+  const applyAttentionFocus = () => {
+    setStatusFilter("All");
+    setAttentionOnly(true);
+    setSortBy("progress");
+    setSearchTerm("");
+    matrixRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const resetMatrixFilters = () => {
+    setStatusFilter("All");
+    setAttentionOnly(false);
+    setSortBy("progress");
+    setSearchTerm("");
+  };
+
+  const handleDownloadStudentMatrix = () => {
+    const csvRows = filteredStudentRows.map((row) => ({
+      Student: row.student_name || "",
+      Course: row.course_title || "",
+      Progress: `${Math.round(Number(row.progress || 0))}%`,
+      "Avg Score": `${Number(row.avg_score || 0).toFixed(1)}%`,
+      Status: row.status || "Not Started",
+    }));
+
+    if (!csvRows.length) return;
+
+    const csv = Papa.unparse(csvRows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `student-matrix-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -303,37 +378,102 @@ const InstructorDashboardView = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 flex flex-col gap-5">
 
-          {/* ENGAGEMENT TRENDS — file1 card style */}
+          {/* STUDENT INSIGHTS */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[380px]">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-50">
               <div>
-                <h3 className="text-sm font-bold text-primary-900 uppercase tracking-wide">Engagement Trends</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Student activity over time</p>
+                <h3 className="text-sm font-bold text-primary-900 uppercase tracking-wide">Student Insights</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Live status and attention indicators</p>
               </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-                <div className="w-2 h-2 rounded-full bg-indigo-500"></div> Students
+              <div className="text-xs font-semibold text-slate-500">
+                Avg Progress <span className="text-indigo-600">{averageProgress}%</span>
               </div>
             </div>
-            <div className="flex-1 p-5">
-              {performanceData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={performanceData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Line dataKey="students" stroke="#6366f1" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-3">
-                    <BarChart3 className="text-slate-300" size={24} />
-                  </div>
-                  <p className="text-sm font-semibold text-slate-400">No engagement data yet</p>
-                  <p className="text-xs text-slate-300 mt-1">Data will appear as students interact with your courses.</p>
+            <div className="flex-1 p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-slate-100 p-4">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Status Split</h4>
+                <div className="space-y-2">
+                  {[
+                    { label: "Completed", value: studentSummary.completed, className: "bg-emerald-50 text-emerald-700" },
+                    { label: "In Progress", value: studentSummary.inProgress, className: "bg-blue-50 text-blue-700" },
+                    { label: "Not Started", value: studentSummary.notStarted, className: "bg-slate-100 text-slate-700" },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <p className="text-sm text-slate-600">{item.label}</p>
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${item.className}`}>
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+
+              <div className="rounded-xl border border-slate-100 p-4">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Needs Attention</h4>
+                {needsAttentionRows.length > 0 ? (
+                  <div className="space-y-2">
+                    {needsAttentionRows.map((row) => (
+                      <div
+                        key={`attention-${row.student_id}-${row.course_id}`}
+                        className="flex items-center justify-between bg-rose-50/60 border border-rose-100 rounded-lg px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{row.student_name}</p>
+                          <p className="text-[11px] text-slate-500 truncate">{row.course_title}</p>
+                        </div>
+                        <p className="text-[11px] font-bold text-rose-600">{Math.round(Number(row.progress || 0))}%</p>
+                      </div>
+                    ))}
+                    <button
+                      onClick={applyAttentionFocus}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors"
+                    >
+                      Open Matrix With Attention Filter
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">No students currently flagged.</p>
+                )}
+              </div>
+
+              <div className="md:col-span-2 rounded-xl border border-slate-100 p-4">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Most Active Courses</h4>
+                {activeCourses.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {activeCourses.map(([courseTitle, learners]) => (
+                      <div key={courseTitle} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <p className="text-sm text-slate-700 truncate">{courseTitle}</p>
+                        <span className="text-xs font-bold text-indigo-600">{learners} learners</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">Active courses will appear once students enroll.</p>
+                )}
+              </div>
+              <div className="md:col-span-2 rounded-xl border border-slate-100 p-4 bg-slate-50/60">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Top Performer</p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {topPerformer ? `${topPerformer.name} (${topPerformer.score.toFixed(1)}%)` : "No data yet"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">At-Risk Learners</p>
+                    <p className="text-sm font-semibold text-rose-600">{needsAttentionRows.length}</p>
+                  </div>
+                  <div className="ml-auto">
+                    <button
+                      onClick={handleDownloadStudentMatrix}
+                      disabled={!filteredStudentRows.length}
+                      className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    >
+                      Export Filtered Matrix
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -435,7 +575,7 @@ const InstructorDashboardView = ({
       </div>
 
       {/* STUDENT PERFORMANCE MATRIX — file2 only */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
+      <div ref={matrixRef} className="bg-white rounded-2xl border border-slate-100 shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 py-4 border-b border-slate-50 gap-3">
           <div>
             <h3 className="text-sm font-bold text-primary-900 uppercase tracking-wide">Student Performance Matrix</h3>
@@ -449,6 +589,55 @@ const InstructorDashboardView = ({
               placeholder="Filter students..."
               className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
             />
+          </div>
+        </div>
+        <div className="px-6 py-3 border-b border-slate-50 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {["All", "Completed", "In Progress", "Not Started"].map((item) => {
+              const count =
+                item === "All"
+                  ? normalizedRows.length
+                  : normalizedRows.filter((row) => String(row.status || "Not Started") === item).length;
+              const active = statusFilter === item;
+              return (
+                <button
+                  key={item}
+                  onClick={() => setStatusFilter(item)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                    active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {item} ({count})
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setAttentionOnly((prev) => !prev)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                attentionOnly ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-600 hover:bg-rose-100"
+              }`}
+            >
+              Needs Attention Only
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-500 font-semibold">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            >
+              <option value="progress">Progress</option>
+              <option value="score">Score</option>
+              <option value="name">Name</option>
+            </select>
+            <button
+              onClick={resetMatrixFilters}
+              className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Reset
+            </button>
+            <span className="text-xs font-semibold text-slate-500">Showing {filteredStudentRows.length}</span>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -466,11 +655,57 @@ const InstructorDashboardView = ({
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td colSpan={6} className="text-center py-14 text-slate-300 text-sm font-medium">
-                  No student data available
-                </td>
-              </tr>
+              {filteredStudentRows.length > 0 ? (
+                filteredStudentRows.map((row) => {
+                  const progress = Math.max(0, Math.min(100, Number(row.progress || 0)));
+                  const avgScore = Number(row.avg_score || 0);
+                  const status = row.status || "Not Started";
+                  const statusClass =
+                    status === "Completed"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : status === "In Progress"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-slate-100 text-slate-700";
+
+                  return (
+                    <tr key={`${row.student_id}-${row.course_id}`} className="border-b border-slate-100 last:border-0">
+                      <td className="px-6 py-4 text-sm font-medium text-slate-700">{row.student_name}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{row.course_title}</td>
+                      <td className="px-6 py-4">
+                        <div className="w-32">
+                          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-indigo-500"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">{progress}%</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{avgScore.toFixed(1)}%</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${statusClass}`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => navigate("/instructor/courses")}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="text-center py-14 text-slate-300 text-sm font-medium">
+                    No student data available
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

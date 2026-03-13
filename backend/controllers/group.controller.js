@@ -96,26 +96,44 @@ export const getGroups = async (req, res) => {
             JOIN users u ON gu.user_id = u.user_id
             WHERE gu.group_id = g.group_id
               AND u.status = 'active'
-              AND u.role = 'student'
+              AND u.role IN ('student', 'instructor')
           )
           -- Timestamp groups (start_date and end_date NOT NULL): count by registration date
           WHEN g.start_date IS NOT NULL AND g.end_date IS NOT NULL THEN (
-            SELECT COUNT(*)::int
-            FROM users u
-            WHERE u.created_at >= g.start_date
-              AND u.created_at <= g.end_date
-              AND u.role = 'student'
-              AND u.status = 'active'
+            (
+              SELECT COUNT(*)::int
+              FROM users u
+              WHERE u.created_at >= g.start_date
+                AND u.created_at <= g.end_date
+                AND u.role = 'student'
+                AND u.status = 'active'
+            ) + (
+              SELECT COUNT(*)::int
+              FROM group_users gu
+              JOIN users u ON gu.user_id = u.user_id
+              WHERE gu.group_id = g.group_id
+                AND u.role = 'instructor'
+                AND u.status = 'active'
+            )
           )
           -- College groups (both dates NULL and created_by NULL): count by college_name (normalized)
           ELSE (
-            SELECT COUNT(*)::int
-            FROM users u
-            WHERE u."college" IS NOT NULL
-              AND REGEXP_REPLACE(UPPER(TRIM(u."college")), '[,.\\-_() ]+', ' ', 'g') 
-                 = REGEXP_REPLACE(UPPER(TRIM(g.group_name)), '[,.\\-_() ]+', ' ', 'g')
-              AND u.role = 'student'
-              AND u.status = 'active'
+            (
+              SELECT COUNT(*)::int
+              FROM users u
+              WHERE u."college" IS NOT NULL
+                AND REGEXP_REPLACE(UPPER(TRIM(u."college")), '[,.\\-_() ]+', ' ', 'g') 
+                   = REGEXP_REPLACE(UPPER(TRIM(g.group_name)), '[,.\\-_() ]+', ' ', 'g')
+                AND u.role = 'student'
+                AND u.status = 'active'
+            ) + (
+              SELECT COUNT(*)::int
+              FROM group_users gu
+              JOIN users u ON gu.user_id = u.user_id
+              WHERE gu.group_id = g.group_id
+                AND u.role = 'instructor'
+                AND u.status = 'active'
+            )
           )
         END AS user_count
       FROM groups g
@@ -176,7 +194,7 @@ export const getGroup = async (req, res) => {
          JOIN users u ON gu.user_id = u.user_id
          WHERE gu.group_id = $1
            AND u.status = 'active'
-           AND u.role = 'student'`,
+           AND u.role IN ('student', 'instructor')`,
         [resolvedId]
       );
       group.user_count = userCountResult.rows[0].user_count;
@@ -184,27 +202,45 @@ export const getGroup = async (req, res) => {
       // TIMESTAMP GROUP
       group_type = 'timestamp';
       const userCountResult = await pool.query(
-        `SELECT COUNT(*)::int AS user_count
-         FROM users u
-         WHERE u.created_at >= $1 
-           AND u.created_at <= $2 
-           AND u.role = 'student' 
-           AND u.status = 'active'`,
-        [group.start_date, group.end_date]
+        `SELECT (
+            SELECT COUNT(*)::int
+            FROM users u
+            WHERE u.created_at >= $1
+              AND u.created_at <= $2
+              AND u.role = 'student'
+              AND u.status = 'active'
+          ) + (
+            SELECT COUNT(*)::int
+            FROM group_users gu
+            JOIN users u ON gu.user_id = u.user_id
+            WHERE gu.group_id = $3
+              AND u.role = 'instructor'
+              AND u.status = 'active'
+          ) AS user_count`,
+        [group.start_date, group.end_date, resolvedId]
       );
       group.user_count = userCountResult.rows[0].user_count;
     } else {
       // COLLEGE GROUP
       group_type = 'college';
       const userCountResult = await pool.query(
-        `SELECT COUNT(*)::int AS user_count
-         FROM users u
-         WHERE u."college" IS NOT NULL
-           AND REGEXP_REPLACE(UPPER(TRIM(u."college")), '[,.\\-_() ]+', ' ', 'g') 
-              = REGEXP_REPLACE(UPPER(TRIM($1)), '[,.\\-_() ]+', ' ', 'g')
-           AND u.role = 'student'
-           AND u.status = 'active'`,
-        [group.group_name]
+        `SELECT (
+            SELECT COUNT(*)::int
+            FROM users u
+            WHERE u."college" IS NOT NULL
+              AND REGEXP_REPLACE(UPPER(TRIM(u."college")), '[,.\\-_() ]+', ' ', 'g') 
+                 = REGEXP_REPLACE(UPPER(TRIM($1)), '[,.\\-_() ]+', ' ', 'g')
+              AND u.role = 'student'
+              AND u.status = 'active'
+          ) + (
+            SELECT COUNT(*)::int
+            FROM group_users gu
+            JOIN users u ON gu.user_id = u.user_id
+            WHERE gu.group_id = $2
+              AND u.role = 'instructor'
+              AND u.status = 'active'
+          ) AS user_count`,
+        [group.group_name, resolvedId]
       );
       group.user_count = userCountResult.rows[0].user_count;
     }
@@ -220,6 +256,11 @@ export const getGroup = async (req, res) => {
 export const getGroupUsers = async (req, res) => {
   const { groupId, id } = req.params;
   const resolvedId = groupId || id;
+  const roleFilter = String(req.query?.role || "all").toLowerCase();
+
+  if (!["all", "student", "instructor"].includes(roleFilter)) {
+    return res.status(400).json({ message: "Invalid role filter. Use all, student, or instructor" });
+  }
 
   try {
     const groupCheck = await pool.query(
@@ -232,14 +273,18 @@ export const getGroupUsers = async (req, res) => {
     }
 
     const { group_name, start_date, end_date, created_by } = groupCheck.rows[0];
+    const roleClause =
+      roleFilter === "all" ? "u.role IN ('student','instructor')" : "u.role = $2";
+    const roleParams = roleFilter === "all" ? [resolvedId] : [resolvedId, roleFilter];
 
     if (created_by) {
-      // MANUAL GROUP: Get students from group_users table
+      // MANUAL GROUP: Get members from group_users table
       const result = await pool.query(
         `SELECT
            u.user_id,
            u.full_name,
            u.email,
+           u.role,
            gu.assigned_at,
            gu.start_date,
            gu.end_date
@@ -247,18 +292,42 @@ export const getGroupUsers = async (req, res) => {
          JOIN users u ON gu.user_id = u.user_id
          WHERE gu.group_id = $1
            AND u.status = 'active'
-           AND u.role = 'student'
+           AND ${roleClause}
          ORDER BY gu.assigned_at`,
-        [resolvedId]
+        roleParams
       );
       return res.status(200).json(result.rows);
     } else if (start_date && end_date) {
-      // TIMESTAMP GROUP: Get students by registration date (created_at)
+      // TIMESTAMP GROUP:
+      // - students are auto-included by registration date
+      // - instructors are manual members via group_users
+      if (roleFilter === "instructor") {
+        const result = await pool.query(
+          `SELECT
+             u.user_id,
+             u.full_name,
+             u.email,
+             u.role,
+             gu.assigned_at,
+             gu.start_date,
+             gu.end_date
+           FROM group_users gu
+           JOIN users u ON gu.user_id = u.user_id
+           WHERE gu.group_id = $1
+             AND u.status = 'active'
+             AND u.role = 'instructor'
+           ORDER BY gu.assigned_at`,
+          [resolvedId]
+        );
+        return res.status(200).json(result.rows);
+      }
+
       const result = await pool.query(
         `SELECT
            u.user_id,
            u.full_name,
            u.email,
+           u.role,
            u.created_at AS assigned_at
          FROM users u
          WHERE u.created_at >= $1 
@@ -270,12 +339,36 @@ export const getGroupUsers = async (req, res) => {
       );
       return res.status(200).json(result.rows);
     } else {
-      // COLLEGE GROUP: Get students by college_name (normalized)
+      // COLLEGE GROUP:
+      // - students are auto-included by college_name
+      // - instructors are manual members via group_users
+      if (roleFilter === "instructor") {
+        const result = await pool.query(
+          `SELECT
+             u.user_id,
+             u.full_name,
+             u.email,
+             u.role,
+             gu.assigned_at,
+             gu.start_date,
+             gu.end_date
+           FROM group_users gu
+           JOIN users u ON gu.user_id = u.user_id
+           WHERE gu.group_id = $1
+             AND u.status = 'active'
+             AND u.role = 'instructor'
+           ORDER BY gu.assigned_at`,
+          [resolvedId]
+        );
+        return res.status(200).json(result.rows);
+      }
+
       const result = await pool.query(
         `SELECT
            u.user_id,
            u.full_name,
            u.email,
+           u.role,
            u.created_at AS assigned_at
          FROM users u
          WHERE u."college" IS NOT NULL
@@ -311,17 +404,23 @@ export const addUserToGroup = async (req, res) => {
 
     const { created_by, start_date: groupStartDate, end_date: groupEndDate } = groupCheck.rows[0];
 
-    // Check if user exists and is an active student
+    // Check if user exists and is an active student/instructor
     const userCheck = await pool.query(
-      `SELECT user_id, created_at FROM users WHERE user_id = $1 AND role = 'student' AND status = 'active'`,
+      `SELECT user_id, role, created_at
+       FROM users
+       WHERE user_id = $1
+         AND role IN ('student', 'instructor')
+         AND status = 'active'`,
       [userId]
     );
 
     if (userCheck.rows.length === 0) {
-      return res.status(400).json({ message: "Only active students can be added to groups" });
+      return res.status(400).json({ message: "Only active students or instructors can be added to groups" });
     }
 
     const user = userCheck.rows[0];
+    const isInstructor = user.role === "instructor";
+    const memberLabel = isInstructor ? "Instructor" : "Student";
 
     if (created_by) {
       // MANUAL GROUP: Add to group_users table
@@ -332,8 +431,18 @@ export const addUserToGroup = async (req, res) => {
          DO UPDATE SET start_date = EXCLUDED.start_date, end_date = EXCLUDED.end_date`,
         [resolvedId, userId, start_date || null, end_date || null]
       );
-      return res.status(200).json({ message: "Student added to manual group" });
+      return res.status(200).json({ message: `${memberLabel} added to manual group` });
     } else if (groupStartDate && groupEndDate) {
+      if (isInstructor) {
+        await pool.query(
+          `INSERT INTO group_users (group_id, user_id, assigned_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (group_id, user_id) DO NOTHING`,
+          [resolvedId, userId]
+        );
+        return res.status(200).json({ message: "Instructor added to timestamp group" });
+      }
+
       // TIMESTAMP GROUP: Validate user's created_at is within the range
       if (user.created_at < new Date(groupStartDate) || user.created_at > new Date(groupEndDate)) {
         return res.status(400).json({
@@ -349,6 +458,16 @@ export const addUserToGroup = async (req, res) => {
       );
       return res.status(200).json({ message: "Student added to timestamp group (date validated)" });
     } else {
+      if (isInstructor) {
+        await pool.query(
+          `INSERT INTO group_users (group_id, user_id, assigned_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (group_id, user_id) DO NOTHING`,
+          [resolvedId, userId]
+        );
+        return res.status(200).json({ message: "Instructor added to college group" });
+      }
+
       // COLLEGE GROUP: Update user's college_name
       const groupName = groupCheck.rows[0].group_name;
       const updateResult = await pool.query(
@@ -386,33 +505,47 @@ export const removeUserFromGroup = async (req, res) => {
 
     const { created_by, start_date, end_date, group_name } = groupCheck.rows[0];
 
+    const userCheckAny = await pool.query(
+      `SELECT role, "college"
+       FROM users
+       WHERE user_id = $1
+         AND role IN ('student', 'instructor')
+         AND status = 'active'`,
+      [userId]
+    );
+
+    if (userCheckAny.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    const userRole = userCheckAny.rows[0].role;
+
     if (created_by) {
       // MANUAL GROUP: Remove from group_users table
       await pool.query(
         `DELETE FROM group_users WHERE group_id = $1 AND user_id = $2`,
         [resolvedId, userId]
       );
-      return res.status(200).json({ message: "Student removed from manual group" });
+      return res.status(200).json({ message: `${userRole === "instructor" ? "Instructor" : "Student"} removed from manual group` });
     } else if (start_date && end_date) {
       // TIMESTAMP GROUP: Remove from group_users table
       await pool.query(
         `DELETE FROM group_users WHERE group_id = $1 AND user_id = $2`,
         [resolvedId, userId]
       );
-      return res.status(200).json({ message: "Student removed from timestamp group" });
+      return res.status(200).json({ message: `${userRole === "instructor" ? "Instructor" : "Student"} removed from timestamp group` });
     } else {
-      // COLLEGE GROUP: Remove by clearing the college field for this user
-      const userCheck = await pool.query(
-        `SELECT "college" FROM users WHERE user_id = $1 AND role = 'student' AND status = 'active'`,
-        [userId]
-      );
-
-      if (userCheck.rows.length === 0) {
-        return res.status(400).json({ message: "Student not found" });
+      if (userRole === "instructor") {
+        await pool.query(
+          `DELETE FROM group_users WHERE group_id = $1 AND user_id = $2`,
+          [resolvedId, userId]
+        );
+        return res.status(200).json({ message: "Instructor removed from college group" });
       }
 
+      // COLLEGE GROUP: Remove by clearing the college field for this user
       // Only clear college if it matches the group name
-      const userCollege = userCheck.rows[0]["college"];
+      const userCollege = userCheckAny.rows[0]["college"];
       if (userCollege) {
         // Normalize both for comparison
         const normalizeForComparison = (str) => str.toUpperCase().trim().replace(/[,.\-_() ]+/g, ' ').trim();

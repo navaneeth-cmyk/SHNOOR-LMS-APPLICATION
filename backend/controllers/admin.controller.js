@@ -444,6 +444,8 @@ export const assignCourses = async (req, res) => {
 export const updateCourseStatus = async (req, res) => {
   const { courses_id } = req.params;
   const { status } = req.body;
+  const feedbackRaw = req.body?.feedback ?? req.body?.comment_text ?? "";
+  const feedback = String(feedbackRaw || "").trim();
 
   const allowedStatuses = ["approved", "rejected", "pending"];
 
@@ -453,10 +455,16 @@ export const updateCourseStatus = async (req, res) => {
     });
   }
 
+  if (status === "rejected" && !feedback) {
+    return res.status(400).json({
+      message: "Feedback is required when rejecting a course",
+    });
+  }
+
   try {
     // ✅ Check if course exists
     const courseCheck = await pool.query(
-      `SELECT courses_id FROM courses WHERE courses_id = $1`,
+      `SELECT courses_id, instructor_id FROM courses WHERE courses_id = $1`,
       [courses_id],
     );
 
@@ -471,9 +479,18 @@ export const updateCourseStatus = async (req, res) => {
       `UPDATE courses
        SET status = $1
        WHERE courses_id = $2
-       RETURNING courses_id, title, status`,
+       RETURNING courses_id, title, status, instructor_id`,
       [status, courses_id],
     );
+
+    if (feedback) {
+      const statusLabel = status === "approved" ? "APPROVED" : status === "rejected" ? "REJECTED" : "UPDATED";
+      await pool.query(
+        `INSERT INTO course_comments (course_id, user_id, comment_text, parent_comment_id)
+         VALUES ($1, $2, $3, NULL)`,
+        [courses_id, req.user.id, `[Admin ${statusLabel}] ${feedback}`]
+      );
+    }
 
     res.status(200).json({
       message: `Course ${status} successfully`,

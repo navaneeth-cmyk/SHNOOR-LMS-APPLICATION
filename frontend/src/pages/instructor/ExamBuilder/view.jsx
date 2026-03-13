@@ -22,12 +22,28 @@ const ExamBuilderView = ({
         setActiveQuestionIndex(index);
     };
 
+    const handleBackArrowClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (step === 1) {
+            navigate("/instructor/dashboard");
+            return;
+        }
+        if (step !== 1) {
+            setStep(1);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans text-primary-900">
             {/* --- Top Bar --- */}
             <header className="px-6 py-3 flex items-center justify-between shrink-0 h-16 shadow-lg" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)' }}>
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/instructor/dashboard')} className="text-slate-400 hover:text-white transition-colors">
+                    <button
+                        type="button"
+                        onClick={handleBackArrowClick}
+                        className="text-slate-400 hover:text-white transition-colors"
+                    >
                         <ArrowLeft size={20} />
                     </button>
                     <div>

@@ -4,18 +4,34 @@ import pool from "../db/postgres.js";
 export const createLearningPath = async (req, res) => {
     const instructorId = req.user.id;
     const { name, description } = req.body;
+    const normalizedName = String(name || "").trim();
 
-    if (!name) return res.status(400).json({ message: "Name is required" });
+    if (!normalizedName) return res.status(400).json({ message: "Name is required" });
 
     try {
+        const duplicateCheck = await pool.query(
+            `SELECT id
+       FROM learning_paths
+       WHERE lower(trim(name)) = lower(trim($1))
+       LIMIT 1`,
+            [normalizedName]
+        );
+
+        if (duplicateCheck.rows.length > 0) {
+            return res.status(409).json({ message: "Learning path already existed" });
+        }
+
         const result = await pool.query(
             `INSERT INTO learning_paths (name, description, instructor_id)
        VALUES ($1, $2, $3) RETURNING *`,
-            [name, description || null, instructorId]
+            [normalizedName, description || null, instructorId]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error("createLearningPath error:", err);
+        if (err.code === "23505") {
+            return res.status(409).json({ message: "Learning path already existed" });
+        }
         res.status(500).json({ message: "Server error" });
     }
 };

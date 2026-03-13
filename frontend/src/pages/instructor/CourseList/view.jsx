@@ -266,6 +266,36 @@ const CourseListView = ({
                 </td>
                 <td className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
+                    onClick={(e) => openCommentsModal(course, e)}
+                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"
+                    title="Course Comments"
+                  >
+                    <MessageSquare size={14} />
+                  </button>
+                  {course.status === "archived" ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUnarchive(course.courses_id);
+                      }}
+                      className="p-2 text-emerald-600 hover:bg-emerald-50 rounded"
+                      title="Unarchive Course"
+                    >
+                      <Archive size={14} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onArchive(course.courses_id);
+                      }}
+                      className="p-2 text-amber-600 hover:bg-amber-50 rounded"
+                      title="Archive Course"
+                    >
+                      <Archive size={14} />
+                    </button>
+                  )}
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onDelete(course.courses_id);

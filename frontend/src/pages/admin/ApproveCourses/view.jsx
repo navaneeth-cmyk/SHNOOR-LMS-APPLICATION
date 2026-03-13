@@ -23,21 +23,14 @@ const ApproveCoursesView = ({
   }, [selectedCourse]);
 
   const initiateAction = (type) => {
-    if (type === "approved") {
-      if (window.confirm("Are you sure you want to approve this course?")) {
-        handleAction(selectedCourse.courses_id, "approved", "", editData);
-        setIsEditing(false);
-      }
-    } else {
-      setActionType(type);
-      setFeedback("");
-      setShowFeedbackModal(true);
-    }
+    setActionType(type);
+    setFeedback("");
+    setShowFeedbackModal(true);
   };
 
   const confirmAction = () => {
     if (selectedCourse) {
-      handleAction(selectedCourse.courses_id, actionType, feedback, editData);
+      handleAction(selectedCourse.courses_id, actionType, feedback.trim(), editData);
       setShowFeedbackModal(false);
       setFeedback("");
       setIsEditing(false);

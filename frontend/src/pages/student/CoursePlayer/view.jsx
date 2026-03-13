@@ -27,11 +27,10 @@ const normalizeExternalUrl = (url) => {
 const buildPdfViewerUrl = (url, authToken) => {
   if (!url || typeof url !== "string") return "";
 
-  // Check on the raw URL BEFORE appending token
   const isCloudinaryRawPdf = /res\.cloudinary\.com\/.+\/raw\/upload\//i.test(url);
-  
   if (isCloudinaryRawPdf) {
-    return `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(url)}`;
+    // Convert raw to image/upload delivery which allows direct browser rendering
+    return url.replace("/raw/upload/", "/image/upload/");
   }
 
   const withToken = authToken

@@ -25,6 +25,35 @@ export const initializeDatabase = async () => {
             );
         `);
 
+        // Enforce globally unique learning path names (case-insensitive, trim-aware).
+        // If legacy duplicate rows exist, skip index creation to avoid boot failure.
+        await pool.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_indexes
+                    WHERE schemaname = 'public'
+                      AND indexname = 'learning_paths_unique_name_idx'
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM (
+                            SELECT lower(trim(name)) AS normalized_name, COUNT(*) AS dup_count
+                            FROM learning_paths
+                            GROUP BY lower(trim(name))
+                            HAVING COUNT(*) > 1
+                        ) dups
+                    ) THEN
+                        CREATE UNIQUE INDEX learning_paths_unique_name_idx
+                        ON learning_paths ((lower(trim(name))));
+                    ELSE
+                        RAISE NOTICE 'Skipping unique index for learning_paths.name due to existing duplicate values';
+                    END IF;
+                END IF;
+            END $$;
+        `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS learning_path_courses (
                 id SERIAL PRIMARY KEY,

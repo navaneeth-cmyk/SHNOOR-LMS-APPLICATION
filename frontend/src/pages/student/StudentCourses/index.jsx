@@ -1,13 +1,15 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-case-declarations */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../../auth/firebase";
 import api from "../../../api/axios";
 import StudentCoursesView from "./view";
+import { useSocket } from "../../../context/SocketContext";
 
 const StudentCourses = () => {
   const navigate = useNavigate();
+  const { socket } = useSocket();
 
   const [activeTab, setActiveTab] = useState("my-learning");
   const [myCourses, setMyCourses] = useState([]);
@@ -37,35 +39,80 @@ const StudentCourses = () => {
     setUpcomingCourses(upcoming);
   }, [allCourses]);
 
-  // Fetch courses (My Learning + Explore)
+  const refreshCourses = useCallback(async (silent = false) => {
+    try {
+      if (!auth.currentUser) return;
+
+      if (!silent) setLoading(true);
+      const token = await auth.currentUser.getIdToken(true);
+
+      const [myRes, exploreRes, recRes] = await Promise.all([
+        api.get("/api/student/my-courses", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        api.get("/api/courses/explore", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        api.get("/api/student/recommendations", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      setMyCourses(myRes.data || []);
+      setAllCourses(exploreRes.data || []);
+      setRecommendedCourses(recRes.data || []);
+    } catch (err) {
+      console.error("Failed to fetch courses:", err);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  // Initial load
   useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        if (!auth.currentUser) return;
+    refreshCourses(false);
+  }, [refreshCourses]);
 
-        setLoading(true);
-        const token = await auth.currentUser.getIdToken(true);
+  // Real-time refresh via socket events
+  useEffect(() => {
+    if (!socket) return;
 
-        const [myRes, exploreRes] = await Promise.all([
-          api.get("/api/student/my-courses", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          api.get("/api/courses/explore", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-
-        setMyCourses(myRes.data || []);
-        setAllCourses(exploreRes.data || []);
-      } catch (err) {
-        console.error("Failed to fetch courses:", err);
-      } finally {
-        setLoading(false);
-      }
+    const handleRealtimeRefresh = () => {
+      refreshCourses(true);
     };
 
-    fetchCourses();
-  }, []);
+    socket.on("dashboard_update", handleRealtimeRefresh);
+    socket.on("new_notification", handleRealtimeRefresh);
+    socket.on("connect", handleRealtimeRefresh);
+
+    return () => {
+      socket.off("dashboard_update", handleRealtimeRefresh);
+      socket.off("new_notification", handleRealtimeRefresh);
+      socket.off("connect", handleRealtimeRefresh);
+    };
+  }, [socket, refreshCourses]);
+
+  // Polling fallback
+  useEffect(() => {
+    const timer = setInterval(() => {
+      refreshCourses(true);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [refreshCourses]);
+
+  // Refresh when user returns to tab/window
+  useEffect(() => {
+    const onFocus = () => refreshCourses(true);
+    const onVisible = () => {
+      if (!document.hidden) refreshCourses(true);
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshCourses]);
 
   // Search courses when search term changes
   useEffect(() => {
@@ -148,12 +195,7 @@ const StudentCourses = () => {
         return allCourses.filter((c) => c.price_type === "paid");
 
       case "recommended":
-        const userCategories = myCourses.map((c) => c.category);
-        return allCourses.filter(
-          (c) =>
-            userCategories.includes(c.category) &&
-            !enrolledIds.includes(c.courses_id || c.id)
-        );
+        return recommendedCourses;
 
       case "upcoming":
         return upcomingCourses;
@@ -199,17 +241,7 @@ const StudentCourses = () => {
 
       // ✅ FREE course → enrolled
       if (res.data?.success) {
-        const [myRes, exploreRes] = await Promise.all([
-          api.get("/api/student/my-courses", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          api.get("/api/courses/explore", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-
-        setMyCourses(myRes.data || []);
-        setAllCourses(exploreRes.data || []);
+        await refreshCourses(true);
         setActiveTab("my-learning");
       }
     } catch (err) {
