@@ -8,7 +8,6 @@ import {
   Library,
   Star,
   Check,
-  CheckCircle2,
 } from "lucide-react";
 import ReviewModal from "../../../components/student/ReviewModal";
 
@@ -462,7 +461,6 @@ const StudentCoursesView = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {displayCourses.map((course) => {
                 const isEnrolled = enrolledIds.includes(course.courses_id);
-                const isCompleted = Boolean(course.is_completed);
                 return (
                   <div
                     key={course.courses_id}
@@ -498,11 +496,6 @@ const StudentCoursesView = ({
 
                     {/* Card Content */}
                     <div className="p-6 flex-1 flex flex-col">
-                      {isCompleted && (
-                        <div className="mb-3 inline-flex items-center gap-1.5 w-fit px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-extrabold uppercase tracking-wide">
-                          <CheckCircle2 size={13} /> Completed
-                        </div>
-                      )}
                       <h4 className="text-lg font-bold text-slate-900 mb-3 line-clamp-2 leading-tight group-hover:text-indigo-600 transition-colors">
                         {course.title}
                       </h4>
@@ -519,20 +512,14 @@ const StudentCoursesView = ({
                       <div className="mt-auto space-y-3">
                         {isEnrolled ? (
                           <>
-                            {isCompleted ? (
-                              <div className="w-full bg-emerald-50 text-emerald-700 border-2 border-emerald-200 font-extrabold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2">
-                                <CheckCircle2 size={16} /> Completed
-                              </div>
-                            ) : (
-                              <button
-                                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3 px-4 rounded-xl text-sm transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10"
-                                onClick={() =>
-                                  navigate(`/student/course/${course.courses_id}`)
-                                }
-                              >
-                                Resume Learning <ArrowRight size={16} />
-                              </button>
-                            )}
+                            <button
+                              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3 px-4 rounded-xl text-sm transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10"
+                              onClick={() =>
+                                navigate(`/student/course/${course.courses_id}`)
+                              }
+                            >
+                              Resume Learning <ArrowRight size={16} />
+                            </button>
                             <button
                               className={`w-full font-extrabold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2 border-2 ${
                                 course.has_reviewed
