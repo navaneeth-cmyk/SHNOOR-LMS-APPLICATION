@@ -26,18 +26,9 @@ const normalizeExternalUrl = (url) => {
 
 const buildPdfViewerUrl = (url, authToken) => {
   if (!url || typeof url !== "string") return "";
-
-  const isCloudinaryRawPdf = /res\.cloudinary\.com\/.+\/raw\/upload\//i.test(url);
-  if (isCloudinaryRawPdf) {
-    // Convert raw to image/upload delivery which allows direct browser rendering
-    return url.replace("/raw/upload/", "/image/upload/");
-  }
-
-  const withToken = authToken
+  return authToken
     ? `${url}${url.includes("?") ? "&" : "?"}token=${authToken}`
     : url;
-
-  return withToken;
 };
 
 const SEEK_TOLERANCE_SECONDS = 1;

@@ -1,37 +1,7 @@
 import pool from "../db/postgres.js";
 import csv from "csv-parser";
-import { Readable } from "stream";
-import { v2 as cloudinary } from "cloudinary";
-
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const uploadBufferToCloudinary = (file) => {
-    const ext = (file.originalname || "").split(".").pop()?.toLowerCase();
-    const isVideo = (file.mimetype || "").startsWith("video/") || ["mp4", "mkv", "webm", "mov", "avi", "ogg"].includes(ext);
-    const isPdf = file.mimetype === "application/pdf" || ext === "pdf";
-
-    const folder = isVideo ? "uploads/videos" : isPdf ? "uploads/pdfs" : "uploads/docs";
-    const resourceType = isVideo ? "video" : "raw";
-
-    return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-            {
-                folder,
-                resource_type: resourceType,
-            },
-            (error, result) => {
-                if (error) return reject(error);
-                resolve(result);
-            }
-        );
-
-        stream.end(file.buffer);
-    });
-};
+import fs from "fs";
+import path from "path";
 
 export const bulkUploadModules = async (req, res) => {
     const client = await pool.connect();
@@ -62,12 +32,15 @@ export const bulkUploadModules = async (req, res) => {
 
         // 2. Parse CSV
         await new Promise((resolve, reject) => {
-            Readable.from(csvFile.buffer)
+            fs.createReadStream(csvFile.path)
                 .pipe(csv())
                 .on('data', (data) => results.push(data))
                 .on('end', resolve)
                 .on('error', reject);
         });
+
+        // Clean up temp CSV file after parsing
+        fs.unlink(csvFile.path, () => {});
 
         // 3. Process Rows
         const validModules = [];
@@ -156,8 +129,8 @@ export const bulkUploadModules = async (req, res) => {
             if (contentUrl && !contentUrl.startsWith('http') && fileMap[contentUrl]) {
                 const f = fileMap[contentUrl];
                 if (!uploadedResourceUrlByName[f.originalname]) {
-                    const uploaded = await uploadBufferToCloudinary(f);
-                    uploadedResourceUrlByName[f.originalname] = uploaded.secure_url || uploaded.url;
+                    const subFolder = path.basename(f.destination);
+                    uploadedResourceUrlByName[f.originalname] = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${f.filename}`;
                 }
                 contentUrl = uploadedResourceUrlByName[f.originalname];
                 uploadedFile = f;
@@ -214,7 +187,11 @@ export const bulkUploadModules = async (req, res) => {
                 const isHtmlFile = m.uploadedFile?.originalname.toLowerCase().endsWith('.html') || m.content_url.toLowerCase().endsWith('.html');
 
                 if (m.uploadedFile && !isHtmlFile) {
-                    textContent = m.uploadedFile.buffer.toString('utf-8');
+                    try {
+                        textContent = fs.readFileSync(m.uploadedFile.path, 'utf-8');
+                    } catch (readErr) {
+                        console.error('Error reading text file from disk:', readErr.message);
+                    }
                 }
                 // If it's a URL, we can't easily chunk it unless we fetch it. 
                 // Assuming Bulk Upload implies they provide the file.

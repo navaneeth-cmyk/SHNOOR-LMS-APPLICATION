@@ -2,7 +2,7 @@ import pool from "../db/postgres.js";
 import csv from "csv-parser";
 import { Readable } from "stream";
 import axios from "axios";
-import { uploadBufferToCloudinary } from "../config/cloudinary.js";
+import path from "path";
 
 const baseUrl = process.env.BACKEND_URL;
 
@@ -1055,11 +1055,8 @@ export const editModule = async (req, res) => {
     let finalContentUrl = content_url || null;
 
     if (req.file) {
-      const uploadResult = await uploadBufferToCloudinary(req.file.buffer, {
-        folder: `${process.env.CLOUDINARY_UPLOAD_FOLDER || "shnoor-lms"}/modules`,
-        originalname: req.file.originalname,
-      });
-      finalContentUrl = uploadResult.secure_url;
+      const subFolder = path.basename(req.file.destination);
+      finalContentUrl = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${req.file.filename}`;
     }
 
     if (!title || !type) {
@@ -1145,11 +1142,8 @@ export const addModule = async (req, res) => {
     let finalContentUrl = content_url || null;
 
     if (req.file) {
-      const uploadResult = await uploadBufferToCloudinary(req.file.buffer, {
-        folder: `${process.env.CLOUDINARY_UPLOAD_FOLDER || "shnoor-lms"}/modules`,
-        originalname: req.file.originalname,
-      });
-      finalContentUrl = uploadResult.secure_url;
+      const subFolder = path.basename(req.file.destination);
+      finalContentUrl = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${req.file.filename}`;
     }
 
     if (!title || !type) {

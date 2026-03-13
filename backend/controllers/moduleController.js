@@ -1,6 +1,7 @@
 import pool from "../db/postgres.js";
 import axios from "axios";
-import { uploadBufferToCloudinary } from "../config/cloudinary.js";
+import path from "path";
+import fs from "fs";
 
 export const addModules = async (req, res) => {
   try {
@@ -33,11 +34,8 @@ export const addModules = async (req, res) => {
       let finalContentUrl = m.content_url || null;
 
       if (pdf) {
-        const uploadResult = await uploadBufferToCloudinary(pdf.buffer, {
-          folder: `${process.env.CLOUDINARY_UPLOAD_FOLDER || "shnoor-lms"}/modules`,
-          originalname: pdf.originalname,
-        });
-        finalContentUrl = uploadResult.secure_url;
+        const subFolder = path.basename(pdf.destination);
+        finalContentUrl = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${pdf.filename}`;
       }
 
       const result = await pool.query(
@@ -76,7 +74,14 @@ export const addModules = async (req, res) => {
         const moduleId = result.rows[0].module_id;
         let textToChunk = m.notes || "";
 
-        // Support text stream files stored remotely (e.g., Cloudinary).
+        // Read text content from disk file if available, else fetch remote URL.
+        if (!textToChunk && pdf && pdf.path) {
+          try {
+            textToChunk = fs.readFileSync(pdf.path, "utf-8");
+          } catch (readErr) {
+            console.error("Error reading text file from disk:", readErr.message);
+          }
+        }
         if (!textToChunk && finalContentUrl && finalContentUrl.startsWith("http")) {
           try {
             const textRes = await axios.get(finalContentUrl, {
@@ -217,42 +222,9 @@ export const getModulePdf = async (req, res) => {
       return res.send(moduleData.pdf_data);
     }
 
-    // 2️⃣ Cloud URL fallback (Cloudinary/external object storage)
+    // 2️⃣ URL fallback — redirect directly to the stored file
     if (moduleData.content_url) {
-      if (moduleData.content_url.startsWith("http")) {
-        try {
-          const remoteRes = await axios.get(moduleData.content_url, {
-            responseType: "stream",
-            timeout: 120000,
-            validateStatus: (status) => status >= 200 && status < 400,
-          });
-
-          const remoteContentType = String(
-            remoteRes.headers?.["content-type"] || "application/pdf"
-          );
-
-          res.setHeader("Content-Type", remoteContentType);
-          res.setHeader("Content-Disposition", `inline; filename="document.pdf"`);
-
-          remoteRes.data.on("error", (streamErr) => {
-            console.error("getModulePdf stream error:", streamErr?.message || streamErr);
-            if (!res.headersSent) {
-              res.status(502).json({ message: "Failed to stream PDF from storage" });
-            } else {
-              res.end();
-            }
-          });
-
-          return remoteRes.data.pipe(res);
-        } catch (remoteErr) {
-          console.error(
-            "getModulePdf remote fetch error:",
-            remoteErr?.message || remoteErr
-          );
-          // Graceful fallback: let browser load from source URL directly.
-          return res.redirect(moduleData.content_url);
-        }
-      }
+      return res.redirect(moduleData.content_url);
     }
 
     res.status(404).json({ message: "PDF content not found" });

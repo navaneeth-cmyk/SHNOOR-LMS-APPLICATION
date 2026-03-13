@@ -1,7 +1,43 @@
 import multer from "multer";
 import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
-const storage = multer.memoryStorage();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const uploadsRoot = path.join(__dirname, "..", "uploads");
+
+const ensureDir = (dir) => {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+};
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        let subFolder;
+        if (file.fieldname === "file") {
+            // CSV file goes to temp folder
+            subFolder = "temp";
+        } else {
+            // Resource files routed by type
+            const ext = path.extname(file.originalname).toLowerCase();
+            if ((file.mimetype || "").startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
+                subFolder = "videos";
+            } else if (file.mimetype === "application/pdf" || ext === ".pdf") {
+                subFolder = "pdfs";
+            } else {
+                subFolder = "docs";
+            }
+        }
+        const dir = path.join(uploadsRoot, subFolder);
+        ensureDir(dir);
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, unique + path.extname(file.originalname));
+    },
+});
 
 const fileFilter = (req, file, cb) => {
     // Allow CSV

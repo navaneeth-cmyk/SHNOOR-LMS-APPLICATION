@@ -11,13 +11,28 @@ import {
   bulkUploadStudents,
 } from "../controllers/user.controller.js";
 import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import firebaseAuth from "../middlewares/firebaseAuth.js";
 import attachUser from "../middlewares/attachUser.js";
 import roleGuard from "../middlewares/roleGuard.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const profilePicsDir = path.join(__dirname, "..", "uploads", "profile_pictures");
+if (!fs.existsSync(profilePicsDir)) fs.mkdirSync(profilePicsDir, { recursive: true });
+
 const router = express.Router();
 const uploadProfilePictureFile = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, profilePicsDir),
+    filename: (req, file, cb) => {
+      const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, unique + path.extname(file.originalname));
+    },
+  }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if ((file.mimetype || "").startsWith("image/")) {

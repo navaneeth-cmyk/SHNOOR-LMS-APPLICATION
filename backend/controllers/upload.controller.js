@@ -1,41 +1,35 @@
 import multer from "multer";
 import path from "path";
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
-// Configure Cloudinary
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Cloudinary Storage
-const storage = new CloudinaryStorage({
-    cloudinary,
-    params: async (req, file) => {
+const uploadsRoot = path.join(__dirname, "..", "uploads");
+
+const ensureDir = (dir) => {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+};
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
-
+        let subFolder;
         if (file.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
-            return {
-                folder: "uploads/videos",
-                resource_type: "video",
-            };
+            subFolder = "videos";
+        } else if (file.mimetype === "application/pdf" || ext === ".pdf") {
+            subFolder = "pdfs";
+        } else {
+            subFolder = "docs";
         }
-
-        if (file.mimetype === "application/pdf" || ext === ".pdf") {
-            return {
-                folder: "uploads/pdfs",
-                resource_type: "raw",
-                format: "pdf",
-            };
-        }
-
-        // HTML, TXT, MD files
-        return {
-            folder: "uploads/docs",
-            resource_type: "raw",
-        };
+        const dir = path.join(uploadsRoot, subFolder);
+        ensureDir(dir);
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, unique + path.extname(file.originalname));
     },
 });
 
@@ -79,7 +73,8 @@ export const handleUpload = (req, res) => {
         return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const fileUrl = req.file.path; // ✅ Permanent Cloudinary URL
+    const subFolder = path.basename(req.file.destination);
+    const fileUrl = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${req.file.filename}`;
 
     res.status(200).json({
         message: "File uploaded successfully",
