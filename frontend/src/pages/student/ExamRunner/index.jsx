@@ -1,11 +1,3 @@
-import { addLocalCertificate } from '../../../utils/certificateStorage';
-import { Peer } from 'peerjs';
-import { toast } from 'react-hot-toast';
-import { useObjectDetection } from '../../../hooks/useObjectDetection';
-import { useVoiceDetection } from '../../../hooks/useVoiceDetection';
-import { useFaceDetection } from '../../../hooks/useFaceDetection';
-import { db } from '../../../auth/firebase';
-
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -22,7 +14,9 @@ const SECTION_CONFIG = {
   coding: { label: "Coding", color: "bg-amber-600", ring: "ring-amber-400", badge: "bg-amber-100 text-amber-700", icon: "💻" },
 };
 
+// ✅ ALL VIOLATIONS & PROCTORING FULLY DISABLED
 const EXAM_VIOLATIONS_DISABLED = true;
+const PROCTORING_DISABLED = true;
 
 const ExamRunner = () => {
   const { examId } = useParams();
@@ -47,161 +41,15 @@ const ExamRunner = () => {
   const [canRewrite, setCanRewrite] = useState(false);
   const socketRef = useRef(null);
 
-  const [isProctored, setIsProctored] = useState(false);
-  const [stream, setStream] = useState(null);
-  const [proctoringError, setProctoringError] = useState(null);
-  const [peer, setPeer] = useState(null);
-
-  const streamRef = useRef(null);
-  const peerRef = useRef(null);
-
-  const { isSuspicious, detections } = useObjectDetection(stream);
-  const { isVoiceSuspicious, isLoudNoise } = useVoiceDetection(stream);
-  const { multipleFacesDetected, noFaceDetected } = useFaceDetection(stream);
-  const lastSyncRef = useRef(0);
-
-  const startCamera = async () => {
-    try {
-      setProctoringError(null);
-      let mediaStream;
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
-      } catch (audioErr) {
-        console.warn('[CAMERA] Audio failed, falling back to video-only:', audioErr.message);
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-      }
-      setStream(mediaStream);
-      streamRef.current = mediaStream;
-      setIsProctored(true);
-      toast.success('Camera started successfully');
-      triggerFullscreen();
-    } catch (err) {
-      console.error('Camera access denied:', err);
-      toast.error('Camera Error: ' + err.message);
-      setProctoringError(
-        'Camera access is required to start the exam. Please enable permissions in your browser settings.'
-      );
-    }
-  };
-
-  useEffect(() => {
-    streamRef.current = stream; // Always keep the latest stream for potential incoming calls
-    if (!stream || peerRef.current) return;
-    let isMounted = true;
-    const initPeer = async () => {
-      const safeId = (auth.currentUser?.uid || 'exam').replace(/[^a-zA-Z0-9]/g, '');
-      const peerId = `${safeId}-${Math.random().toString(36).substr(2, 5)}`;
-      const newPeer = new Peer(peerId, {
-        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
-      });
-      newPeer.on('open', async (id) => {
-        if (!isMounted) return;
-        try {
-          // USE BACKEND BRIDGE TO BYPASS PERMISSION ISSUES
-          await api.post('/api/proctoring/register', {
-            peerId: id,
-            userName: auth.currentUser?.displayName || localStorage.getItem('full_name') || 'Student',
-            examId: examId,
-            examTitle: exam?.title || 'Regular Exam',
-            userId: auth.currentUser?.uid
-          });
-          console.log("[PROCTORING] session registered via backend:", id);
-        } catch (e) {
-          console.error("[PROCTORING] Registration Error:", e);
-          toast.error("Proctoring Registry Error: " + (e.response?.data?.message || e.message));
-        }
-      });
-      newPeer.on('call', (call) => {
-        console.log("[PEER] Receiving proctoring call. Answering with current stream...");
-        if (streamRef.current) {
-          call.answer(streamRef.current);
-          console.log("[PEER] Answered call with stream:", streamRef.current.id);
-        } else {
-          console.warn("[PEER] Call received but no local stream available to answer with.");
-        }
-      });
-      if (isMounted) {
-        setPeer(newPeer);
-        peerRef.current = newPeer;
-      }
-    };
-    const timer = setTimeout(initPeer, 1500);
-    return () => { isMounted = false; clearTimeout(timer); };
-  }, [stream]);
-
-  useEffect(() => {
-    if (!peer || !peer.id || !isProctored || isSubmitted) return;
-    const syncSuspiciousStatus = async () => {
-      const now = Date.now();
-      if (now - lastSyncRef.current < 3000) return;
-      lastSyncRef.current = now;
-      const isViolation = isSuspicious || isVoiceSuspicious || multipleFacesDetected || noFaceDetected || isLoudNoise;
-      try {
-        await api.post("/api/proctoring/status", {
-          peerId: peer.id,
-          status: {
-            isSuspicious: isViolation,
-            isVoiceSuspicious: isVoiceSuspicious || isLoudNoise,
-            multipleFacesDetected: multipleFacesDetected,
-            noFaceDetected: noFaceDetected,
-            lastDetected: isViolation ? new Date().toISOString() : null
-          }
-        });
-        if (!EXAM_VIOLATIONS_DISABLED && isViolation && (now - (window._lastViolationLog || 0) > 10000)) {
-          window._lastViolationLog = now;
-          let type = 'UNKNOWN';
-          if (isSuspicious) {
-            const hasPhone = detections.some(d => d.class === 'cell phone');
-            type = hasPhone ? 'PHONE_DETECTED' : 'OBJECT_DETECTION';
-          } else if (noFaceDetected) type = 'NO_FACE';
-          else if (multipleFacesDetected) type = 'MULTIPLE_FACES';
-          else if (isLoudNoise) type = 'LOUD_NOISE';
-          else if (isVoiceSuspicious) type = 'VOICE_DETECTION';
-          api.post(`/api/student/exams/${examId}/violation`, {
-            type,
-            details: {
-              timestamp: new Date().toISOString(),
-              objectDetection: isSuspicious,
-              voiceDetection: isVoiceSuspicious,
-              loudNoise: isLoudNoise,
-              noFace: noFaceDetected,
-              multipleFaces: multipleFacesDetected,
-              detections
-            }
-          }).catch(e => console.error(e));
-        }
-      } catch (err) { }
-    };
-    syncSuspiciousStatus();
-  }, [isSuspicious, isVoiceSuspicious, multipleFacesDetected, noFaceDetected, isLoudNoise, peer, isProctored, isSubmitted, examId]);
-
-  useEffect(() => {
-    const handleUnload = () => {
-      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
-      if (peerRef.current) {
-        const pId = peerRef.current.id;
-        peerRef.current.destroy();
-        api.delete(`/api/proctoring/session/${pId}`).catch(() => { });
-      }
-    };
-    window.addEventListener('beforeunload', handleUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
-      if (peerRef.current) {
-        const pId = peerRef.current.id;
-        peerRef.current.destroy();
-        deleteDoc(doc(db, 'live_sessions', pId)).catch(() => { });
-      }
-    };
-  }, []);
-
+  // ✅ PROCTORING STATE — all inert/disabled
+  const isProctored = false;
+  const stream = null;
+  const proctoringError = null;
+  const isSuspicious = false;
+  const isVoiceSuspicious = false;
+  const multipleFacesDetected = false;
+  const detections = [];
+  const startCamera = () => {};
 
   // Server-authoritative timer state
   const [endTimeMs, setEndTimeMs] = useState(null);
@@ -247,7 +95,6 @@ const ExamRunner = () => {
   /* =========================
      LOAD EXAM FROM BACKEND
   ========================= */
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -256,14 +103,11 @@ const ExamRunner = () => {
       }
 
       try {
-        // Use cached token to avoid Firebase quota issues
         const token = await user.getIdToken(false);
 
         const res = await api.get(
           `/api/student/exams/${examId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
         const examData = res.data;
@@ -291,17 +135,6 @@ const ExamRunner = () => {
             console.warn("⚠️ Using fallback timer - timestamps will be less secure");
             return;
           }
-
-          console.log("⏰ Time Debugging:", {
-            raw_server_time: attemptRes.data.server_time,
-            raw_end_time: attemptRes.data.end_time,
-            parsed_server_time: serverTime,
-            parsed_end_time: endTime,
-            client_time: clientTime,
-            server_offset: serverTime - clientTime,
-            duration_minutes: examData.duration,
-            remaining_seconds: Math.floor((endTime - serverTime) / 1000)
-          });
 
           setServerOffsetMs(serverTime - clientTime);
           setEndTimeMs(endTime);
@@ -388,7 +221,6 @@ const ExamRunner = () => {
 
     const connectSocket = async () => {
       try {
-        // Use cached token for socket connection
         const token = await auth.currentUser.getIdToken(false);
 
         const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
@@ -402,33 +234,22 @@ const ExamRunner = () => {
 
         socketRef.current = socket;
 
-        console.log("🔧 Setting up socket listeners for exam:", examId);
-
-        // Handle auto-submit event from server (SET THIS UP FIRST!)
         socket.on("exam:autoSubmitted", (data) => {
-          console.log("🚨🚨🚨 RECEIVED exam:autoSubmitted event:", data);
-          console.log("Current state - isSubmitted:", isSubmitted, "isExamLocked:", isExamLocked);
-
+          console.log("🚨 RECEIVED exam:autoSubmitted event:", data);
           setIsExamLocked(true);
           setIsSubmitted(true);
           fetchExamResult();
-
           alert(data.message || "Exam auto-submitted due to disconnection.");
         });
 
-        // Initial connection AND reconnection
         socket.on("connect", () => {
           console.log("🔌 Connected to server, socket ID:", socket.id);
-          console.log("📝 Emitting exam:start for examId:", examId);
-
           socket.emit("exam:start", { examId });
-
           checkExamStatus();
         });
 
         socket.on("disconnect", (reason) => {
           console.warn("❌ Disconnected from server. Reason:", reason);
-          console.warn("⏰ Grace timer should start now on backend");
           if (reason === "io server disconnect") {
             socket.connect();
           }
@@ -443,8 +264,7 @@ const ExamRunner = () => {
         });
 
         socket.io.on("reconnect", (attempt) => {
-          console.log("✅✅✅ Successfully reconnected after", attempt, "attempts");
-          console.log("📝 exam:start will be emitted via 'connect' event");
+          console.log("✅ Successfully reconnected after", attempt, "attempts");
         });
 
       } catch (error) {
@@ -456,31 +276,25 @@ const ExamRunner = () => {
 
     return () => {
       if (socketRef.current) {
-        console.log("🔌 Disconnecting socket...");
         socketRef.current.disconnect();
       }
     };
   }, [exam, examId, isSubmitted]);
 
   /* =========================
-     VISIBILITY CHECK FOR AUTO-SUBMIT
-     (Fallback if socket event is missed)
+     VISIBILITY CHECK (Status fallback)
   ========================= */
   useEffect(() => {
     if (!exam || isSubmitted) return;
 
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log("👀 Page became visible, checking exam status...");
         checkExamStatus();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [exam, examId, isSubmitted]);
 
   /* =========================
@@ -489,24 +303,11 @@ const ExamRunner = () => {
   useEffect(() => {
     if (!exam || isSubmitted || exam.duration === 0 || !endTimeMs || isExamLocked) return;
 
-    let tickCount = 0;
     const timer = setInterval(() => {
       const now = Date.now() + serverOffsetMs;
       const secondsRemaining = Math.floor((endTimeMs - now) / 1000);
 
-      if (tickCount < 3) {
-        console.log(`⏱️ Timer Tick ${tickCount + 1}:`, {
-          clientNow: Date.now(),
-          serverOffsetMs,
-          adjustedNow: now,
-          endTimeMs,
-          secondsRemaining
-        });
-        tickCount++;
-      }
-
       if (secondsRemaining <= 0) {
-        console.log("❌ Timer expired - locking exam");
         setTimeLeft(0);
         setIsExamLocked(true);
         clearInterval(timer);
@@ -532,7 +333,6 @@ const ExamRunner = () => {
 
   /* =========================
      ANSWER HANDLING
-     (KEYED BY QUESTION_ID)
   ========================= */
   const handleAnswer = async (question, value) => {
     if (isExamLocked || isSubmitted) return;
@@ -546,38 +346,25 @@ const ExamRunner = () => {
       const token = await auth.currentUser.getIdToken(false);
 
       if (question.type === "mcq") {
-        console.log("💾 Saving MCQ answer:", { questionId: question.id, optionId: value });
-
-        const response = await api.post(
+        await api.post(
           `/api/exams/${examId}/save-answer`,
           { questionId: question.id, selectedOptionId: value },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-
-        console.log("✅ MCQ answer saved:", response.data);
       } else {
-        console.log("💾 Saving text answer:", { questionId: question.id, textLength: value?.length });
-
-        const response = await api.post(
+        await api.post(
           `/api/exams/${examId}/save-answer`,
           { questionId: question.id, answerText: value },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-
-        console.log("✅ Text answer saved:", response.data);
       }
     } catch (error) {
-      console.error("❌ Failed to save answer:", {
-        questionId: question.id,
-        error: error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      });
+      console.error("❌ Failed to save answer:", error.message);
     }
   };
 
   /* =========================
-     SUBMIT EXAM (BACKEND)
+     SUBMIT EXAM
   ========================= */
   const handleSubmit = async () => {
     try {
@@ -585,31 +372,18 @@ const ExamRunner = () => {
 
       const token = await auth.currentUser.getIdToken(false);
 
-      console.log("📤 Submitting exam...", {
-        examId,
-        answersCount: Object.keys(answersRef.current).length,
-        answers: answersRef.current
-      });
-
       const res = await api.post(
         `/api/exams/${examId}/submit`,
         { answers: answersRef.current },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      console.log("✅ Exam submitted successfully:", res.data);
-
       setResult(res.data);
       setIsSubmitted(true);
       setCanRewrite(true);
 
     } catch (err) {
-      console.error("❌ Exam submission failed:", {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-        error: err
-      });
+      console.error("❌ Exam submission failed:", err);
 
       const errorMessage = err.response?.data?.message || "Failed to submit exam. Please try again.";
 
@@ -617,8 +391,6 @@ const ExamRunner = () => {
         setIsSubmitted(true);
         setCanRewrite(true);
         alert("Exam has been submitted. You can rewrite it if needed.");
-      } else if (err.message?.includes('auth/quota-exceeded')) {
-        alert('Firebase quota exceeded. Please try again in a few minutes or contact support.');
       } else {
         alert(`Submission Error: ${errorMessage}`);
       }
@@ -638,20 +410,18 @@ const ExamRunner = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Reset UI state
       setIsSubmitted(false);
       setResult(null);
       setAnswers({});
       setCurrentQIndex(0);
       setCanRewrite(false);
-      // Also reset section to first available
       setSectionIndex(0);
 
       if (exam?.duration > 0) {
-        const token = await auth.currentUser.getIdToken(false);
+        const token2 = await auth.currentUser.getIdToken(false);
         const attemptRes = await api.get(
           `/api/exams/${examId}/attempt`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token2}` } }
         );
         const serverTime = new Date(attemptRes.data.server_time).getTime();
         const endTime = new Date(attemptRes.data.end_time).getTime();
@@ -661,7 +431,6 @@ const ExamRunner = () => {
         setTimeLeft(Math.max(0, remaining));
       }
 
-      console.log("✅ Rewrite attempt created successfully");
     } catch (err) {
       console.error("❌ Failed to create rewrite attempt:", err);
       alert("Failed to start rewrite. Please try again.");
@@ -669,7 +438,7 @@ const ExamRunner = () => {
   };
 
   /* =========================
-     EXAM SECURITY HOOK
+     EXAM SECURITY HOOK — FULLY DISABLED
   ========================= */
   const [securityModal, setSecurityModal] = useState({
     open: false,
@@ -677,23 +446,16 @@ const ExamRunner = () => {
     count: 0
   });
 
-  const handleSecurityWarning = (type, count) => {
-    setSecurityModal({
-      open: true,
-      type: type,
-      count: count
-    });
-  };
-
+  // ✅ No-op handlers — violations completely disabled
+  const handleSecurityWarning = () => {};
   const handleResumeExam = () => {
     setSecurityModal(prev => ({ ...prev, open: false }));
-    triggerFullscreen();
   };
 
   const { securityHandlers, triggerFullscreen, isTerminated } = useExamSecurity(
     handleSubmit,
     handleSecurityWarning,
-    { enabled: !EXAM_VIOLATIONS_DISABLED }
+    { enabled: false } // ✅ Always disabled
   );
 
   return (
@@ -726,14 +488,14 @@ const ExamRunner = () => {
       availableSections={availableSections}
       handleSectionChange={handleSectionChange}
       sectionConfig={SECTION_CONFIG}
-      // AI Props
+      // ✅ Proctoring — all disabled/inert
       isProctored={isProctored}
       stream={stream}
       proctoringError={proctoringError}
       startCamera={startCamera}
-      isSuspicious={isSuspicious || isVoiceSuspicious || multipleFacesDetected}
-      isVoiceSuspicious={isVoiceSuspicious}
-      multipleFacesDetected={multipleFacesDetected}
+      isSuspicious={false}
+      isVoiceSuspicious={false}
+      multipleFacesDetected={false}
       detections={detections}
     />
   );
