@@ -1,5 +1,4 @@
 import express from "express";
-import multer from "multer";
 import {
   addCourse,
   approveCourse,
@@ -26,9 +25,17 @@ import firebaseAuth from "../middlewares/firebaseAuth.js";
 import attachUser from "../middlewares/attachUser.js";
 import roleGuard from "../middlewares/roleGuard.js";
 import uploadCsv from "../middlewares/uploadCsv.js";
+import { uploadFile } from "../controllers/upload.controller.js";
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const uploadModuleFile = (req, res, next) => {
+  uploadFile(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message });
+    }
+    next();
+  });
+};
 
 
 router.post(
@@ -175,7 +182,7 @@ router.patch(
   firebaseAuth,
   attachUser,
   roleGuard("instructor"),
-  upload.single("file"),
+  uploadModuleFile,
   editModule
 );
 
@@ -184,7 +191,7 @@ router.post(
   firebaseAuth,
   attachUser,
   roleGuard("instructor"),
-  upload.single("file"),   // reuse the existing multer instance
+  uploadModuleFile,
   addModule
 );
 

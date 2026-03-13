@@ -1022,11 +1022,11 @@ export const editModule = async (req, res) => {
       fields.push(`pdf_filename = $${idx++}`); values.push(null);
       fields.push(`pdf_mime = $${idx++}`); values.push(null);
     } else if (req.file) {
-      // Upload mode — store binary, clear URL
-      fields.push(`pdf_data = $${idx++}`); values.push(req.file.buffer);
-      fields.push(`pdf_filename = $${idx++}`); values.push(req.file.originalname);
-      fields.push(`pdf_mime = $${idx++}`); values.push(req.file.mimetype);
-      fields.push(`content_url = $${idx++}`); values.push(null);
+      // Upload mode (Cloudinary) — store remote URL, clear binary data
+      fields.push(`content_url = $${idx++}`); values.push(req.file.path || null);
+      fields.push(`pdf_data = $${idx++}`); values.push(null);
+      fields.push(`pdf_filename = $${idx++}`); values.push(null);
+      fields.push(`pdf_mime = $${idx++}`); values.push(null);
     }
 
     // Re-chunk text_stream content when notes change
@@ -1055,7 +1055,7 @@ export const editModule = async (req, res) => {
        RETURNING module_id, course_id, title, type, content_url,
                  duration_mins AS duration, module_order, notes, pdf_filename, created_at,
                  CASE 
-                   WHEN type = 'pdf' OR pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
+                   WHEN pdf_data IS NOT NULL OR pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
                    ELSE content_url 
                  END AS resolved_url`,
       values
@@ -1108,10 +1108,7 @@ export const addModule = async (req, res) => {
     let pdfMime = null;
 
     if (req.file) {
-      pdfData = req.file.buffer;
-      pdfFilename = req.file.originalname;
-      pdfMime = req.file.mimetype;
-      finalContentUrl = null;
+      finalContentUrl = req.file.path || null;
     }
 
     const result = await pool.query(

@@ -4,7 +4,13 @@ import { sendInstructorInvite, sendStudentInvite } from "../services/email.servi
 import { validateBulkInstructors } from "../utils/csvValidator.js";
 import csvParser from "csv-parser";
 import { Readable } from "stream";
-const baseUrl = process.env.BACKEND_URL;
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export const getMyProfile = async (req, res) => {
   try {
@@ -303,9 +309,24 @@ export const uploadProfilePicture = async (req, res) => {
     return res.status(400).json({ message: "No file uploaded" });
   }
 
-  const fileUrl = `${baseUrl}/uploads/profile_pictures/${req.file.filename}`;
-
   try {
+    const uploaded = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: "uploads/profile_pictures",
+          resource_type: "image",
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      );
+
+      stream.end(req.file.buffer);
+    });
+
+    const fileUrl = uploaded.secure_url || uploaded.url;
+
     await pool.query(
       "UPDATE users SET photo_url = $1 WHERE user_id = $2",
       [fileUrl, req.user.id]

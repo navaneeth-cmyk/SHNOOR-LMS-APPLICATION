@@ -1,7 +1,37 @@
 import pool from "../db/postgres.js";
 import csv from "csv-parser";
-import fs from "fs";
-import path from "path";
+import { Readable } from "stream";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const uploadBufferToCloudinary = (file) => {
+    const ext = (file.originalname || "").split(".").pop()?.toLowerCase();
+    const isVideo = (file.mimetype || "").startsWith("video/") || ["mp4", "mkv", "webm", "mov", "avi", "ogg"].includes(ext);
+    const isPdf = file.mimetype === "application/pdf" || ext === "pdf";
+
+    const folder = isVideo ? "uploads/videos" : isPdf ? "uploads/pdfs" : "uploads/docs";
+    const resourceType = isVideo ? "video" : "raw";
+
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: resourceType,
+            },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result);
+            }
+        );
+
+        stream.end(file.buffer);
+    });
+};
 
 export const bulkUploadModules = async (req, res) => {
     const client = await pool.connect();
@@ -25,13 +55,14 @@ export const bulkUploadModules = async (req, res) => {
         resourceFiles.forEach(f => {
             fileMap[f.originalname] = f;
         });
+        const uploadedResourceUrlByName = {};
 
         const results = [];
         const errors = [];
 
         // 2. Parse CSV
         await new Promise((resolve, reject) => {
-            fs.createReadStream(csvFile.path)
+            Readable.from(csvFile.buffer)
                 .pipe(csv())
                 .on('data', (data) => results.push(data))
                 .on('end', resolve)
@@ -124,14 +155,11 @@ export const bulkUploadModules = async (req, res) => {
             // If source looks like a filename, check if we have it in uploaded resources
             if (contentUrl && !contentUrl.startsWith('http') && fileMap[contentUrl]) {
                 const f = fileMap[contentUrl];
-                const protocol = req.protocol;
-                const host = req.get("host");
-
-                // We need to store consistent URL format. 
-                // Currently upload.controller uses full URL, but moduleController handles local files via path sometimes.
-                // Best to store partial path 'uploads/filename.ext' or full URL.
-                // Let's match helper style: full URL
-                contentUrl = `${protocol}://${host}/uploads/${f.filename}`;
+                if (!uploadedResourceUrlByName[f.originalname]) {
+                    const uploaded = await uploadBufferToCloudinary(f);
+                    uploadedResourceUrlByName[f.originalname] = uploaded.secure_url || uploaded.url;
+                }
+                contentUrl = uploadedResourceUrlByName[f.originalname];
                 uploadedFile = f;
             }
 
@@ -186,8 +214,7 @@ export const bulkUploadModules = async (req, res) => {
                 const isHtmlFile = m.uploadedFile?.originalname.toLowerCase().endsWith('.html') || m.content_url.toLowerCase().endsWith('.html');
 
                 if (m.uploadedFile && !isHtmlFile) {
-                    // Read directly from disk
-                    textContent = fs.readFileSync(m.uploadedFile.path, 'utf-8');
+                    textContent = m.uploadedFile.buffer.toString('utf-8');
                 }
                 // If it's a URL, we can't easily chunk it unless we fetch it. 
                 // Assuming Bulk Upload implies they provide the file.

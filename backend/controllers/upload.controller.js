@@ -1,57 +1,55 @@
 import multer from "multer";
 import path from "path";
-import fs from "fs";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
-const baseUrl = process.env.BACKEND_URL;
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// Configure storage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = "uploads/";
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
+// Cloudinary Storage
+const storage = new CloudinaryStorage({
+    cloudinary,
+    params: async (req, file) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+
+        if (file.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
+            return {
+                folder: "uploads/videos",
+                resource_type: "video",
+            };
         }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
+
+        if (file.mimetype === "application/pdf" || ext === ".pdf") {
+            return {
+                folder: "uploads/pdfs",
+                resource_type: "raw",
+                format: "pdf",
+            };
+        }
+
+        // HTML, TXT, MD files
+        return {
+            folder: "uploads/docs",
+            resource_type: "raw",
+        };
     },
 });
 
-// File filter (Video & PDF)
+// File filter (Video & PDF & Docs)
 const fileFilter = (req, file, cb) => {
     const allowedTypes = [
-        // Common video types
-        "video/mp4",
-        "video/webm",
-        "video/quicktime", // .mov
-        "video/x-matroska", // .mkv (common browser/OS mime)
-        "video/x-msvideo", // .avi
-        "video/ogg",
-        // PDFs
-        "application/pdf",
-        "application/x-pdf",
-        // HTML and Text
-        "text/html",
-        "application/xhtml+xml",
-        "text/plain",
+        "video/mp4", "video/webm", "video/quicktime",
+        "video/x-matroska", "video/x-msvideo", "video/ogg",
+        "application/pdf", "application/x-pdf",
+        "text/html", "application/xhtml+xml", "text/plain",
     ];
 
     const ext = path.extname(file.originalname || "").toLowerCase();
-    const allowedExts = [
-        ".mp4",
-        ".mkv",
-        ".webm",
-        ".mov",
-        ".avi",
-        ".ogg",
-        ".pdf",
-        ".html",
-        ".htm",
-        ".txt",
-        ".md",
-    ];
+    const allowedExts = [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg", ".pdf", ".html", ".htm", ".txt", ".md"];
 
     const isAllowedMime = allowedTypes.includes(file.mimetype);
     const isAllowedByExt =
@@ -64,12 +62,7 @@ const fileFilter = (req, file, cb) => {
         cb(null, true);
     } else {
         console.error(`[Upload Debug] Rejected file: ${file.originalname} (${file.mimetype})`);
-        cb(
-            new Error(
-                `Invalid file type (${file.mimetype}). Only common video formats, PDF, HTML, and Text files are allowed.`
-            ),
-            false
-        );
+        cb(new Error(`Invalid file type (${file.mimetype}). Only video, PDF, HTML, and Text files are allowed.`), false);
     }
 };
 
@@ -86,7 +79,7 @@ export const handleUpload = (req, res) => {
         return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    const fileUrl = req.file.path; // ✅ Permanent Cloudinary URL
 
     res.status(200).json({
         message: "File uploaded successfully",

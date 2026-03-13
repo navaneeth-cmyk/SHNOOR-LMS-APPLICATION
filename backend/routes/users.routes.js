@@ -11,29 +11,21 @@ import {
   bulkUploadStudents,
 } from "../controllers/user.controller.js";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import firebaseAuth from "../middlewares/firebaseAuth.js";
 import attachUser from "../middlewares/attachUser.js";
 import roleGuard from "../middlewares/roleGuard.js";
 
 const router = express.Router();
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = "uploads/profile_pictures";
-    // Ensure directory exists
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
+const uploadProfilePictureFile = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if ((file.mimetype || "").startsWith("image/")) {
+      return cb(null, true);
     }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    cb(new Error("Only image files are allowed"), false);
   },
 });
-
-const uploadProfilePictureFile = multer({ storage });
 const uploadCsv = multer({ storage: multer.memoryStorage() });
 
 router.get(
@@ -104,7 +96,14 @@ router.post(
   "/upload-profile-picture",
   firebaseAuth,
   attachUser,
-  uploadProfilePictureFile.single("file"),
+  (req, res, next) => {
+    uploadProfilePictureFile.single("file")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ message: err.message });
+      }
+      next();
+    });
+  },
   uploadProfilePicture
 );
 export default router;
