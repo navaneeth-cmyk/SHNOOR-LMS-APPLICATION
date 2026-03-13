@@ -1,3 +1,10 @@
+import { addLocalCertificate } from '../../../utils/certificateStorage';
+import { Peer } from 'peerjs';
+import { toast } from 'react-hot-toast';
+import { useObjectDetection } from '../../../hooks/useObjectDetection';
+import { useVoiceDetection } from '../../../hooks/useVoiceDetection';
+import { useFaceDetection } from '../../../hooks/useFaceDetection';
+import { db } from '../../../auth/firebase';
 
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -37,6 +44,162 @@ const ExamRunner = () => {
   const [loading, setLoading] = useState(true);
   const [canRewrite, setCanRewrite] = useState(false);
   const socketRef = useRef(null);
+
+  const [isProctored, setIsProctored] = useState(false);
+  const [stream, setStream] = useState(null);
+  const [proctoringError, setProctoringError] = useState(null);
+  const [peer, setPeer] = useState(null);
+
+  const streamRef = useRef(null);
+  const peerRef = useRef(null);
+
+  const { isSuspicious, detections } = useObjectDetection(stream);
+  const { isVoiceSuspicious, isLoudNoise } = useVoiceDetection(stream);
+  const { multipleFacesDetected, noFaceDetected } = useFaceDetection(stream);
+  const lastSyncRef = useRef(0);
+
+  const startCamera = async () => {
+    try {
+      setProctoringError(null);
+      let mediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+      } catch (audioErr) {
+        console.warn('[CAMERA] Audio failed, falling back to video-only:', audioErr.message);
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+      setStream(mediaStream);
+      streamRef.current = mediaStream;
+      setIsProctored(true);
+      toast.success('Camera started successfully');
+      triggerFullscreen();
+    } catch (err) {
+      console.error('Camera access denied:', err);
+      toast.error('Camera Error: ' + err.message);
+      setProctoringError(
+        'Camera access is required to start the exam. Please enable permissions in your browser settings.'
+      );
+    }
+  };
+
+  useEffect(() => {
+    streamRef.current = stream; // Always keep the latest stream for potential incoming calls
+    if (!stream || peerRef.current) return;
+    let isMounted = true;
+    const initPeer = async () => {
+      const safeId = (auth.currentUser?.uid || 'exam').replace(/[^a-zA-Z0-9]/g, '');
+      const peerId = `${safeId}-${Math.random().toString(36).substr(2, 5)}`;
+      const newPeer = new Peer(peerId, {
+        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+      });
+      newPeer.on('open', async (id) => {
+        if (!isMounted) return;
+        try {
+          // USE BACKEND BRIDGE TO BYPASS PERMISSION ISSUES
+          await api.post('/api/proctoring/register', {
+            peerId: id,
+            userName: auth.currentUser?.displayName || localStorage.getItem('full_name') || 'Student',
+            examId: examId,
+            examTitle: exam?.title || 'Regular Exam',
+            userId: auth.currentUser?.uid
+          });
+          console.log("[PROCTORING] session registered via backend:", id);
+        } catch (e) {
+          console.error("[PROCTORING] Registration Error:", e);
+          toast.error("Proctoring Registry Error: " + (e.response?.data?.message || e.message));
+        }
+      });
+      newPeer.on('call', (call) => {
+        console.log("[PEER] Receiving proctoring call. Answering with current stream...");
+        if (streamRef.current) {
+          call.answer(streamRef.current);
+          console.log("[PEER] Answered call with stream:", streamRef.current.id);
+        } else {
+          console.warn("[PEER] Call received but no local stream available to answer with.");
+        }
+      });
+      if (isMounted) {
+        setPeer(newPeer);
+        peerRef.current = newPeer;
+      }
+    };
+    const timer = setTimeout(initPeer, 1500);
+    return () => { isMounted = false; clearTimeout(timer); };
+  }, [stream]);
+
+  useEffect(() => {
+    if (!peer || !peer.id || !isProctored || isSubmitted) return;
+    const syncSuspiciousStatus = async () => {
+      const now = Date.now();
+      if (now - lastSyncRef.current < 3000) return;
+      lastSyncRef.current = now;
+      const isViolation = isSuspicious || isVoiceSuspicious || multipleFacesDetected || noFaceDetected || isLoudNoise;
+      try {
+        await api.post("/api/proctoring/status", {
+          peerId: peer.id,
+          status: {
+            isSuspicious: isViolation,
+            isVoiceSuspicious: isVoiceSuspicious || isLoudNoise,
+            multipleFacesDetected: multipleFacesDetected,
+            noFaceDetected: noFaceDetected,
+            lastDetected: isViolation ? new Date().toISOString() : null
+          }
+        });
+        if (isViolation && (now - (window._lastViolationLog || 0) > 10000)) {
+          window._lastViolationLog = now;
+          let type = 'UNKNOWN';
+          if (isSuspicious) {
+            const hasPhone = detections.some(d => d.class === 'cell phone');
+            type = hasPhone ? 'PHONE_DETECTED' : 'OBJECT_DETECTION';
+          } else if (noFaceDetected) type = 'NO_FACE';
+          else if (multipleFacesDetected) type = 'MULTIPLE_FACES';
+          else if (isLoudNoise) type = 'LOUD_NOISE';
+          else if (isVoiceSuspicious) type = 'VOICE_DETECTION';
+          api.post(`/api/student/exams/${examId}/violation`, {
+            type,
+            details: {
+              timestamp: new Date().toISOString(),
+              objectDetection: isSuspicious,
+              voiceDetection: isVoiceSuspicious,
+              loudNoise: isLoudNoise,
+              noFace: noFaceDetected,
+              multipleFaces: multipleFacesDetected,
+              detections
+            }
+          }).catch(e => console.error(e));
+        }
+      } catch (err) { }
+    };
+    syncSuspiciousStatus();
+  }, [isSuspicious, isVoiceSuspicious, multipleFacesDetected, noFaceDetected, isLoudNoise, peer, isProctored, isSubmitted, examId]);
+
+  useEffect(() => {
+    const handleUnload = () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
+      if (peerRef.current) {
+        const pId = peerRef.current.id;
+        peerRef.current.destroy();
+        api.delete(`/api/proctoring/session/${pId}`).catch(() => { });
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
+      if (peerRef.current) {
+        const pId = peerRef.current.id;
+        peerRef.current.destroy();
+        deleteDoc(doc(db, 'live_sessions', pId)).catch(() => { });
+      }
+    };
+  }, []);
+
 
   // Server-authoritative timer state
   const [endTimeMs, setEndTimeMs] = useState(null);
@@ -557,6 +720,15 @@ const ExamRunner = () => {
       availableSections={availableSections}
       handleSectionChange={handleSectionChange}
       sectionConfig={SECTION_CONFIG}
+      // AI Props
+      isProctored={isProctored}
+      stream={stream}
+      proctoringError={proctoringError}
+      startCamera={startCamera}
+      isSuspicious={isSuspicious || isVoiceSuspicious || multipleFacesDetected}
+      isVoiceSuspicious={isVoiceSuspicious}
+      multipleFacesDetected={multipleFacesDetected}
+      detections={detections}
     />
   );
 };
