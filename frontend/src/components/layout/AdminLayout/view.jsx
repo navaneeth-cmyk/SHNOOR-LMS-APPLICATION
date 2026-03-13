@@ -185,7 +185,7 @@ const AdminLayoutView = ({
           </ul>
 
           {/* Security */}
-          <div style={{
+          {/* <div style={{
             fontSize: '10px', fontWeight: 700,
             color: 'rgba(255,255,255,0.3)',
             textTransform: 'uppercase', letterSpacing: '2px',
@@ -196,7 +196,7 @@ const AdminLayoutView = ({
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             <NavItem path="proctoring" icon={Video} label="Live Proctoring" />
             <NavItem path="violations" icon={ShieldAlert} label="Violation Log" />
-          </ul>
+          </ul> */}
         </div>
       </div>
 
