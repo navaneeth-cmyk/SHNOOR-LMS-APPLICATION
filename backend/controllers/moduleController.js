@@ -1,4 +1,5 @@
 import pool from "../db/postgres.js";
+import axios from "axios";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from 'url';
@@ -217,10 +218,27 @@ export const getModulePdf = async (req, res) => {
         return res.sendFile(filePath);
       }
 
-      // If it's an external URL, we can't easily serve it through here with these headers 
-      // without proxying, but we can redirect.
+      // Proxy external URLs so browsers receive a real PDF response in the iframe.
       if (moduleData.content_url.startsWith("http")) {
-        return res.redirect(moduleData.content_url);
+        const upstream = await axios.get(moduleData.content_url, {
+          responseType: "stream",
+          maxRedirects: 5,
+        });
+
+        res.setHeader(
+          "Content-Type",
+          upstream.headers["content-type"] || moduleData.pdf_mime || "application/pdf"
+        );
+        res.setHeader(
+          "Content-Disposition",
+          `inline; filename="${moduleData.pdf_filename || "document.pdf"}"`
+        );
+
+        if (upstream.headers["content-length"]) {
+          res.setHeader("Content-Length", upstream.headers["content-length"]);
+        }
+
+        return upstream.data.pipe(res);
       }
     }
 
