@@ -12,6 +12,112 @@ export const initializeDatabase = async () => {
         // 1. Ensure PGCrypto for UUID generation
         await pool.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto";');
 
+        // --- Core Tables ---
+        console.log("   - Setting up Core Tables (Users, Courses)...");
+        
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                user_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                firebase_uid VARCHAR(255) UNIQUE NOT NULL,
+                full_name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                role VARCHAR(50) NOT NULL,
+                status VARCHAR(50) DEFAULT 'pending',
+                xp INTEGER DEFAULT 0,
+                streak INTEGER DEFAULT 0,
+                last_active_date DATE,
+                last_login TIMESTAMP,
+                college VARCHAR(255),
+                photo_url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        // Migration: Ensure last_login and streak columns
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS streak INTEGER DEFAULT 0;`).catch(() => {});
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0;`).catch(() => {});
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_date DATE;`).catch(() => {});
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS courses (
+                courses_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                instructor_id UUID REFERENCES users(user_id) ON DELETE SET NULL,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                category VARCHAR(100),
+                thumbnail_url TEXT,
+                difficulty VARCHAR(50),
+                status VARCHAR(50) DEFAULT 'draft',
+                validity_value INTEGER,
+                validity_unit VARCHAR(20),
+                expires_at TIMESTAMP,
+                schedule_start_at TIMESTAMP,
+                price_type VARCHAR(20) DEFAULT 'free',
+                price_amount DECIMAL(10, 2),
+                prereq_description TEXT,
+                prereq_video_urls JSONB DEFAULT '[]',
+                prereq_pdf_url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS modules (
+                module_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                course_id UUID REFERENCES courses(courses_id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                type VARCHAR(50) NOT NULL,
+                content_url TEXT,
+                pdf_filename TEXT,
+                duration_mins INTEGER DEFAULT 0,
+                module_order INTEGER DEFAULT 0,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS module_progress (
+                student_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
+                course_id UUID REFERENCES courses(courses_id) ON DELETE CASCADE,
+                module_id UUID REFERENCES modules(module_id) ON DELETE CASCADE,
+                time_spent_seconds INTEGER DEFAULT 0,
+                last_position_seconds INTEGER DEFAULT 0,
+                last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                PRIMARY KEY (student_id, module_id)
+            );
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS student_courses (
+                student_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
+                course_id UUID REFERENCES courses(courses_id) ON DELETE CASCADE,
+                enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (student_id, course_id)
+            );
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS course_assignments (
+                assignment_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                student_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
+                course_id UUID REFERENCES courses(courses_id) ON DELETE CASCADE,
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (student_id, course_id)
+            );
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS module_text_chunks (
+                chunk_id SERIAL PRIMARY KEY,
+                module_id UUID REFERENCES modules(module_id) ON DELETE CASCADE,
+                content TEXT NOT NULL,
+                chunk_order INTEGER NOT NULL,
+                duration_seconds INTEGER DEFAULT 1
+            );
+        `);
+
         // 2. Learning Paths Module
         console.log("   - Setting up Learning Paths...");
         await pool.query(`

@@ -639,6 +639,37 @@ app.use(
 
 app.use(express.json());
 
+// Log 401 errors to help debug unauthorized requests
+app.use((req, res, next) => {
+  const originalJson = res.json;
+  const originalSendStatus = res.sendStatus;
+  const originalSend = res.send;
+
+  res.json = function(body) {
+    if (res.statusCode === 401) {
+      console.warn(`[401 UNAUTHORIZED] ${req.method} ${req.url} - IP: ${req.ip}`);
+      console.warn(`Headers:`, req.headers);
+    }
+    return originalJson.call(this, body);
+  };
+  
+  res.sendStatus = function(code) {
+    if (code === 401) {
+      console.warn(`[401 UNAUTHORIZED] ${req.method} ${req.url} - SendStatus`);
+    }
+    return originalSendStatus.call(this, code);
+  };
+
+  res.send = function(body) {
+    if (res.statusCode === 401) {
+      console.warn(`[401 UNAUTHORIZED] ${req.method} ${req.url} - Send`);
+    }
+    return originalSend.call(this, body);
+  };
+
+  next();
+});
+
 // Serve static uploads with CORS headers
 app.use("/uploads", (req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -646,6 +677,7 @@ app.use("/uploads", (req, res, next) => {
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Range");
   res.header("Access-Control-Expose-Headers", "Content-Length, Content-Range");
   res.header("Cross-Origin-Resource-Policy", "cross-origin");
+  res.header("Cross-Origin-Embedder-Policy", "credentialless");
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }

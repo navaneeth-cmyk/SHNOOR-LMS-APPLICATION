@@ -1,9 +1,70 @@
 import pool from "../db/postgres.js";
 import csv from "csv-parser";
 import { Readable } from "stream";
+import axios from "axios";
 import { uploadBufferToCloudinary } from "../config/cloudinary.js";
 
 const baseUrl = process.env.BACKEND_URL;
+
+const extractTextStreamContent = async ({ notes, contentUrl }) => {
+  let text = String(notes || "").trim();
+
+  if (!text && contentUrl && /^https?:\/\//i.test(contentUrl)) {
+    try {
+      const response = await axios.get(contentUrl, {
+        responseType: "text",
+        transformResponse: [(data) => data],
+      });
+      const contentType = String(response.headers?.["content-type"] || "").toLowerCase();
+      const isTextLike =
+        contentType.includes("text/plain") ||
+        contentType.includes("text/markdown") ||
+        contentType.includes("text/html") ||
+        /\.txt($|\?)/i.test(contentUrl) ||
+        /\.md($|\?)/i.test(contentUrl) ||
+        /\.html?($|\?)/i.test(contentUrl);
+
+      if (isTextLike && typeof response.data === "string") {
+        text = response.data;
+      }
+    } catch (err) {
+      console.warn("Could not fetch text_stream content from URL:", err?.message || err);
+    }
+  }
+
+  if (text && /\.html?($|\?)/i.test(String(contentUrl || ""))) {
+    text = text.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
+  }
+
+  return text;
+};
+
+const rebuildTextChunks = async (moduleId, textContent) => {
+  await pool.query(`DELETE FROM module_text_chunks WHERE module_id = $1`, [moduleId]);
+
+  const chunks = String(textContent || "")
+    .split(/\s+/)
+    .filter((c) => c.length > 0)
+    .map((c) => `${c} `);
+
+  if (!chunks.length) return 0;
+
+  const chunkVals = [];
+  const chunkPlaceholders = [];
+  for (let k = 0; k < chunks.length; k++) {
+    chunkVals.push(moduleId, chunks[k], k, 1);
+    const o = k * 4;
+    chunkPlaceholders.push(`($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4})`);
+  }
+
+  await pool.query(
+    `INSERT INTO module_text_chunks (module_id, content, chunk_order, duration_seconds)
+     VALUES ${chunkPlaceholders.join(", ")}`,
+    chunkVals
+  );
+
+  return chunks.length;
+};
 
 export const addCourse = async (req, res) => {
   const instructor_id = req.user.id;
@@ -149,7 +210,7 @@ export const getPendingCourses = async (req, res) => {
       `SELECT c.*, u.full_name AS instructor_name
        FROM courses c
        JOIN users u ON c.instructor_id = u.user_id
-       WHERE c.status = 'pending'
+       WHERE c.status IN ('pending', 'review')
        ORDER BY c.created_at DESC`,
     );
 
@@ -174,7 +235,7 @@ export const approveCourse = async (req, res) => {
     const result = await pool.query(
       `UPDATE courses
        SET status = $1
-       WHERE course_id = $2
+       WHERE courses_id = $2
        RETURNING *`,
       [status, courseId],
     );
@@ -401,35 +462,40 @@ export const exploreCourses = async (req, res) => {
 
     const { rows } = await pool.query(
       `
-      SELECT DISTINCT
-        c.courses_id,
-        c.title,
-        c.description,
-        c.category,
-        c.difficulty,
-        c.price_type,
-        c.price_amount,
-        c.schedule_start_at,
-        c.thumbnail_url,
-        c.instructor_id,
-        u.full_name AS instructor_name,
-        CASE WHEN ca.student_id IS NOT NULL THEN true ELSE false END AS is_assigned,
-        false AS is_enrolled,
-        CASE WHEN c.price_type = 'paid' THEN true ELSE false END AS is_paid,
-        false AS is_completed
-      FROM courses c
-      LEFT JOIN users u ON u.user_id = c.instructor_id
-      LEFT JOIN course_assignments ca
-        ON ca.course_id = c.courses_id
-       AND ca.student_id = $1
-      WHERE c.status = 'approved'
-      AND ca.student_id IS NOT NULL
-      AND c.courses_id NOT IN (
-        SELECT course_id
-        FROM student_courses
-        WHERE student_id = $1
-      )
-      ORDER BY c.created_at DESC
+      SELECT * FROM (
+        SELECT DISTINCT
+          c.courses_id,
+          c.title,
+          c.description,
+          c.category,
+          c.difficulty,
+          c.created_at,
+          c.price_type,
+          c.price_amount,
+          c.schedule_start_at,
+          c.thumbnail_url,
+          c.instructor_id,
+          u.full_name AS instructor_name,
+          CASE WHEN ca.student_id IS NOT NULL THEN true ELSE false END AS is_assigned,
+          CASE WHEN sc.student_id IS NOT NULL THEN true ELSE false END AS is_enrolled,
+          CASE WHEN c.price_type = 'paid' THEN true ELSE false END AS is_paid,
+          false AS is_completed,
+          CASE WHEN ca.student_id IS NOT NULL THEN 0 ELSE 1 END AS assigned_sort
+        FROM courses c
+        LEFT JOIN users u ON u.user_id = c.instructor_id
+        LEFT JOIN student_courses sc
+          ON sc.course_id = c.courses_id
+         AND sc.student_id = $1
+        LEFT JOIN course_assignments ca
+          ON ca.course_id = c.courses_id
+         AND ca.student_id = $1
+        WHERE c.status = 'approved'
+        AND (c.schedule_start_at IS NULL OR c.schedule_start_at <= NOW())
+        AND sc.student_id IS NULL
+      ) AS subquery
+      ORDER BY
+        assigned_sort ASC,
+        created_at DESC
       `,
       [studentId],
     );
@@ -999,6 +1065,12 @@ export const editModule = async (req, res) => {
     if (!title || !type) {
       return res.status(400).json({ message: "Title and type are required" });
     }
+    if ((type === "video" || type === "pdf" || type === "html") && !finalContentUrl) {
+      return res.status(400).json({ message: "Please provide a file or valid URL for this module type" });
+    }
+    if (type === "text_stream" && !notes && !finalContentUrl) {
+      return res.status(400).json({ message: "Text stream requires notes text or a text/HTML URL" });
+    }
 
     const fields = [];
     const values = [];
@@ -1020,24 +1092,12 @@ export const editModule = async (req, res) => {
       fields.push(`pdf_mime = $${idx++}`); values.push(null);
     }
 
-    // Re-chunk text_stream content when notes change
-    if (type === "text_stream" && notes) {
-      const chunks = notes.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
-      await pool.query(`DELETE FROM module_text_chunks WHERE module_id = $1`, [moduleId]);
-      if (chunks.length > 0) {
-        const chunkVals = [];
-        const chunkPlaceholders = [];
-        for (let k = 0; k < chunks.length; k++) {
-          chunkVals.push(moduleId, chunks[k], k, 1);
-          const o = k * 4;
-          chunkPlaceholders.push(`($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4})`);
-        }
-        await pool.query(
-          `INSERT INTO module_text_chunks (module_id, content, chunk_order, duration_seconds)
-           VALUES ${chunkPlaceholders.join(", ")}`,
-          chunkVals
-        );
-      }
+    if (type === "text_stream") {
+      const textContent = await extractTextStreamContent({
+        notes,
+        contentUrl: finalContentUrl,
+      });
+      await rebuildTextChunks(moduleId, textContent);
     }
 
     values.push(moduleId);
@@ -1095,6 +1155,12 @@ export const addModule = async (req, res) => {
     if (!title || !type) {
       return res.status(400).json({ message: "Title and type are required" });
     }
+    if ((type === "video" || type === "pdf" || type === "html") && !finalContentUrl) {
+      return res.status(400).json({ message: "Please provide a file or valid URL for this module type" });
+    }
+    if (type === "text_stream" && !notes && !finalContentUrl) {
+      return res.status(400).json({ message: "Text stream requires notes text or a text/HTML URL" });
+    }
 
     const orderResult = await pool.query(
       `SELECT COALESCE(MAX(module_order), 0) + 1 AS next_order FROM modules WHERE course_id = $1`,
@@ -1122,24 +1188,13 @@ export const addModule = async (req, res) => {
       newModule.content_url = newModule.resolved_url;
     }
 
-    // text_stream chunking
-    if (type === "text_stream" && notes) {
+    if (type === "text_stream") {
       const moduleId = result.rows[0].module_id;
-      const chunks = notes.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
-      if (chunks.length > 0) {
-        const chunkVals = [];
-        const chunkPlaceholders = [];
-        for (let k = 0; k < chunks.length; k++) {
-          chunkVals.push(moduleId, chunks[k], k, 1);
-          const o = k * 4;
-          chunkPlaceholders.push(`($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4})`);
-        }
-        await pool.query(
-          `INSERT INTO module_text_chunks (module_id, content, chunk_order, duration_seconds)
-           VALUES ${chunkPlaceholders.join(", ")}`,
-          chunkVals
-        );
-      }
+      const textContent = await extractTextStreamContent({
+        notes,
+        contentUrl: finalContentUrl,
+      });
+      await rebuildTextChunks(moduleId, textContent);
     }
 
     res.status(201).json(newModule);

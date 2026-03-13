@@ -1,8 +1,6 @@
 import pool from "../db/postgres.js";
 import axios from "axios";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from 'url';
+import { uploadBufferToCloudinary } from "../config/cloudinary.js";
 
 export const addModules = async (req, res) => {
   try {
@@ -32,6 +30,15 @@ export const addModules = async (req, res) => {
     for (let i = 0; i < modules.length; i++) {
       const m = modules[i];
       const pdf = pdfFiles[i] || null;
+      let finalContentUrl = m.content_url || null;
+
+      if (pdf) {
+        const uploadResult = await uploadBufferToCloudinary(pdf.buffer, {
+          folder: `${process.env.CLOUDINARY_UPLOAD_FOLDER || "shnoor-lms"}/modules`,
+          originalname: pdf.originalname,
+        });
+        finalContentUrl = uploadResult.secure_url;
+      }
 
       const result = await pool.query(
         `
@@ -54,13 +61,13 @@ export const addModules = async (req, res) => {
           courseId,
           m.title,
           m.type,
-          m.content_url,
+          finalContentUrl,
           m.duration || 0,
           m.order_index || i + 1,
           m.notes || null,
-          pdf ? pdf.buffer : null,
-          pdf ? pdf.originalname : null,
-          pdf ? pdf.mimetype : null,
+          null,
+          null,
+          null,
         ]
       );
 
@@ -69,17 +76,31 @@ export const addModules = async (req, res) => {
         const moduleId = result.rows[0].module_id;
         let textToChunk = m.notes || "";
 
-        // If no notes but we have a content_url that might be a local text file
-        if (!textToChunk && m.content_url && m.content_url.includes("/uploads/")) {
+        // Support text stream files stored remotely (e.g., Cloudinary).
+        if (!textToChunk && finalContentUrl && finalContentUrl.startsWith("http")) {
           try {
-            const filename = m.content_url.split("/uploads/").pop();
-            const filePath = path.join(process.cwd(), "uploads", filename);
-            if (fs.existsSync(filePath) && (filename.endsWith(".txt") || filename.endsWith(".md"))) {
-              textToChunk = fs.readFileSync(filePath, "utf-8");
+            const textRes = await axios.get(finalContentUrl, {
+              responseType: "text",
+              transformResponse: [(data) => data],
+            });
+            const contentType = String(textRes.headers?.["content-type"] || "").toLowerCase();
+            const isTextLike =
+              contentType.includes("text/plain") ||
+              contentType.includes("text/markdown") ||
+              contentType.includes("text/html") ||
+              /\.txt($|\?)/i.test(finalContentUrl) ||
+              /\.md($|\?)/i.test(finalContentUrl) ||
+              /\.html?($|\?)/i.test(finalContentUrl);
+            if (isTextLike && typeof textRes.data === "string") {
+              textToChunk = textRes.data;
             }
-          } catch (readError) {
-            console.error("Error reading text stream file:", readError);
+          } catch (fetchError) {
+            console.error("Error fetching remote text stream file:", fetchError.message);
           }
+        }
+
+        if (textToChunk && /\.html?($|\?)/i.test(finalContentUrl || "")) {
+          textToChunk = textToChunk.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
         }
 
         if (textToChunk) {
@@ -183,6 +204,8 @@ export const getModulePdf = async (req, res) => {
     res.removeHeader("X-Frame-Options");
     res.setHeader("Content-Security-Policy", "frame-ancestors 'self' *");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
 
     // 1️⃣ Priority: Binary data in DB
     if (moduleData.pdf_data) {
@@ -194,51 +217,41 @@ export const getModulePdf = async (req, res) => {
       return res.send(moduleData.pdf_data);
     }
 
-    // 2️⃣ Fallback: File on disk (from content_url)
+    // 2️⃣ Cloud URL fallback (Cloudinary/external object storage)
     if (moduleData.content_url) {
-      // Check if it's a relative path to uploads
-      let filePath = "";
-      if (moduleData.content_url.includes("/uploads/")) {
-        const filename = moduleData.content_url.split("/uploads/").pop();
-        filePath = path.join(process.cwd(), "uploads", filename);
-      } else if (moduleData.content_url.startsWith("uploads/")) {
-        filePath = path.join(process.cwd(), moduleData.content_url);
-      }
-
-      if (filePath && fs.existsSync(filePath)) {
-        const ext = path.extname(filePath).toLowerCase();
-        const mimeByExt = {
-          ".pdf": "application/pdf",
-          ".txt": "text/plain; charset=utf-8",
-          ".md": "text/plain; charset=utf-8",
-          ".html": "text/html; charset=utf-8",
-          ".htm": "text/html; charset=utf-8",
-        };
-        res.setHeader("Content-Type", mimeByExt[ext] || "application/octet-stream");
-        return res.sendFile(filePath);
-      }
-
-      // Proxy external URLs so browsers receive a real PDF response in the iframe.
       if (moduleData.content_url.startsWith("http")) {
-        const upstream = await axios.get(moduleData.content_url, {
-          responseType: "stream",
-          maxRedirects: 5,
-        });
+        try {
+          const remoteRes = await axios.get(moduleData.content_url, {
+            responseType: "stream",
+            timeout: 120000,
+            validateStatus: (status) => status >= 200 && status < 400,
+          });
 
-        res.setHeader(
-          "Content-Type",
-          upstream.headers["content-type"] || moduleData.pdf_mime || "application/pdf"
-        );
-        res.setHeader(
-          "Content-Disposition",
-          `inline; filename="${moduleData.pdf_filename || "document.pdf"}"`
-        );
+          const remoteContentType = String(
+            remoteRes.headers?.["content-type"] || "application/pdf"
+          );
 
-        if (upstream.headers["content-length"]) {
-          res.setHeader("Content-Length", upstream.headers["content-length"]);
+          res.setHeader("Content-Type", remoteContentType);
+          res.setHeader("Content-Disposition", `inline; filename="document.pdf"`);
+
+          remoteRes.data.on("error", (streamErr) => {
+            console.error("getModulePdf stream error:", streamErr?.message || streamErr);
+            if (!res.headersSent) {
+              res.status(502).json({ message: "Failed to stream PDF from storage" });
+            } else {
+              res.end();
+            }
+          });
+
+          return remoteRes.data.pipe(res);
+        } catch (remoteErr) {
+          console.error(
+            "getModulePdf remote fetch error:",
+            remoteErr?.message || remoteErr
+          );
+          // Graceful fallback: let browser load from source URL directly.
+          return res.redirect(moduleData.content_url);
         }
-
-        return upstream.data.pipe(res);
       }
     }
 
