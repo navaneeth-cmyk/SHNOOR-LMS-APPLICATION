@@ -537,9 +537,9 @@ import {
   ChevronRight, UserPlus, Info, CheckCircle, ShieldCheck
 } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
-import ChatList from '../../components/chat/ChatList';
 import ChatWindow from '../../components/chat/ChatWindow';
 import api from '../../api/axios';
+import '../../styles/Chat.css';
 
 const ChatWithStudents = () => {
   const { socket, dbUser, unreadCounts, markChatRead, handleSetActiveChat } = useSocket();
@@ -901,6 +901,14 @@ const ChatWithStudents = () => {
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const hasSearchQuery = searchQuery.trim().length > 0;
   const showSearchPanel = showSearch && hasSearchQuery;
+  const sortedChats = useMemo(() => {
+    return [...chats].sort((a, b) => {
+      const aUnread = unreadCounts?.[a.id] || 0;
+      const bUnread = unreadCounts?.[b.id] || 0;
+      if (aUnread !== bUnread) return bUnread - aUnread;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [chats, unreadCounts]);
 
   const handleSearchResultClick = async (chatId) => {
     const chatToLoad = chats.find(c => c.id === chatId);
@@ -1030,12 +1038,48 @@ const ChatWithStudents = () => {
             No groups yet. Create one to get started!
           </div>
         ) : (
-          <ChatList
-            chats={chats}
-            activeChat={activeChat}
-            onSelectChat={handleSelectChat}
-            unreadCounts={unreadCounts}
-          />
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 bg-gray-50/70">
+            {sortedChats.map((chat) => {
+              const unread = unreadCounts?.[chat.id] || 0;
+              const isActive = activeChat?.id === chat.id;
+
+              return (
+                <button
+                  key={chat.id}
+                  onClick={() => handleSelectChat(chat)}
+                  className={`w-full text-left p-3 rounded-xl border transition-all group ${
+                    isActive
+                      ? 'bg-white border-indigo-200 shadow-sm ring-1 ring-indigo-100'
+                      : 'bg-white/90 border-gray-200 hover:border-indigo-200 hover:shadow-sm'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-full bg-indigo-100 text-indigo-700 font-semibold flex items-center justify-center flex-shrink-0">
+                      {chat.name?.charAt(0)?.toUpperCase() || 'G'}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{chat.name}</p>
+                        {unread > 0 && (
+                          <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                            {unread > 99 ? '99+' : unread}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-gray-500 truncate">{chat.lastMessage || 'Open to view messages'}</p>
+                        <span className="text-[11px] text-gray-400 whitespace-nowrap">
+                          {chat.memberCount || 0} members
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 
