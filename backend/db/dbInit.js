@@ -194,6 +194,11 @@ export const initializeDatabase = async () => {
             ALTER TABLE exams ADD COLUMN IF NOT EXISTS disconnect_grace_time INTEGER DEFAULT 300;
         `);
 
+        // Ensure status exists (migration for older schemas)
+        await pool.query(`
+            ALTER TABLE exams ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'approved';
+        `).catch(() => {});
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS exam_questions (
                 question_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

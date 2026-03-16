@@ -44,8 +44,8 @@ const resolveExamByName = async (examName) => {
 
     // Auto-create the PRACTICE QUIZ exam record if it doesn't exist in the DB
     const insertResult = await pool.query(`
-      INSERT INTO exams (title, description, duration, pass_percentage, status)
-      SELECT 'PRACTICE QUIZ', 'General practice assessment for students.', 30, 40, 'published'
+      INSERT INTO exams (title, description, duration, pass_percentage)
+      SELECT 'PRACTICE QUIZ', 'General practice assessment for students.', 30, 40
       WHERE NOT EXISTS (SELECT 1 FROM exams WHERE title = 'PRACTICE QUIZ')
       RETURNING exam_id, title
     `);

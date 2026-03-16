@@ -1188,7 +1188,7 @@ export const getViolationsSummary = async (req, res) => {
         COUNT(v.violation_id) AS total_count
       FROM users u
       JOIN exam_violations v ON u.user_id = v.student_id
-      WHERE u.role = 'student'
+      WHERE u.role IN ('student', 'user', 'learner')
       GROUP BY u.user_id, u.full_name, u.email
       ORDER BY total_count DESC`
     );

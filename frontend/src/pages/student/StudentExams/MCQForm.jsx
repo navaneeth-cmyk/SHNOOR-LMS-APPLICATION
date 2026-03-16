@@ -165,6 +165,7 @@ const MCQForm = ({ onBack }) => {
   const { isVoiceSuspicious, isLoudNoise } = useVoiceDetection(stream);
   const { multipleFacesDetected, noFaceDetected } = useFaceDetection(stream);
   const lastSyncRef = useRef(0);
+  const lastViolationLogRef = useRef(0);
 
   const STORAGE_KEY = "mcq_quiz_answers";
   const QUIZ_COMPLETED_KEY = "mcq_quiz_completed";
@@ -352,9 +353,9 @@ const MCQForm = ({ onBack }) => {
       }
 
       if (isViolation) {
-        const lastBackendLog = window._lastViolationLog || 0;
+        const lastBackendLog = lastViolationLogRef.current || 0;
         if (now - lastBackendLog > 10000) {
-          window._lastViolationLog = now;
+          lastViolationLogRef.current = now;
           let type = "UNKNOWN";
 
           if (isSuspicious) {

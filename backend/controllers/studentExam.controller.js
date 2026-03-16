@@ -653,8 +653,7 @@ export const logViolation = async (req, res) => {
     const { examId } = req.params;
     const studentId = req.user.id;
     const { type, details } = req.body;
-    const resolvedExamId = await resolveStoredExamId(examId);
-    const storedExamId = resolvedExamId || String(examId || "practice-quiz");
+    const storedExamId = String(examId || "practice-quiz");
 
     await ensureViolationsTableReady();
 
