@@ -20,6 +20,7 @@ import { useVoiceDetection } from "../../../hooks/useVoiceDetection";
 import { useFaceDetection } from "../../../hooks/useFaceDetection";
 
 const PRACTICE_QUIZ_TITLE = "PRACTICE QUIZ";
+const PRACTICE_VIOLATION_ENDPOINT = "/api/student/exams/practice-quiz/violation";
 
 const CameraPreview = ({ stream, isHidden = false }) => {
   const videoRef = useRef(null);
@@ -190,6 +191,22 @@ const MCQForm = ({ onBack }) => {
   /* =========================
      CAMERA / PROCTORING LOGIC
   ========================= */
+  const logPracticeViolation = async (type, details = {}) => {
+    try {
+      await api.post(PRACTICE_VIOLATION_ENDPOINT, {
+        type,
+        details: {
+          timestamp: new Date().toISOString(),
+          isPractice: true,
+          ...details,
+        },
+      });
+      console.log("[BACKEND] Practice violation logged:", type);
+    } catch (error) {
+      console.error("[BACKEND] Practice violation log failed:", error);
+    }
+  };
+
   const startCamera = async () => {
     try {
       setProctoringError(null);
@@ -270,7 +287,7 @@ const MCQForm = ({ onBack }) => {
 
   // Sync suspicious status to Firestore in real-time AND log to backend
   useEffect(() => {
-    if (!peer || !peer.id || !isProctored || submitted) return;
+    if (!isProctored || submitted) return;
 
     const syncSuspiciousStatus = async () => {
       // Throttling: Only sync every 3 seconds
@@ -280,7 +297,7 @@ const MCQForm = ({ onBack }) => {
 
       const isViolation = isSuspicious || isVoiceSuspicious || multipleFacesDetected || noFaceDetected || isLoudNoise;
 
-      try {
+      if (peer?.id) {
         await api.post("/api/proctoring/status", {
           peerId: peer.id,
           status: {
@@ -290,48 +307,40 @@ const MCQForm = ({ onBack }) => {
             noFaceDetected: noFaceDetected,
             lastDetected: isViolation ? new Date().toISOString() : null
           }
+        }).catch((err) => {
+          console.error("[PROCTORING] Status sync failed:", err);
         });
+      }
 
-        if (isViolation) {
-          // Log to Permanent Storage (PostgreSQL) - Throttled to once every 10 seconds
-          const lastBackendLog = window._lastViolationLog || 0;
-          if (now - lastBackendLog > 10000) {
-            window._lastViolationLog = now;
-            let type = "UNKNOWN";
+      if (isViolation) {
+        const lastBackendLog = window._lastViolationLog || 0;
+        if (now - lastBackendLog > 10000) {
+          window._lastViolationLog = now;
+          let type = "UNKNOWN";
 
-            // Prioritize most severe/specific
-            if (isSuspicious) {
-              const hasPhone = detections.some(d => d.class === 'cell phone');
-              type = hasPhone ? "PHONE_DETECTED" : "OBJECT_DETECTION";
-            } else if (noFaceDetected) {
-              type = "NO_FACE";
-            } else if (multipleFacesDetected) {
-              type = "MULTIPLE_FACES";
-            } else if (isLoudNoise) {
-              type = "LOUD_NOISE";
-            } else if (isVoiceSuspicious) {
-              type = "VOICE_DETECTION";
-            }
-
-            console.log(`[VIOLATION DEBUG] Sending to backend: /api/student/exams/practice-quiz/violation`, type);
-            // For practice quiz, we use a fixed examId or "practice"
-            api.post(`/api/student/exams/practice-quiz/violation`, {
-              type,
-              details: {
-                timestamp: new Date().toISOString(),
-                isPractice: true,
-                objectDetection: isSuspicious,
-                voiceDetection: isVoiceSuspicious,
-                loudNoise: isLoudNoise,
-                noFace: noFaceDetected,
-                multipleFaces: multipleFacesDetected,
-                detections: detections
-              }
-            }).catch(e => console.error("[BACKEND] Practice violation log failed:", e));
+          if (isSuspicious) {
+            const hasPhone = detections.some(d => d.class === 'cell phone');
+            type = hasPhone ? "PHONE_DETECTED" : "OBJECT_DETECTION";
+          } else if (noFaceDetected) {
+            type = "NO_FACE";
+          } else if (multipleFacesDetected) {
+            type = "MULTIPLE_FACES";
+          } else if (isLoudNoise) {
+            type = "LOUD_NOISE";
+          } else if (isVoiceSuspicious) {
+            type = "VOICE_DETECTION";
           }
+
+          console.log(`[VIOLATION DEBUG] Sending to backend: ${PRACTICE_VIOLATION_ENDPOINT}`, type);
+          await logPracticeViolation(type, {
+            objectDetection: isSuspicious,
+            voiceDetection: isVoiceSuspicious,
+            loudNoise: isLoudNoise,
+            noFace: noFaceDetected,
+            multipleFaces: multipleFacesDetected,
+            detections,
+          });
         }
-      } catch (err) {
-        console.error("[FIRESTORE] Failed to sync suspicious status:", err);
       }
     };
 
@@ -392,6 +401,10 @@ const MCQForm = ({ onBack }) => {
       );
 
       if (!isFullscreen && isProctored && !submitted) {
+        logPracticeViolation("FULLSCREEN_EXIT", {
+          reason: "fullscreen_exit",
+        });
+
         toast.error("Warning: Please stay in fullscreen mode to continue the exam!", {
           duration: 5000,
           position: "top-center",
