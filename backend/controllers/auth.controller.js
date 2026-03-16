@@ -127,8 +127,8 @@ export const getMe = async (req, res) => {
   try {
     // attachUser already ran
     res.json({
-      user_id: req.user.user_id,
-      full_name: req.user.full_name,
+      user_id: req.user.id,
+      full_name: req.user.fullName,
       email: req.user.email,
       role: req.user.role,
       status: req.user.status,

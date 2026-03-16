@@ -19,6 +19,8 @@ import { useObjectDetection } from "../../../hooks/useObjectDetection";
 import { useVoiceDetection } from "../../../hooks/useVoiceDetection";
 import { useFaceDetection } from "../../../hooks/useFaceDetection";
 
+const PRACTICE_QUIZ_TITLE = "PRACTICE QUIZ";
+
 const CameraPreview = ({ stream, isHidden = false }) => {
   const videoRef = useRef(null);
 
@@ -504,11 +506,11 @@ const MCQForm = ({ onBack }) => {
 
     // Always save certificate locally when passing (no backend required)
     if (score >= 50) {
-      addLocalCertificate({ course: "React Fundamentals Quiz", score });
+      addLocalCertificate({ course: PRACTICE_QUIZ_TITLE, score });
       toast.success("Certificate earned! View it in Certificates.");
       try {
         await api.post("/api/certificate/quiz/generate", {
-          exam_name: "React Fundamentals Quiz",
+          exam_name: PRACTICE_QUIZ_TITLE,
           percentage: score,
         });
       } catch (_) {
@@ -519,7 +521,7 @@ const MCQForm = ({ onBack }) => {
     // NEW: Always save to PostgreSQL exam_results for Proctoring Dashboard visibility
     try {
       await api.post("/api/studentExam/practice/save-result", {
-        exam_name: "React Fundamentals Quiz",
+        exam_name: PRACTICE_QUIZ_TITLE,
         percentage: score,
         obtained_marks: Math.round((score / 100) * questions.length),
         total_marks: questions.length

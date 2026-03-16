@@ -2,7 +2,7 @@ import { FaDownload, FaTrophy, FaCertificate, FaPrint } from "react-icons/fa";
 import { QRCodeSVG } from "qrcode.react";
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../../api/axios";
-import { getLocalCertificates } from "../../utils/certificateStorage";
+import { claimAnonymousCertificates, getLocalCertificates } from "../../utils/certificateStorage";
 import "../../styles/Dashboard.css";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../auth/firebase";
@@ -90,21 +90,30 @@ const MyCertificates = () => {
 
 
   const loadCertificates = useCallback(async () => {
+    let userId = localStorage.getItem("user_id");
+
+    try {
+      const meRes = await api.get("/api/auth/me", { timeout: 2000 });
+      if (meRes.data?.user_id != null) {
+        userId = String(meRes.data.user_id);
+        localStorage.setItem("user_id", userId);
+      }
+      if (meRes.data?.full_name) {
+        localStorage.setItem("full_name", meRes.data.full_name);
+      }
+    } catch (_) { }
+
+    if (userId) {
+      claimAnonymousCertificates(userId);
+    }
+
     // 1) Always show local certificates first (no backend needed)
     const local = getLocalCertificates();
     setCertificates(local);
     setLoading(false);
 
     // 2) Optionally merge in backend certificates if server is available
-    const userId = localStorage.getItem("user_id");
     if (!userId) return;
-
-    try {
-      const meRes = await api.get("/api/auth/me", { timeout: 2000 });
-      if (meRes.data?.user_id != null) {
-        localStorage.setItem("user_id", String(meRes.data.user_id));
-      }
-    } catch (_) { }
 
     try {
       const res = await api.get(`/api/certificate/${userId}`);
