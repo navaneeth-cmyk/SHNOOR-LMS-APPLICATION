@@ -8,6 +8,44 @@ const __dirname = path.dirname(__filename);
 
 console.log("CERTIFICATE CONTROLLER LOADED");
 
+const PRACTICE_QUIZ_ALIASES = [
+  "PRACTICE QUIZ",
+  "Practice Quiz",
+  "React Fundamentals Quiz",
+];
+
+const normalizeExamName = (examName) => String(examName || "").trim();
+
+const resolveExamByName = async (examName) => {
+  const normalizedName = normalizeExamName(examName);
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  const exactMatch = await pool.query(
+    `SELECT exam_id, title FROM exams WHERE title = $1 LIMIT 1`,
+    [normalizedName]
+  );
+
+  if (exactMatch.rows.length > 0) {
+    return exactMatch.rows[0];
+  }
+
+  if (PRACTICE_QUIZ_ALIASES.includes(normalizedName)) {
+    const practiceMatch = await pool.query(
+      `SELECT exam_id, title FROM exams WHERE title = ANY($1::text[]) LIMIT 1`,
+      [PRACTICE_QUIZ_ALIASES]
+    );
+
+    if (practiceMatch.rows.length > 0) {
+      return practiceMatch.rows[0];
+    }
+  }
+
+  return null;
+};
+
 
 const generateCertificate = async (user_id) => {
   try {
@@ -170,16 +208,13 @@ const generateQuizCertificate = async (req, res) => {
       });
     }
 
-    const examRes = await pool.query(
-      `SELECT exam_id FROM exams WHERE title = $1`,
-      [exam_name]
-    );
+    const exam = await resolveExamByName(exam_name);
 
-    if (examRes.rows.length === 0) {
+    if (!exam) {
       return res.status(404).json({ message: "Exam not found" });
     }
 
-    const exam_id = examRes.rows[0].exam_id;
+    const exam_id = exam.exam_id;
 
     const certificateResult = await issueExamCertificate({
       userId: user_id,
@@ -222,5 +257,6 @@ const generateQuizCertificate = async (req, res) => {
 export {
   generateCertificate,
   issueExamCertificate,
-  generateQuizCertificate
+  generateQuizCertificate,
+  resolveExamByName
 };

@@ -5,6 +5,21 @@
 
 const STORAGE_KEY = "local_certificates";
 
+export function normalizeCertificateCourseName(course) {
+  const value = String(course || "").trim();
+  const lower = value.toLowerCase();
+
+  if (
+    lower === "react fundamentals quiz" ||
+    lower === "practice quiz" ||
+    lower.includes("practice quiz")
+  ) {
+    return "PRACTICE QUIZ";
+  }
+
+  return value || "Exam";
+}
+
 function getStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -55,7 +70,7 @@ export function getLocalCertificates() {
   const forUser = userId ? all.filter((c) => c.userId === userId) : [];
   return forUser.map((c) => ({
     id: c.id,
-    course: c.course,
+    course: normalizeCertificateCourseName(c.course),
     date: c.date,
     score: c.score,
     previewColor: "#003366",
@@ -69,10 +84,11 @@ export function getLocalCertificates() {
 export function addLocalCertificate(opts) {
   const userId = typeof localStorage !== "undefined" ? localStorage.getItem("user_id") : null;
   const list = getStorage();
+  const course = normalizeCertificateCourseName(opts.course);
 
   if (userId) {
     const existingCertificate = list.find(
-      (certificate) => certificate.userId === userId && certificate.course === (opts.course || "Exam")
+      (certificate) => certificate.userId === userId && normalizeCertificateCourseName(certificate.course) === course
     );
 
     if (existingCertificate) {
@@ -85,7 +101,7 @@ export function addLocalCertificate(opts) {
   const certificate = {
     id,
     userId: userId || "",
-    course: opts.course || "Exam",
+    course,
     score: opts.score ?? 0,
     date,
   };

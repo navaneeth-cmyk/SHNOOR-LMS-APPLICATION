@@ -2,7 +2,11 @@ import { FaDownload, FaTrophy, FaCertificate, FaPrint } from "react-icons/fa";
 import { QRCodeSVG } from "qrcode.react";
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../../api/axios";
-import { claimAnonymousCertificates, getLocalCertificates } from "../../utils/certificateStorage";
+import {
+  claimAnonymousCertificates,
+  getLocalCertificates,
+  normalizeCertificateCourseName,
+} from "../../utils/certificateStorage";
 import "../../styles/Dashboard.css";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../auth/firebase";
@@ -14,7 +18,7 @@ const generateCertificateAPI = async (user_id, course, score) => {
   try {
     const res = await api.post("/api/certificate/add", {
       user_id,
-      exam_name: course,
+      exam_name: normalizeCertificateCourseName(course),
       score,
     });
     return res.data?.generated ? { generated: true } : { generated: false };
@@ -125,7 +129,7 @@ const MyCertificates = () => {
       const certArray = Array.isArray(data) ? data : data ? [data] : [];
       const formatted = certArray.map((c) => ({
         id: c.id || c.certificate_id || String(Math.random()).slice(2, 11),
-        course: c.exam_name,
+        course: normalizeCertificateCourseName(c.exam_name),
         date: c.issued_at ? new Date(c.issued_at).toLocaleDateString() : new Date().toLocaleDateString(),
         score: c.score,
         previewColor: "#003366",
