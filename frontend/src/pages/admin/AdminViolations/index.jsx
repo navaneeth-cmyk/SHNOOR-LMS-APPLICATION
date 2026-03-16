@@ -64,6 +64,7 @@ const AdminViolations = () => {
       } else {
         console.error("❌ [ADMIN] Detailed violations fetch error:", detailedRes.reason);
         setAllViolations([]);
+        toast.error("Detailed violations feed failed to load");
       }
 
       if (summaryRes.status !== "fulfilled" && detailedRes.status !== "fulfilled") {
