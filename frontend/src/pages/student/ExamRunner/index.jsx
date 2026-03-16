@@ -4,7 +4,6 @@ import { toast } from 'react-hot-toast';
 import { useObjectDetection } from '../../../hooks/useObjectDetection';
 import { useVoiceDetection } from '../../../hooks/useVoiceDetection';
 import { useFaceDetection } from '../../../hooks/useFaceDetection';
-import { db } from '../../../auth/firebase';
 
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -195,7 +194,7 @@ const ExamRunner = () => {
       if (peerRef.current) {
         const pId = peerRef.current.id;
         peerRef.current.destroy();
-        deleteDoc(doc(db, 'live_sessions', pId)).catch(() => { });
+        api.delete(`/api/proctoring/session/${pId}`).catch(() => { });
       }
     };
   }, []);

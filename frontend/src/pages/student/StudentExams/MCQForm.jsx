@@ -22,6 +22,45 @@ import { useFaceDetection } from "../../../hooks/useFaceDetection";
 const PRACTICE_QUIZ_TITLE = "PRACTICE QUIZ";
 const PRACTICE_VIOLATION_ENDPOINT = "/api/student/exams/practice-quiz/violation";
 
+const getActiveViolationMeta = ({ isSuspicious, isVoiceSuspicious, isLoudNoise, multipleFacesDetected, noFaceDetected }) => {
+  if (multipleFacesDetected) {
+    return {
+      title: "Multiple Faces Detected!",
+      message: "Only one candidate is allowed in front of the camera. Multiple people detected.",
+    };
+  }
+
+  if (noFaceDetected) {
+    return {
+      title: "Face Not Visible!",
+      message: "Your face is not clearly visible. Stay in frame so proctoring can continue.",
+    };
+  }
+
+  if (isLoudNoise) {
+    return {
+      title: "Loud Noise Detected!",
+      message: "A loud noise was detected. Keep the environment quiet while taking the quiz.",
+    };
+  }
+
+  if (isVoiceSuspicious) {
+    return {
+      title: "Voice Detected!",
+      message: "Audio was detected. Please maintain silence during the quiz.",
+    };
+  }
+
+  if (isSuspicious) {
+    return {
+      title: "Suspicious Object Detected!",
+      message: "A restricted object was detected. Remove it to continue.",
+    };
+  }
+
+  return null;
+};
+
 const CameraPreview = ({ stream, isHidden = false }) => {
   const videoRef = useRef(null);
 
@@ -572,6 +611,13 @@ const MCQForm = ({ onBack }) => {
   const selectedAnswer = answers[currentQuestion];
   const score = calculateScore();
   const passed = score >= 50;
+  const activeViolation = getActiveViolationMeta({
+    isSuspicious,
+    isVoiceSuspicious,
+    isLoudNoise,
+    multipleFacesDetected,
+    noFaceDetected,
+  });
 
   // 1. Live Proctoring Step (Setup)
   if (!isProctored) {
@@ -673,22 +719,17 @@ const MCQForm = ({ onBack }) => {
   return (
     <div className="fixed inset-0 bg-slate-50 z-[9999] overflow-y-auto p-4 md:p-8">
       {/* ⚠️ Suspicious Activity Warning Detail Overlay */}
-      {(isSuspicious || isVoiceSuspicious || multipleFacesDetected) && (
+      {activeViolation && (
         <div className="fixed inset-0 z-[10000] bg-rose-900/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl border-4 border-rose-500 animate-pulse">
             <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertTriangle size={40} />
             </div>
             <h2 className="text-2xl font-black text-slate-900 mb-4">
-              {multipleFacesDetected ? "Multiple Faces Detected!" : (isVoiceSuspicious ? "Voice Detected!" : "Suspicious Object!")}
+              {activeViolation.title}
             </h2>
             <p className="text-slate-600 font-medium mb-8">
-              {multipleFacesDetected
-                ? "Only one candidate is allowed in front of the camera. Multiple people detected."
-                : (isVoiceSuspicious
-                  ? "Experimental voice detection has picked up audio. Please maintain silence."
-                  : "A Mobile Phone was detected. Please remove it to continue.")
-              }
+              {activeViolation.message}
               <br /><br />
               This incident has been logged and reported.
             </p>
