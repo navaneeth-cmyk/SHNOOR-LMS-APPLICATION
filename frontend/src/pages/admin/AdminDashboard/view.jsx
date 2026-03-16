@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import {
     Users, BookOpen, Clock, Award, Search, X, Download, BarChart3,
     TrendingUp, ArrowUpRight, ArrowDownRight, UserPlus, CheckCircle,
-    Activity, Zap, Calendar, FileText, GraduationCap, BookMarked
+    Activity, Zap, Calendar, FileText, GraduationCap, BookMarked, Video
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
@@ -23,11 +24,11 @@ const AdminDashboardView = ({
     goToAddInstructor,
     goToApproveCourses,
     goToAssignCourse,
+    goToProctoring,
+    liveSessionCount,
 }) => {
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const themePrimary = 'var(--color-primary)';
-    const themePrimaryLight = 'var(--color-primary-light)';
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[500px]">
@@ -72,14 +73,16 @@ const AdminDashboardView = ({
     const statCards = [
         { label: 'Total Students', value: stats?.totalStudents ?? 0, icon: Users, change: '+12%', up: true, color: '#6366f1', bg: '#eef2ff', iconColor: '#6366f1', spark: sparkData[0] },
         { label: 'Total Instructors', value: stats?.totalInstructors ?? 0, icon: GraduationCap, change: '+5%', up: true, color: '#8b5cf6', bg: '#f5f3ff', iconColor: '#8b5cf6', spark: sparkData[1] },
+        { label: 'Live Sessions', value: liveSessionCount ?? 0, icon: Video, change: 'LIVE', up: true, color: '#ef4444', bg: '#fee2e2', iconColor: '#ef4444', spark: [5, 2, 8, 4, 6, 3, 7] },
         { label: 'Pending Courses', value: stats?.pendingCourses ?? 0, icon: Clock, change: '-3%', up: false, color: '#f59e0b', bg: '#fffbeb', iconColor: '#f59e0b', spark: sparkData[2] },
         { label: 'Certificates Issued', value: stats?.certificates ?? 0, icon: Award, change: '+18%', up: true, color: '#10b981', bg: '#ecfdf5', iconColor: '#10b981', spark: sparkData[3] },
     ];
 
     // Quick actions
     const quickActions = [
-        { label: 'Add Instructor', icon: UserPlus, onClick: goToAddInstructor, color: '#5558e1ff' },
+        { label: 'Add Instructor', icon: UserPlus, onClick: goToAddInstructor, color: '#6366f1' },
         { label: 'Approve Courses', icon: CheckCircle, onClick: goToApproveCourses, color: '#10b981' },
+        { label: 'Live Proctoring', icon: Video, onClick: goToProctoring, color: '#8b5cf6' },
         { label: 'Assign Course', icon: BookMarked, onClick: goToAssignCourse, color: '#f59e0b' },
         { label: 'Download Report', icon: FileText, onClick: onDownloadReport, color: '#ef4444' },
     ];
@@ -270,50 +273,26 @@ const AdminDashboardView = ({
                             <p className="text-xs text-slate-400 mt-0.5">Weekly engagement overview</p>
                         </div>
                         <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: themePrimary }}></div>
+                            <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
                             Lessons
                         </div>
                     </div>
                     <div className="flex-1 p-5">
                         {chartData && chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                <AreaChart data={chartData}>
                                     <defs>
-                                        <linearGradient id="lessonsBarGradient" x1="0" y1="0" x2="1" y2="0">
-                                            <stop offset="0%" stopColor="#172743" />
-                                            <stop offset="100%" stopColor="#2B2B72" />
+                                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#6366f1" stopOpacity={0.2} />
+                                            <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis 
-                                        dataKey="name" 
-                                        axisLine={false} 
-                                        tickLine={false} 
-                                        tick={{ fill: '#94a3b8', fontSize: 11 }} 
-                                        dy={8} 
-                                    />
-                                    <YAxis 
-                                        axisLine={false} 
-                                        tickLine={false} 
-                                        tick={{ fill: '#94a3b8', fontSize: 11 }} 
-                                        width={28} 
-                                    />
-                                    <Tooltip 
-                                        cursor={{ fill: '#f8fafc' }}
-                                        contentStyle={{ 
-                                            borderRadius: '12px', 
-                                            border: `1px solid ${themePrimaryLight}`, 
-                                            boxShadow: '0 4px 12px rgba(0,0,0,.08)', 
-                                            fontSize: '13px' 
-                                        }} 
-                                    />
-                                    <Bar 
-                                        dataKey="lessons" 
-                                        fill="url(#lessonsBarGradient)"
-                                        radius={[4, 4, 0, 0]} 
-                                        barSize={32}
-                                    />
-                                </BarChart>
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} dy={8} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} width={28} />
+                                    <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,.08)', fontSize: '13px' }} />
+                                    <Area type="monotone" dataKey="lessons" stroke="#6366f1" strokeWidth={2.5} fill="url(#chartGradient)" />
+                                </AreaChart>
                             </ResponsiveContainer>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-center">

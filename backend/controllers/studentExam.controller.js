@@ -4,11 +4,11 @@ import { submitExam as submitExamUnified } from "./exams/examSubmission.controll
 import { issueExamCertificate } from "./certificate.controller.js";
 
 // =============================================================================
-// getStudentExams
-// — Doc 3: simple approved-exam list, no enrollment filter, no course title
-// — Doc 4: filters by enrolled courses, joins course title + attempt status
-// — Integrated: uses Doc 4's richer query; falls back gracefully if
-//   student_courses has no rows (returns empty array, not a 500)
+//  getStudentExams
+//  ✅ Doc 3: simple approved-exam list, no enrollment filter, no course title
+//  ✅ Doc 4: filters by enrolled courses, joins course title + attempt status
+//  🔀 Integrated: Uses Doc 4's richer query with full result data.
+//                 Falls back gracefully if student has no enrolled courses.
 // =============================================================================
 export const getStudentExams = async (req, res) => {
   try {
@@ -21,18 +21,19 @@ export const getStudentExams = async (req, res) => {
         e.title,
         e.duration,
         e.pass_percentage,
-        c.title                                           AS course_title,
-        (er.exam_id IS NOT NULL)                          AS attempted,
-        ea.status                                         AS attempt_status,
+        c.title                                             AS course_title,
+        (er.exam_id IS NOT NULL)                            AS attempted,
+        ea.status                                           AS attempt_status,
         (ea.status = 'submitted' OR er.exam_id IS NOT NULL) AS is_completed,
         er.percentage,
         er.passed
       FROM exams e
-      JOIN courses          c  ON c.courses_id  = e.course_id
-      JOIN student_courses  sc ON sc.course_id  = c.courses_id
-      LEFT JOIN exam_results  er ON er.exam_id  = e.exam_id  AND er.student_id  = $1
-      LEFT JOIN exam_attempts ea ON ea.exam_id  = e.exam_id  AND ea.student_id  = $1
+      JOIN courses          c  ON c.courses_id = e.course_id
+      JOIN student_courses  sc ON sc.course_id = c.courses_id
+      LEFT JOIN exam_results  er ON er.exam_id = e.exam_id AND er.student_id = $1
+      LEFT JOIN exam_attempts ea ON ea.exam_id = e.exam_id AND ea.student_id = $1
       WHERE sc.student_id = $1
+        AND e.status = 'approved'
       ORDER BY e.created_at DESC
       `,
       [studentId],
@@ -46,12 +47,12 @@ export const getStudentExams = async (req, res) => {
 };
 
 // =============================================================================
-// getExamForAttempt
-// — Doc 3: basic lookup, skipped enrollment, no attempt tracking, no shuffle
-// — Doc 4: virtual "final_<courseId>" IDs, enrollment guard, timer tracking,
-//          per-student seeded shuffle, coding question fields
-// — Integrated: full Doc 4 logic retained; Doc 3's simpler path is the
-//   fallback when virtual-ID resolution is not needed
+//  getExamForAttempt
+//  ✅ Doc 3: basic lookup, skipped enrollment, no attempt tracking, no shuffle
+//  ✅ Doc 4: virtual "final_<courseId>" IDs, enrollment guard, timer tracking,
+//            per-student seeded shuffle, coding question fields
+//  🔀 Integrated: Full Doc 4 logic. Doc 3's simpler question fields are a
+//                 subset of Doc 4's query — fully covered.
 // =============================================================================
 export const getExamForAttempt = async (req, res) => {
   try {
@@ -94,12 +95,9 @@ export const getExamForAttempt = async (req, res) => {
     const examRes = await pool.query(
       isFinalExamLookup
         ? `SELECT exam_id, title, duration, pass_percentage, course_id
-           FROM exams
-           WHERE course_id = $1
-           LIMIT 1`
+           FROM exams WHERE course_id = $1 LIMIT 1`
         : `SELECT exam_id, title, duration, pass_percentage, course_id
-           FROM exams
-           WHERE exam_id = $1`,
+           FROM exams WHERE exam_id = $1`,
       [examId],
     );
 
@@ -112,15 +110,13 @@ export const getExamForAttempt = async (req, res) => {
     examId = exam.exam_id;
 
     /* -----------------------------------------------------------------------
-       STEP 2 — Enrollment check (Doc 4; Doc 3 skipped this)
+       STEP 2 — Enrollment check
+       Doc 3 skipped this. Doc 4 enforced it. Integrated: enforced.
     ----------------------------------------------------------------------- */
     if (exam.course_id) {
       const enrolled = await pool.query(
-        `
-        SELECT 1
-        FROM student_courses
-        WHERE student_id = $1 AND course_id = $2
-        `,
+        `SELECT 1 FROM student_courses
+         WHERE student_id = $1 AND course_id = $2`,
         [studentId, exam.course_id],
       );
 
@@ -133,7 +129,8 @@ export const getExamForAttempt = async (req, res) => {
        STEP 3 — Already-submitted guard (Doc 4)
     ----------------------------------------------------------------------- */
     const attemptCheck = await pool.query(
-      `SELECT status FROM exam_attempts WHERE exam_id = $1 AND student_id = $2`,
+      `SELECT status FROM exam_attempts
+       WHERE exam_id = $1 AND student_id = $2`,
       [examId, studentId],
     );
 
@@ -187,10 +184,10 @@ export const getExamForAttempt = async (req, res) => {
 
     /* -----------------------------------------------------------------------
        STEP 5 — Fetch questions
-       Doc 3: id, text, type, marks, options (plain text array)
-       Doc 4: + title, description, starterCode, options as {id,text},
+       Doc 3: id, text, type, marks, options as plain text array
+       Doc 4: + title, description, starterCode, options as {id, text},
                testCases for coding questions
-       Integrated: Doc 4's full query (superset of Doc 3)
+       Integrated: Doc 4's full query (strict superset of Doc 3)
     ----------------------------------------------------------------------- */
     const { rows } = await pool.query(
       `
@@ -237,7 +234,7 @@ export const getExamForAttempt = async (req, res) => {
         ) AS questions
 
       FROM exams e
-      LEFT JOIN exam_questions        q  ON q.exam_id    = e.exam_id
+      LEFT JOIN exam_questions        q  ON q.exam_id     = e.exam_id
       LEFT JOIN exam_coding_questions cq ON cq.question_id = q.question_id
       WHERE e.exam_id = $1
       GROUP BY e.exam_id, e.title, e.duration, e.pass_percentage
@@ -247,6 +244,7 @@ export const getExamForAttempt = async (req, res) => {
 
     /* -----------------------------------------------------------------------
        STEP 6 — Per-student seeded shuffle (Doc 4 anti-cheat)
+       Shuffles both questions and MCQ options deterministically per student
     ----------------------------------------------------------------------- */
     const examPayload = rows[0];
 
@@ -279,8 +277,7 @@ export const getExamForAttempt = async (req, res) => {
 
       examPayload.questions.forEach((question, index) => {
         if (question.type === "mcq" && Array.isArray(question.options)) {
-          const optionSeed =
-            baseSeed + hashString(`${question.id}:${index}`);
+          const optionSeed = baseSeed + hashString(`${question.id}:${index}`);
           shuffleWithSeed(question.options, optionSeed);
         }
       });
@@ -292,31 +289,29 @@ export const getExamForAttempt = async (req, res) => {
     res.json(examPayload);
   } catch (err) {
     console.error("getExamForAttempt error:", err);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: err.message });
+    res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
 
 // =============================================================================
-// submitExam
-// — Doc 3: saves raw answers only, no grading, no transaction
-// — Doc 4: delegates to unified grading pipeline (MCQ + descriptive + coding)
-// — Integrated: delegates to unified pipeline (Doc 4). The full inline grading
-//   logic below is kept as a self-contained fallback in case the unified
-//   controller is unavailable.
+//  submitExam
+//  ✅ Doc 3: saves raw answers only, no grading, no transaction
+//  ✅ Doc 4: delegates to unified grading pipeline (MCQ + descriptive + coding)
+//  🔀 Integrated: Primary path delegates to unified pipeline (Doc 4).
+//                 Full inline grading logic retained as self-contained fallback
+//                 in case the unified controller is unavailable.
 // =============================================================================
 export const submitExam = async (req, res) => {
-  // Primary path — unified grading pipeline (MCQ + descriptive + coding)
+  // ── PRIMARY PATH — unified grading pipeline (MCQ + descriptive + coding) ──
   return submitExamUnified(req, res);
 
-  // ── FALLBACK (unreachable unless submitExamUnified is removed) ──────────
+  // ── FALLBACK (unreachable unless submitExamUnified is removed) ─────────────
   const client = await pool.connect();
 
   try {
     let { examId } = req.params;
 
-    // Resolve virtual exam IDs
+    // Resolve virtual exam IDs (Doc 3 didn't need this, Doc 4 did)
     if (examId && examId.startsWith("final_")) {
       const courseId = examId.replace("final_", "");
       const { rows: resolvedExams } = await client.query(
@@ -330,7 +325,26 @@ export const submitExam = async (req, res) => {
     const { answers } = req.body;
 
     /* -----------------------------------------------------------------------
-       Time-window enforcement (Doc 4)
+       Duplicate submission check
+       Doc 3: basic check against exam_results
+       Doc 4: checks exam_attempts status
+       Integrated: Doc 4's approach (attempt-based)
+    ----------------------------------------------------------------------- */
+    const attempted = await client.query(
+      `SELECT status FROM exam_attempts
+       WHERE exam_id = $1 AND student_id = $2`,
+      [examId, studentId],
+    );
+
+    if (attempted.rows.length > 0 && attempted.rows[0].status === "submitted") {
+      return res.status(400).json({
+        message: "Exam already submitted",
+        alreadySubmitted: true,
+      });
+    }
+
+    /* -----------------------------------------------------------------------
+       Time-window enforcement (Doc 4 only)
     ----------------------------------------------------------------------- */
     const { rows: attemptRows } = await client.query(
       `
@@ -362,7 +376,19 @@ export const submitExam = async (req, res) => {
 
     await client.query("BEGIN");
 
-    // Clear previous answers (allow resubmit within window)
+    // Save raw submission (Doc 3 approach — kept as audit trail)
+    await client.query(
+      `
+      INSERT INTO exam_submissions
+        (exam_id, student_id, answers, submitted_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (exam_id, student_id)
+      DO UPDATE SET answers = EXCLUDED.answers, submitted_at = NOW()
+      `,
+      [examId, studentId, answers],
+    );
+
+    // Clear previous graded answers (allow resubmit within window)
     await client.query(
       `DELETE FROM exam_answers WHERE exam_id = $1 AND student_id = $2`,
       [examId, studentId],
@@ -498,8 +524,8 @@ export const submitExam = async (req, res) => {
     await client.query(
       `
       UPDATE exam_attempts
-      SET status         = 'submitted',
-          submitted_at   = NOW(),
+      SET status          = 'submitted',
+          submitted_at    = NOW(),
           disconnected_at = NULL
       WHERE exam_id = $1 AND student_id = $2
       `,
@@ -508,7 +534,7 @@ export const submitExam = async (req, res) => {
 
     await client.query("COMMIT");
 
-    // Issue certificate if passed
+    // Issue certificate if passed (Doc 4)
     let certificateIssued = false;
     if (passed) {
       try {
@@ -541,8 +567,8 @@ export const submitExam = async (req, res) => {
 };
 
 // =============================================================================
-// autoSubmitExam  (Doc 4 only — server-triggered on timer expiry)
-// Called by scheduler/socket, not an HTTP handler
+//  autoSubmitExam  (Doc 4 only)
+//  Server-triggered on timer expiry — called by scheduler/socket, not HTTP
 // =============================================================================
 export const autoSubmitExam = async (studentId, examId) => {
   const client = await pool.connect();
@@ -583,8 +609,8 @@ export const autoSubmitExam = async (studentId, examId) => {
 };
 
 // =============================================================================
-// logViolation  (Doc 3 — retained; likely split into its own controller in
-//                Doc 4's modular structure, but kept here for completeness)
+//  logViolation
+//  ✅ Doc 3 & Doc 4 — nearly identical. Integrated version retained as-is.
 // =============================================================================
 export const logViolation = async (req, res) => {
   try {
@@ -616,8 +642,11 @@ export const logViolation = async (req, res) => {
 };
 
 // =============================================================================
-// savePracticeResult  (Doc 3 — retained for practice/quiz flows that sit
-//                      outside the formal exam pipeline)
+//  savePracticeResult
+//  ✅ Doc 3 & Doc 4 — nearly identical.
+//  🔀 Integrated: Uses Doc 4's `obtained_marks ?? percentage` (nullish
+//     coalescing) which correctly handles 0 marks, unlike Doc 3's `||`.
+//     Removed unused `exam_name` field from Doc 3.
 // =============================================================================
 export const savePracticeResult = async (req, res) => {
   try {
@@ -644,7 +673,7 @@ export const savePracticeResult = async (req, res) => {
         "practice-quiz",
         studentId,
         total_marks || 100,
-        obtained_marks ?? percentage,
+        obtained_marks ?? percentage, // ?? correctly handles obtained_marks = 0
         percentage,
         percentage >= 50,
       ],
