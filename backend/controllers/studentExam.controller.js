@@ -1,7 +1,24 @@
 import pool from "../db/postgres.js";
 import { autoGradeDescriptive } from "./exams/examdescriptive.controller.js";
 import { submitExam as submitExamUnified } from "./exams/examSubmission.controller.js";
-import { issueExamCertificate } from "./certificate.controller.js";
+import { issueExamCertificate, resolveExamByName } from "./certificate.controller.js";
+
+const PRACTICE_EXAM_ROUTE_IDS = new Set(["practice-quiz", "practice", "PRACTICE QUIZ"]);
+
+const resolveStoredExamId = async (examId) => {
+  const rawExamId = String(examId || "").trim();
+
+  if (!rawExamId) {
+    return null;
+  }
+
+  if (PRACTICE_EXAM_ROUTE_IDS.has(rawExamId)) {
+    const practiceExam = await resolveExamByName("PRACTICE QUIZ");
+    return practiceExam?.exam_id || null;
+  }
+
+  return rawExamId;
+};
 
 // =============================================================================
 //  getStudentExams
@@ -617,12 +634,17 @@ export const logViolation = async (req, res) => {
     const { examId } = req.params;
     const studentId = req.user.id;
     const { type, details } = req.body;
+    const storedExamId = await resolveStoredExamId(examId);
+
+    if (!storedExamId) {
+      return res.status(400).json({ message: "Exam not found for violation logging" });
+    }
 
     console.log("\n**************************************************");
     console.log(`🚀 [VIOLATION RECEIVED]`);
     console.log(`📅 Time: ${new Date().toLocaleString()}`);
     console.log(`👤 Student ID: ${studentId}`);
-    console.log(`📝 Exam ID: ${examId}`);
+    console.log(`📝 Exam ID: ${storedExamId}`);
     console.log(`⚠️  Type: ${type}`);
     console.log("**************************************************\n");
 
@@ -630,7 +652,7 @@ export const logViolation = async (req, res) => {
       `INSERT INTO exam_violations
          (exam_id, student_id, violation_type, details)
        VALUES ($1, $2, $3, $4)`,
-      [String(examId), studentId, type, JSON.stringify(details)],
+      [storedExamId, studentId, type, JSON.stringify(details)],
     );
 
     console.log("✅ [DATABASE] Violation saved successfully.");
@@ -652,6 +674,11 @@ export const savePracticeResult = async (req, res) => {
   try {
     const studentId = req.user.id;
     const { percentage, obtained_marks, total_marks } = req.body;
+    const practiceExamId = await resolveStoredExamId("practice-quiz");
+
+    if (!practiceExamId) {
+      return res.status(400).json({ message: "Practice quiz exam not found" });
+    }
 
     console.log(
       `\n--- [PRACTICE RESULT] Saving for Student: ${studentId} ---`,
@@ -670,7 +697,7 @@ export const savePracticeResult = async (req, res) => {
         evaluated_at   = NOW()
       `,
       [
-        "practice-quiz",
+        practiceExamId,
         studentId,
         total_marks || 100,
         obtained_marks ?? percentage, // ?? correctly handles obtained_marks = 0

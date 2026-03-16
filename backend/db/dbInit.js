@@ -314,6 +314,28 @@ export const initializeDatabase = async () => {
             );
         `);
 
+        console.log("   - Setting up Exam Violations...");
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS exam_violations (
+                violation_id SERIAL PRIMARY KEY,
+                exam_id TEXT NOT NULL,
+                student_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
+                violation_type VARCHAR(50) NOT NULL,
+                details JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await pool.query(`
+            ALTER TABLE exam_violations
+            ALTER COLUMN exam_id TYPE TEXT USING exam_id::text;
+        `).catch(() => {});
+
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_exam_violations_student_exam
+            ON exam_violations(student_id, exam_id, created_at DESC);
+        `);
+
         // 4. Practice Challenges
         console.log("   - Setting up Practice Challenges...");
         await pool.query(`
