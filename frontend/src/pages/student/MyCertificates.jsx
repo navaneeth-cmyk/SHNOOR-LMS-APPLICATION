@@ -163,15 +163,22 @@ const MyCertificates = () => {
   // ================= GENERATE CERTIFICATE (PDF via backend, optional) =================
   const handleGenerateCertificate = async (cert) => {
     const userId = localStorage.getItem("user_id");
-    if (!userId) return;
+    if (!userId) {
+      // No user id – open the viewer directly so the student can still download
+      setSelectedCert(cert);
+      return;
+    }
 
+    // Try backend generation; if it succeeds (new or already exists) open the viewer
     const result = await generateCertificateAPI(userId, cert.course, cert.score || 90);
 
     if (result.generated) {
-      alert("Certificate generated successfully!");
-      loadCertificates();
+      // Open the certificate viewer so the student can download the PDF immediately
+      setSelectedCert(cert);
     } else {
-      alert("PDF generation requires the server, or certificate already exists.");
+      // Backend unavailable or truly not eligible – still open the viewer
+      // so the student can at least see and download the client-side PDF
+      setSelectedCert(cert);
     }
   };
 

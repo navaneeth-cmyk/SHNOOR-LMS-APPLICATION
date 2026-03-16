@@ -41,6 +41,23 @@ const resolveExamByName = async (examName) => {
     if (practiceMatch.rows.length > 0) {
       return practiceMatch.rows[0];
     }
+
+    // Auto-create the PRACTICE QUIZ exam record if it doesn't exist in the DB
+    const insertResult = await pool.query(`
+      INSERT INTO exams (title, description, duration, pass_percentage, status)
+      SELECT 'PRACTICE QUIZ', 'General practice assessment for students.', 30, 40, 'published'
+      WHERE NOT EXISTS (SELECT 1 FROM exams WHERE title = 'PRACTICE QUIZ')
+      RETURNING exam_id, title
+    `);
+
+    if (insertResult.rows.length > 0) {
+      return insertResult.rows[0];
+    }
+
+    const retryMatch = await pool.query(
+      `SELECT exam_id, title FROM exams WHERE title = 'PRACTICE QUIZ' LIMIT 1`
+    );
+    return retryMatch.rows[0] || null;
   }
 
   return null;
@@ -130,12 +147,17 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
   }
 
   const existingCert = await pool.query(
-    `SELECT 1 FROM certificates WHERE user_id = $1 AND exam_id = $2`,
+    `SELECT * FROM certificates WHERE user_id = $1 AND exam_id = $2`,
     [userId, examId]
   );
 
   if (existingCert.rows.length > 0) {
-    return { issued: false, reason: "already_issued" };
+    return {
+      issued: true,
+      certificate: existingCert.rows[0],
+      filePath: existingCert.rows[0].certificate_id || null,
+      alreadyExisted: true
+    };
   }
 
   const userRes = await pool.query(
