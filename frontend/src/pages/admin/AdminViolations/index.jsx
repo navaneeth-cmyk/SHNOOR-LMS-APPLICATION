@@ -40,17 +40,35 @@ const AdminViolations = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [summaryRes, detailedRes] = await Promise.all([
+      const [summaryRes, detailedRes] = await Promise.allSettled([
         api.get("/api/admin/violations/summary"),
         api.get("/api/admin/violations")
       ]);
-      console.log("📊 [ADMIN] Summary:", summaryRes.data?.length, "records");
-      console.log("📝 [ADMIN] Detailed Violations:", detailedRes.data?.length, "records");
-      if (detailedRes.data?.length > 0) {
-        console.log("🔍 [ADMIN] Sample Exam Title:", detailedRes.data[0].exam_title);
+
+      if (summaryRes.status === "fulfilled") {
+        const summaryData = summaryRes.value?.data || [];
+        setSummary(summaryData);
+        console.log("📊 [ADMIN] Summary:", summaryData.length, "records");
+      } else {
+        console.error("❌ [ADMIN] Summary fetch error:", summaryRes.reason);
+        setSummary([]);
       }
-      setSummary(summaryRes.data || []);
-      setAllViolations(detailedRes.data || []);
+
+      if (detailedRes.status === "fulfilled") {
+        const violationsData = detailedRes.value?.data || [];
+        setAllViolations(violationsData);
+        console.log("📝 [ADMIN] Detailed Violations:", violationsData.length, "records");
+        if (violationsData.length > 0) {
+          console.log("🔍 [ADMIN] Sample Exam Title:", violationsData[0].exam_title);
+        }
+      } else {
+        console.error("❌ [ADMIN] Detailed violations fetch error:", detailedRes.reason);
+        setAllViolations([]);
+      }
+
+      if (summaryRes.status !== "fulfilled" && detailedRes.status !== "fulfilled") {
+        toast.error("Failed to load violations data");
+      }
     } catch (err) {
       console.error("❌ [ADMIN] Fetch error:", err);
       toast.error("Failed to load violations data");

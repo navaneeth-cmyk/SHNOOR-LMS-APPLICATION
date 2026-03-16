@@ -20,6 +20,25 @@ const resolveStoredExamId = async (examId) => {
   return rawExamId;
 };
 
+const ensureViolationsTableReady = async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS exam_violations (
+      violation_id SERIAL PRIMARY KEY,
+      exam_id TEXT NOT NULL,
+      student_id UUID NOT NULL,
+      violation_type VARCHAR(50) NOT NULL,
+      details JSONB,
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE CASCADE
+    );
+  `);
+
+  await pool.query(`
+    ALTER TABLE exam_violations
+    ALTER COLUMN exam_id TYPE TEXT USING exam_id::text;
+  `).catch(() => {});
+};
+
 // =============================================================================
 //  getStudentExams
 //  ✅ Doc 3: simple approved-exam list, no enrollment filter, no course title
@@ -634,11 +653,10 @@ export const logViolation = async (req, res) => {
     const { examId } = req.params;
     const studentId = req.user.id;
     const { type, details } = req.body;
-    const storedExamId = await resolveStoredExamId(examId);
+    const resolvedExamId = await resolveStoredExamId(examId);
+    const storedExamId = resolvedExamId || String(examId || "practice-quiz");
 
-    if (!storedExamId) {
-      return res.status(400).json({ message: "Exam not found for violation logging" });
-    }
+    await ensureViolationsTableReady();
 
     console.log("\n**************************************************");
     console.log(`🚀 [VIOLATION RECEIVED]`);
