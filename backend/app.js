@@ -557,6 +557,7 @@ import uploadRoutes from "./routes/upload.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
 import groupsRoutes from "./routes/group.routes.js";
 import practiceRoutes from "./routes/practice.routes.js";
+import proctoringRoutes from "./routes/proctoring.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import http from "http";
 import { Server } from "socket.io";
