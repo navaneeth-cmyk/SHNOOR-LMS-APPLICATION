@@ -767,6 +767,7 @@ const ExamRunner = () => {
       isSuspicious={isSuspicious || isVoiceSuspicious || multipleFacesDetected}
       isVoiceSuspicious={isVoiceSuspicious}
       multipleFacesDetected={multipleFacesDetected}
+      noFaceDetected={noFaceDetected}
       detections={detections}
     />
   );

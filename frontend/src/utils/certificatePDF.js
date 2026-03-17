@@ -14,12 +14,40 @@ export const exportToPDF = async (elementId, fileName = "certificate.pdf") => {
     }
 
     try {
+        // Wait for all images to fully load before capturing
+        const imgs = Array.from(element.querySelectorAll("img"));
+        await Promise.all(
+            imgs.map(
+                (img) =>
+                    new Promise((resolve) => {
+                        if (img.complete) resolve();
+                        else { img.onload = resolve; img.onerror = resolve; }
+                    })
+            )
+        );
+
         // 1. Capture as canvas with high resolution
         const canvas = await html2canvas(element, {
             scale: 3, // High resolution for professional print
             useCORS: true, // Crucial for external image URLs (Firebase Storage)
             allowTaint: true,
             backgroundColor: "#ffffff",
+            logging: false,
+            scrollX: 0,
+            scrollY: -window.scrollY,
+            windowWidth: element.scrollWidth,
+            windowHeight: element.scrollHeight,
+            removeContainer: true,
+            onclone: (_clonedDoc, clonedEl) => {
+                // Force dimensions so CSS variables resolve correctly in the clone
+                const computed = window.getComputedStyle(element);
+                clonedEl.style.width = computed.width;
+                clonedEl.style.height = computed.height;
+                // Ensure cross-origin images render in clone
+                clonedEl.querySelectorAll("img").forEach((img) => {
+                    img.crossOrigin = "anonymous";
+                });
+            },
         });
 
         const imgData = canvas.toDataURL("image/png");

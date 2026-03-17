@@ -1,4 +1,4 @@
-import { FaDownload, FaTrophy, FaCertificate, FaPrint } from "react-icons/fa";
+import { FaDownload, FaTrophy, FaCertificate, FaMedal, FaCalendarAlt, FaChartBar, FaEye } from "react-icons/fa";
 import { QRCodeSVG } from "qrcode.react";
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../../api/axios";
@@ -65,6 +65,8 @@ const MyCertificates = () => {
   const [certConfig, setCertConfig] = useState(null);
   const [currentCertId, setCurrentCertId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  // Pre-generated ID map: { [course]: certId } — populated in background so QR is instant
+  const [certIds, setCertIds] = useState({});
 
   useEffect(() => {
     const fetchCertConfig = async () => {
@@ -116,6 +118,23 @@ const MyCertificates = () => {
     setCertificates(local);
     setLoading(false);
 
+    // Pre-generate certificate IDs in background so QR renders instantly
+    const preGenIds = async (certs) => {
+      const uid = localStorage.getItem("user_id") || "guest";
+      const name = localStorage.getItem("full_name") || "Student";
+      const map = {};
+      await Promise.all(
+        certs.map(async (cert) => {
+          try {
+            const id = await getOrGenerateCertificateId(uid, cert.course, name);
+            map[cert.course] = id;
+          } catch (_) {}
+        })
+      );
+      setCertIds(map);
+    };
+    preGenIds(local);
+
     // 2) Optionally merge in backend certificates if server is available
     if (!userId) return;
 
@@ -145,20 +164,24 @@ const MyCertificates = () => {
     loadCertificates();
   }, [loadCertificates]);
 
-  // Fetch/Generate Unique ID when a certificate is viewed
+  // Use pre-generated ID instantly; fall back to async fetch if not ready yet
   useEffect(() => {
-    const fetchCertId = async () => {
-      if (selectedCert) {
+    if (!selectedCert) { setCurrentCertId(""); return; }
+    const cached = certIds[selectedCert.course];
+    if (cached) {
+      setCurrentCertId(cached);
+    } else {
+      // Not pre-generated yet (edge case) — fetch now
+      const fetchCertId = async () => {
         const userId = localStorage.getItem("user_id") || "guest";
         const studentName = localStorage.getItem("full_name") || "Student";
         const certId = await getOrGenerateCertificateId(userId, selectedCert.course, studentName);
         setCurrentCertId(certId);
-      } else {
-        setCurrentCertId("");
-      }
-    };
-    fetchCertId();
-  }, [selectedCert]);
+        setCertIds((prev) => ({ ...prev, [selectedCert.course]: certId }));
+      };
+      fetchCertId();
+    }
+  }, [selectedCert, certIds]);
 
   // ================= GENERATE CERTIFICATE (PDF via backend, optional) =================
   const handleGenerateCertificate = async (cert) => {
@@ -295,39 +318,94 @@ const MyCertificates = () => {
 
   // ================= DASHBOARD =================
   return (
-    <div>
-      <div className="student-page-header">
-        <h3>My Certificates</h3>
-        <div>
-          <FaTrophy /> 0 XP
+    <div className="w-full pb-12 space-y-6">
+      {/* HEADER */}
+      <div
+        className="relative overflow-hidden rounded-2xl p-6 lg:p-8"
+        style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)' }}
+      >
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
+              <FaMedal size={24} className="text-amber-300" />
+            </div>
+            <div>
+              <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">My Certificates</h1>
+              <p className="text-slate-400 text-sm mt-0.5">Your earned achievements and credentials.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-4 py-2">
+            <FaTrophy className="text-amber-300" size={16} />
+            <span className="text-white font-bold text-sm">{certificates.length} Earned</span>
+          </div>
         </div>
+        <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)' }} />
       </div>
 
+      {backendUnavailable && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm font-medium">
+          Showing locally saved certificates. Start the server to sync more.
+        </div>
+      )}
+
       {certificates.length === 0 ? (
-        <div>
-          <p className="text-slate-500">No certificates yet. Complete exams to earn certificates.</p>
-          {backendUnavailable && (
-            <p className="text-sm text-slate-400 mt-2">When the server is running, you can sync more certificates.</p>
-          )}
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-100 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-4">
+            <FaMedal className="text-slate-300" size={32} />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800 mb-1">No Certificates Yet</h3>
+          <p className="text-sm text-slate-400">Complete exams to earn certificates.</p>
         </div>
       ) : (
-        <>
-          {backendUnavailable && (
-            <p className="text-sm text-slate-500 mb-4">Showing your locally saved certificates. Start the server to generate PDFs.</p>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {certificates.map((cert) => (
-            <div key={cert.id} className="certificate-item">
-              <h4>{cert.course}</h4>
-              <p>Date: {cert.date}</p>
-              <p>Score: {cert.score}</p>
+            <div
+              key={cert.id}
+              className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col hover:border-indigo-200 hover:shadow-md transition-all duration-300 group"
+            >
+              {/* Certificate thumbnail */}
+              <div
+                className="h-36 flex flex-col items-center justify-center relative"
+                style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #312e81 100%)' }}
+              >
+                <FaMedal className="text-amber-400/60 group-hover:text-amber-400/90 transition-colors" size={52} />
+                {certIds[cert.course] && (
+                  <span className="absolute bottom-2 right-3 text-[10px] font-mono text-slate-400/70">
+                    {certIds[cert.course]}
+                  </span>
+                )}
+              </div>
 
-              <button onClick={() => setSelectedCert(cert)}>View</button>
-              <button onClick={() => handleGenerateCertificate(cert)}>
-                Generate PDF
-              </button>
+              {/* Content */}
+              <div className="p-5 flex flex-col flex-1">
+                <h4 className="text-sm font-bold text-slate-900 mb-3 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+                  {cert.course}
+                </h4>
+
+                <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-400 mb-5">
+                  <div className="flex items-center gap-1.5">
+                    <FaCalendarAlt size={11} className="text-slate-400" />
+                    {cert.date}
+                  </div>
+                  {cert.score != null && (
+                    <div className="flex items-center gap-1.5">
+                      <FaChartBar size={11} className="text-emerald-500" />
+                      <span className="font-bold text-slate-600">{cert.score}%</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  className="mt-auto w-full text-white font-bold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 hover:shadow-xl active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' }}
+                  onClick={() => handleGenerateCertificate(cert)}
+                >
+                  <FaEye size={13} /> View Certificate
+                </button>
+              </div>
             </div>
           ))}
-        </>
+        </div>
       )}
     </div>
   );

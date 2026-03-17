@@ -14,31 +14,7 @@ import {
 } from "react-icons/fa";
 import PracticeSession from "../PracticeSession.jsx";
 import SecurityViolationModal from "../../../components/exam/SecurityViolationModal.jsx";
-
-const CameraPreview = ({ stream, isHidden = false }) => {
-  const videoRef = React.useRef(null);
-  React.useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
-  }, [stream]);
-  if (!stream) return null;
-  return (
-    <div className={`fixed bottom-6 right-6 w-48 h-36 bg-slate-900 rounded-lg shadow-2xl border-2 border-indigo-500 overflow-hidden z-50 ring-4 ring-indigo-500/20 transition-opacity ${isHidden ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
-        className="w-full h-full object-cover transform -scale-x-100"
-      />
-      <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 bg-red-500 rounded-full">
-        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-        <span className="text-[10px] font-bold text-white uppercase tracking-wider">Live</span>
-      </div>
-    </div>
-  );
-};
+import VideoStreamWidget from "../../../components/exam/VideoStreamWidget.jsx";
 
 const ProctoringSetup = ({ startCamera, error, examTitle, navigate }) => {
   return (
@@ -128,6 +104,7 @@ const ExamRunnerView = ({
   isSuspicious,
   isVoiceSuspicious,
   multipleFacesDetected,
+  noFaceDetected,
   detections,
 }) => {
   const [hasStarted, setHasStarted] = React.useState(false);
@@ -460,41 +437,31 @@ const ExamRunnerView = ({
       className="h-[calc(100vh-6rem)] flex flex-col bg-slate-50"
       {...securityHandlers}
     >
-      {/* ⚠️ Suspicious Activity Warning Detail Overlay */}
-      {isSuspicious && !multipleFacesDetected && (
-        <div className="fixed inset-0 z-[10000] bg-rose-900/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl border-4 border-rose-500 animate-pulse">
-            <div className="w-24 h-24 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-rose-50">
-              <FaExclamationTriangle size={48} />
+      {/* ── Proctoring violation banners (non-blocking) ── */}
+      {(isSuspicious || multipleFacesDetected || noFaceDetected) && (
+        <div className="fixed top-16 left-0 right-0 z-[10000] flex flex-col gap-1.5 px-4 pt-2 pointer-events-none">
+          {isSuspicious && !multipleFacesDetected && (
+            <div className="flex items-center gap-3 px-5 py-3 bg-rose-600 text-white rounded-xl shadow-xl text-sm font-bold animate-pulse">
+              <FaExclamationTriangle size={16} />
+              ⚠ Suspicious Activity Detected — Unauthorized object or phone in frame. This is being logged.
             </div>
-            <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Suspicious Activity!</h2>
-            <p className="text-slate-600 text-lg font-medium mb-8">
-              Unauthorized objects or a mobile phone detected in your frame.
-              <br /><br />
-              <strong>Warning:</strong> This incident is being logged. Please remove the device immediately.
-            </p>
-          </div>
+          )}
+          {multipleFacesDetected && (
+            <div className="flex items-center gap-3 px-5 py-3 bg-rose-700 text-white rounded-xl shadow-xl text-sm font-bold animate-pulse">
+              <FaExclamationTriangle size={16} />
+              ⚠ Multiple Faces Detected — Only one candidate is allowed. This violation is being reported.
+            </div>
+          )}
+          {noFaceDetected && (
+            <div className="flex items-center gap-3 px-5 py-3 bg-orange-500 text-white rounded-xl shadow-xl text-sm font-bold animate-pulse">
+              <FaExclamationTriangle size={16} />
+              ⚠ No Face Detected — Please ensure your face is clearly visible to the camera.
+            </div>
+          )}
         </div>
       )}
 
-      {/* 👥 Multiple Faces Detected Warning */}
-      {multipleFacesDetected && (
-        <div className="fixed inset-0 z-[10001] bg-rose-900/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl border-4 border-rose-500 animate-pulse">
-            <div className="w-24 h-24 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-rose-50">
-              <FaExclamationTriangle size={48} />
-            </div>
-            <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Multi-Face Alert!</h2>
-            <p className="text-slate-600 text-lg font-medium mb-8">
-              Multiple people detected. Only one candidate is allowed during the exam.
-              <br /><br />
-              <strong>Warning:</strong> This violation is being reported to the admin.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <CameraPreview stream={stream} />
+      <VideoStreamWidget stream={stream} initialCorner="bottom-right" />
 
       <SecurityViolationModal
         isOpen={securityModal.open}
