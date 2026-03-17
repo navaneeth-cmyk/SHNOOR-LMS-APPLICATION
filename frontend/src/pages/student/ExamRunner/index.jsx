@@ -674,12 +674,52 @@ const ExamRunner = () => {
     count: 0
   });
 
+  const mapSecurityViolationType = (type) => {
+    switch (type) {
+      case 'tab-switch':
+      case 'visibility-hidden':
+      case 'blur':
+        return 'TAB_SWITCH';
+      case 'copy-paste':
+        return 'COPY_PASTE';
+      case 'fullscreen-exit':
+        return 'FULLSCREEN_EXIT';
+      default:
+        return 'SECURITY_EVENT';
+    }
+  };
+
+  const logSecurityViolation = async (type, count) => {
+    try {
+      const token = await auth.currentUser?.getIdToken(false);
+      await api.post(
+        `/api/student/exams/${examId}/violation`,
+        {
+          type: mapSecurityViolationType(type),
+          details: {
+            source: 'exam-security-hook',
+            clientType: type,
+            count,
+            timestamp: new Date().toISOString(),
+          },
+        },
+        token
+          ? { headers: { Authorization: `Bearer ${token}` } }
+          : undefined
+      );
+    } catch (err) {
+      console.error('Failed to log security violation:', err?.message || err);
+    }
+  };
+
   const handleSecurityWarning = (type, count) => {
     setSecurityModal({
       open: true,
       type: type,
       count: count
     });
+
+    logSecurityViolation(type, count);
   };
 
   const handleResumeExam = () => {

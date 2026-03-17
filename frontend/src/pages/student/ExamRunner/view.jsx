@@ -789,13 +789,6 @@ const ExamRunnerView = ({
         </div>
       </div>
 
-      <SecurityViolationModal
-        isOpen={securityModal.open}
-        violationType={securityModal.type}
-        count={securityModal.count}
-        onResume={handleResumeExam}
-        isTerminated={isTerminated}
-      />
     </div>
   );
 };

@@ -64,7 +64,7 @@ const useExamSecurity = (onAutoSubmit, onWarning, options = {}) => {
 
         if (newCount < MAX_VIOLATIONS) {
             if (onWarningRef.current) {
-                onWarningRef.current('tab-switch', newCount);
+                onWarningRef.current(type, newCount);
             }
         } else if (newCount >= MAX_VIOLATIONS) {
             // Termination Logic
@@ -72,7 +72,7 @@ const useExamSecurity = (onAutoSubmit, onWarning, options = {}) => {
 
             // Trigger Warning first to show Modal "Terminated" state
             if (onWarningRef.current) {
-                onWarningRef.current('tab-switch', newCount);
+                onWarningRef.current(type, newCount);
             }
 
             // Trigger Auto-Submit
@@ -81,6 +81,18 @@ const useExamSecurity = (onAutoSubmit, onWarning, options = {}) => {
             }
         }
     }, [enabled, isTerminated]);
+    // 3. FULLSCREEN EXIT HANDLER
+    const handleFullscreenChange = useCallback(() => {
+        if (processingRef.current) return;
+        if (!document.fullscreenElement) {
+            processingRef.current = true;
+            handleViolation('fullscreen-exit');
+            setTimeout(() => {
+                processingRef.current = false;
+            }, 100);
+        }
+    }, [handleViolation]);
+
 
 
     // 1. VISIBILITY CHANGE HANDLER
@@ -124,12 +136,14 @@ const useExamSecurity = (onAutoSubmit, onWarning, options = {}) => {
         if (!enabled) return;
         document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("blur", handleWindowBlur);
+        document.addEventListener("fullscreenchange", handleFullscreenChange);
 
         return () => {
             document.removeEventListener("visibilitychange", handleVisibilityChange);
             window.removeEventListener("blur", handleWindowBlur);
+            document.removeEventListener("fullscreenchange", handleFullscreenChange);
         };
-    }, [enabled, handleVisibilityChange, handleWindowBlur]);
+    }, [enabled, handleVisibilityChange, handleWindowBlur, handleFullscreenChange]);
 
 
     // 2. Fullscreen Enforcement
@@ -161,20 +175,17 @@ const useExamSecurity = (onAutoSubmit, onWarning, options = {}) => {
 
 
     // 3. Clipboard & Context Menu Blockers
-    const preventAction = useCallback((e, message) => {
+    const preventAction = useCallback((e) => {
         if (!enabled) return;
         e.preventDefault();
-
-        if (onWarningRef.current) {
-            onWarningRef.current('copy-paste', violationsRef.current);
-        }
-    }, [enabled]);
+        handleViolation('copy-paste');
+    }, [enabled, handleViolation]);
 
     const securityHandlers = {
-        onCopy: (e) => preventAction(e, 'Copying is disabled during the exam'),
-        onCut: (e) => preventAction(e, 'Cutting is disabled during the exam'),
-        onPaste: (e) => preventAction(e, 'Pasting is disabled during the exam'),
-        onContextMenu: (e) => preventAction(e, 'Right-click is disabled during the exam'),
+        onCopy: (e) => preventAction(e),
+        onCut: (e) => preventAction(e),
+        onPaste: (e) => preventAction(e),
+        onContextMenu: (e) => preventAction(e),
     };
 
     return {
