@@ -45,7 +45,9 @@ const AdminLayout = () => {
 
   const handleNavigate = (path) => {
     navigate(path);
-    setIsSidebarOpen(false);
+    if (window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
   };
 
   return (

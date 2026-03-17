@@ -36,7 +36,6 @@ const AdminLayoutView = ({
       <li
         onClick={() => {
           handleNavigate(`/admin/${path}`);
-          setIsSidebarOpen(false);
         }}
         style={{
           display: 'flex',
@@ -110,8 +109,8 @@ const AdminLayoutView = ({
 
       {/* ═══ DARK SIDEBAR ═══ */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
-          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
         style={{
           width: '260px',
           background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
@@ -201,7 +200,10 @@ const AdminLayoutView = ({
       </div>
 
       {/* ═══ MAIN CONTENT AREA ═══ */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+      <div
+        className={`transition-all duration-300 ${isSidebarOpen ? 'lg:ml-[260px]' : 'ml-0'}`}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}
+      >
         {/* Top Header Bar */}
         <header style={{
           background: '#fff',
@@ -214,7 +216,6 @@ const AdminLayoutView = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button
-              className="lg:hidden"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               style={{
                 padding: '8px', background: 'none', border: 'none',
