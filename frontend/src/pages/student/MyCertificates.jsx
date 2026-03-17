@@ -3,6 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../../api/axios";
 import {
+  addLocalCertificate,
   claimAnonymousCertificates,
   getLocalCertificates,
   normalizeCertificateCourseName,
@@ -118,6 +119,27 @@ const MyCertificates = () => {
     setCertificates(local);
     setLoading(false);
 
+    // 1b) Backfill local certificates from passed exams (for users who passed before local save existed)
+    try {
+      const examsRes = await api.get("/api/exams", { timeout: 2500 });
+      const exams = Array.isArray(examsRes.data) ? examsRes.data : [];
+      const passedExams = exams.filter((exam) => Boolean(exam?.passed));
+
+      if (passedExams.length > 0) {
+        passedExams.forEach((exam) => {
+          addLocalCertificate({
+            course: exam.title || exam.course_title || "Exam",
+            score: Number(exam.percentage ?? 0),
+          });
+        });
+
+        const refreshedLocal = getLocalCertificates();
+        setCertificates(refreshedLocal);
+      }
+    } catch (_) {
+      // Non-blocking: keep showing local/backend data if exams endpoint is unavailable
+    }
+
     // Pre-generate certificate IDs in background so QR renders instantly
     const preGenIds = async (certs) => {
       const uid = localStorage.getItem("user_id") || "guest";
@@ -133,7 +155,7 @@ const MyCertificates = () => {
       );
       setCertIds(map);
     };
-    preGenIds(local);
+    preGenIds(getLocalCertificates());
 
     // 2) Optionally merge in backend certificates if server is available
     if (!userId) return;

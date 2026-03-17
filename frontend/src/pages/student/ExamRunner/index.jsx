@@ -596,6 +596,13 @@ const ExamRunner = () => {
 
       console.log("✅ Exam submitted successfully:", res.data);
 
+      if (res.data?.passed) {
+        addLocalCertificate({
+          course: exam?.title || "Exam",
+          score: Number(res.data?.percentage ?? 0),
+        });
+      }
+
       setResult(res.data);
       setIsSubmitted(true);
       setCanRewrite(true);
