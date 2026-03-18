@@ -27,8 +27,8 @@ const ChatWithStudents = () => {
   const [colleges, setColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState('');
   const [loadingColleges, setLoadingColleges] = useState(false);
-  const [students, setStudents] = useState([]);
-  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const fetchExecuted = useRef(false);
   const fetchData = async () => {
   try {
@@ -847,12 +847,12 @@ const ChatWithStudents = () => {
         payload.college_id = selectedCollege;
         endpoint = '/api/admingroups/by-college';
       } else {
-        if (selectedMembers.length === 0) return alert('Select at least one student');
+        if (selectedMembers.length === 0) return alert('Select at least one member');
         payload.studentIds = selectedMembers;
       }
 
       const res = await api.post(endpoint, payload);
-      alert(`Group created successfully!\nAdded ${res.data.member_count || selectedMembers.length || '?'} students.`);
+      alert(`Group created successfully!\nAdded ${res.data.member_count || selectedMembers.length || '?'} members.`);
 
       setShowGroupModal(false);
       setGroupName('');
@@ -884,17 +884,21 @@ const ChatWithStudents = () => {
     }
   }, [showGroupModal, addMode]);
 
-  // Fetch students when mode is 'manual'
+  // Fetch students + instructors when mode is 'manual'
   useEffect(() => {
     if (showGroupModal && addMode === 'manual') {
-      setLoadingStudents(true);
+      setLoadingMembers(true);
       api.get('/api/admin/users')
         .then(res => {
           const list = Array.isArray(res.data) ? res.data : [];
-          setStudents(list.filter(u => u.role === 'student' && u.status === 'active'));
+          setMembers(
+            list.filter(
+              u => ['student', 'instructor'].includes(u.role) && u.status === 'active'
+            )
+          );
         })
-        .catch(err => console.error('Failed to load students:', err))
-        .finally(() => setLoadingStudents(false));
+        .catch(err => console.error('Failed to load members:', err))
+        .finally(() => setLoadingMembers(false));
     }
   }, [showGroupModal, addMode]);
 
@@ -1098,7 +1102,7 @@ const ChatWithStudents = () => {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b px-6 py-5 flex items-center justify-between z-10">
-              <h3 className="text-xl font-bold text-gray-900">Create New Student Group</h3>
+              <h3 className="text-xl font-bold text-gray-900">Create New Group</h3>
               <button onClick={() => setShowGroupModal(false)}>
                 <X size={24} className="text-gray-600 hover:text-gray-800" />
               </button>
@@ -1135,7 +1139,7 @@ const ChatWithStudents = () => {
 
               {/* Mode Toggle */}
               <div className="flex items-center gap-4 flex-wrap">
-                <label className="text-sm font-medium text-gray-700">Add students by:</label>
+                <label className="text-sm font-medium text-gray-700">Add members by:</label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1192,39 +1196,40 @@ const ChatWithStudents = () => {
                 /* Manual mode */
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Students <span className="text-red-500">*</span>
+                    Select Members (Students / Instructors) <span className="text-red-500">*</span>
                   </label>
                   <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
-                    {loadingStudents ? (
+                    {loadingMembers ? (
                       <div className="flex items-center gap-2 text-gray-500">
-                        <Loader2 className="h-5 w-5 animate-spin" /> Loading students...
+                        <Loader2 className="h-5 w-5 animate-spin" /> Loading members...
                       </div>
-                    ) : students.length === 0 ? (
-                      <p className="text-red-600">No active students found</p>
+                    ) : members.length === 0 ? (
+                      <p className="text-red-600">No active members found</p>
                     ) : (
-                      students.map(student => (
-                        <label key={student.user_id} className="flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer">
+                      members.map(member => (
+                        <label key={member.user_id} className="flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={selectedMembers.includes(student.user_id)}
+                            checked={selectedMembers.includes(member.user_id)}
                             onChange={e => {
                               if (e.target.checked) {
-                                setSelectedMembers(prev => [...prev, student.user_id]);
+                                setSelectedMembers(prev => [...prev, member.user_id]);
                               } else {
-                                setSelectedMembers(prev => prev.filter(id => id !== student.user_id));
+                                setSelectedMembers(prev => prev.filter(id => id !== member.user_id));
                               }
                             }}
                             className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                           />
-                          <span className="text-gray-900 font-medium">
-                            {student.full_name || student.name || student.email}
-                          </span>
+                          <div className="flex items-center gap-2 text-gray-900 font-medium">
+                            <span>{member.full_name || member.name || member.email}</span>
+                            <span className="text-xs text-gray-500 capitalize">({member.role})</span>
+                          </div>
                         </label>
                       ))
                     )}
                   </div>
                   <p className="mt-2 text-sm text-gray-500">
-                    {selectedMembers.length} student{selectedMembers.length !== 1 ? 's' : ''} selected
+                    {selectedMembers.length} member{selectedMembers.length !== 1 ? 's' : ''} selected
                   </p>
                 </div>
               )}

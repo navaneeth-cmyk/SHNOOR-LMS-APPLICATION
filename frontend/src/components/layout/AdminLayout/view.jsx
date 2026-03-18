@@ -158,7 +158,7 @@ const AdminLayoutView = ({
           </div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, marginBottom: '32px' }}>
             <NavItem path="dashboard" icon={LayoutGrid} label="Dashboard" />
-            <NavItem path="add-instructor" icon={GraduationCap} label="Add Instructor (Manual)" />
+            <NavItem path="add-instructor" icon={GraduationCap} label="Add Instructor" />
             <NavItem path="add-student" icon={UserPlus} label="Add Student" />
           </ul>
 
