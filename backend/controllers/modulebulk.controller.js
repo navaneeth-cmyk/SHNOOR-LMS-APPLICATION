@@ -1,10 +1,16 @@
 import pool from "../db/postgres.js";
 import csv from "csv-parser";
 import fs from "fs";
-import path from "path";
+import {
+    uploadLocalFileToSupabase,
+    resolveModuleStorageFolder,
+    removeLocalFileSafe,
+} from "../services/supabaseStorage.service.js";
 
 export const bulkUploadModules = async (req, res) => {
     const client = await pool.connect();
+    let csvFile = null;
+    let resourceFiles = [];
 
     try {
         const { courseId } = req.body;
@@ -13,8 +19,8 @@ export const bulkUploadModules = async (req, res) => {
         }
 
         // 1. Files
-        const csvFile = req.files && req.files['file'] ? req.files['file'][0] : null;
-        const resourceFiles = req.files && req.files['resources'] ? req.files['resources'] : [];
+        csvFile = req.files && req.files['file'] ? req.files['file'][0] : null;
+        resourceFiles = req.files && req.files['resources'] ? req.files['resources'] : [];
 
         if (!csvFile) {
             return res.status(400).json({ message: "CSV file is required" });
@@ -129,8 +135,16 @@ export const bulkUploadModules = async (req, res) => {
             if (contentUrl && !contentUrl.startsWith('http') && fileMap[contentUrl]) {
                 const f = fileMap[contentUrl];
                 if (!uploadedResourceUrlByName[f.originalname]) {
-                    const subFolder = path.basename(f.destination);
-                    uploadedResourceUrlByName[f.originalname] = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${f.filename}`;
+                    const uploaded = await uploadLocalFileToSupabase(f.path, {
+                        originalName: f.originalname,
+                        mimeType: f.mimetype,
+                        folder: `modules/${resolveModuleStorageFolder({
+                            type: normalizedType,
+                            mimeType: f.mimetype,
+                            originalName: f.originalname,
+                        })}`,
+                    });
+                    uploadedResourceUrlByName[f.originalname] = uploaded.url;
                 }
                 contentUrl = uploadedResourceUrlByName[f.originalname];
                 uploadedFile = f;
@@ -283,6 +297,12 @@ export const bulkUploadModules = async (req, res) => {
         console.error("Bulk Module Upload Error:", err);
         res.status(500).json({ message: "Server error during bulk upload", error: err.message });
     } finally {
+        if (csvFile?.path) {
+            await removeLocalFileSafe(csvFile.path);
+        }
+        for (const file of resourceFiles) {
+            await removeLocalFileSafe(file?.path);
+        }
         client.release();
     }
 };

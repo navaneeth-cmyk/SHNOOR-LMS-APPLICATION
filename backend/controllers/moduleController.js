@@ -1,7 +1,11 @@
 import pool from "../db/postgres.js";
 import axios from "axios";
-import path from "path";
 import fs from "fs";
+import {
+  uploadLocalFileToSupabase,
+  resolveModuleStorageFolder,
+  removeLocalFileSafe,
+} from "../services/supabaseStorage.service.js";
 
 export const addModules = async (req, res) => {
   try {
@@ -34,8 +38,16 @@ export const addModules = async (req, res) => {
       let finalContentUrl = m.content_url || null;
 
       if (pdf) {
-        const subFolder = path.basename(pdf.destination);
-        finalContentUrl = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${pdf.filename}`;
+        const uploadResult = await uploadLocalFileToSupabase(pdf.path, {
+          originalName: pdf.originalname,
+          mimeType: pdf.mimetype,
+          folder: `modules/${resolveModuleStorageFolder({
+            type: m.type,
+            mimeType: pdf.mimetype,
+            originalName: pdf.originalname,
+          })}`,
+        });
+        finalContentUrl = uploadResult.url;
       }
 
       const result = await pool.query(
@@ -138,6 +150,10 @@ export const addModules = async (req, res) => {
             }
           }
         }
+      }
+
+      if (pdf?.path) {
+        await removeLocalFileSafe(pdf.path);
       }
     }
 

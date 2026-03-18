@@ -2,7 +2,11 @@ import pool from "../db/postgres.js";
 import csv from "csv-parser";
 import { Readable } from "stream";
 import axios from "axios";
-import path from "path";
+import {
+  uploadLocalFileToSupabase,
+  resolveModuleStorageFolder,
+  removeLocalFileSafe,
+} from "../services/supabaseStorage.service.js";
 
 const baseUrl = process.env.BACKEND_URL;
 
@@ -1055,8 +1059,20 @@ export const editModule = async (req, res) => {
     let finalContentUrl = content_url || null;
 
     if (req.file) {
-      const subFolder = path.basename(req.file.destination);
-      finalContentUrl = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${req.file.filename}`;
+      try {
+        const uploadResult = await uploadLocalFileToSupabase(req.file.path, {
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          folder: `modules/${resolveModuleStorageFolder({
+            type,
+            mimeType: req.file.mimetype,
+            originalName: req.file.originalname,
+          })}`,
+        });
+        finalContentUrl = uploadResult.url;
+      } finally {
+        await removeLocalFileSafe(req.file.path);
+      }
     }
 
     if (!title || !type) {
@@ -1142,8 +1158,20 @@ export const addModule = async (req, res) => {
     let finalContentUrl = content_url || null;
 
     if (req.file) {
-      const subFolder = path.basename(req.file.destination);
-      finalContentUrl = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${req.file.filename}`;
+      try {
+        const uploadResult = await uploadLocalFileToSupabase(req.file.path, {
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          folder: `modules/${resolveModuleStorageFolder({
+            type,
+            mimeType: req.file.mimetype,
+            originalName: req.file.originalname,
+          })}`,
+        });
+        finalContentUrl = uploadResult.url;
+      } finally {
+        await removeLocalFileSafe(req.file.path);
+      }
     }
 
     if (!title || !type) {

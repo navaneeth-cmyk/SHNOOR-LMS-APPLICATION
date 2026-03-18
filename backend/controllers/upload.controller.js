@@ -2,6 +2,11 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import {
+    uploadLocalFileToSupabase,
+    resolveModuleStorageFolder,
+    removeLocalFileSafe,
+} from "../services/supabaseStorage.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -68,18 +73,33 @@ const upload = multer({
 
 export const uploadFile = upload.single("file");
 
-export const handleUpload = (req, res) => {
+export const handleUpload = async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const subFolder = path.basename(req.file.destination);
-    const fileUrl = `${process.env.BACKEND_URL || ""}/uploads/${subFolder}/${req.file.filename}`;
+    let fileUrl = null;
+    try {
+        const uploaded = await uploadLocalFileToSupabase(req.file.path, {
+            originalName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            folder: `modules/${resolveModuleStorageFolder({
+                mimeType: req.file.mimetype,
+                originalName: req.file.originalname,
+            })}`,
+        });
+        fileUrl = uploaded.url;
+    } catch (error) {
+        await removeLocalFileSafe(req.file.path);
+        return res.status(500).json({ message: error.message || "File upload failed" });
+    }
+
+    await removeLocalFileSafe(req.file.path);
 
     res.status(200).json({
         message: "File uploaded successfully",
         url: fileUrl,
-        filename: req.file.filename,
+        filename: req.file.originalname,
         mimetype: req.file.mimetype,
     });
 };
