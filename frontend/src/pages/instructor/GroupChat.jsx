@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
@@ -8,7 +8,10 @@ import '../../styles/Chat.css';
 
 const InstructorGroupChat = () => {
   const { groupId } = useParams();
+  const [searchParams] = useSearchParams();
   const { socket, dbUser } = useSocket();
+  const source = searchParams.get('source') || 'admin-chat';
+  const isAdminSectionGroup = source === 'admin-section';
 
   const [group, setGroup] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -29,10 +32,16 @@ const InstructorGroupChat = () => {
         setLoading(true);
         setError(null);
 
-        const groupRes = await api.get(`/api/admingroups/${groupId}`);
+        const groupRes = isAdminSectionGroup
+          ? await api.get(`/api/admin/groups/instructor/${groupId}`)
+          : await api.get(`/api/admingroups/${groupId}`);
+
         setGroup(groupRes.data);
 
-        const msgRes = await api.get(`/api/admingroups/${groupId}/messages`);
+        const msgRes = isAdminSectionGroup
+          ? await api.get(`/api/chats/groups/${groupId}/messages`)
+          : await api.get(`/api/admingroups/${groupId}/messages`);
+
         setMessages(
           msgRes.data.map(msg => ({
             ...msg,
@@ -50,7 +59,7 @@ const InstructorGroupChat = () => {
     };
 
     fetchGroupAndMessages();
-  }, [groupId, dbUser?.id]);
+  }, [groupId, dbUser?.id, isAdminSectionGroup]);
 
   useEffect(() => {
     if (!socket || !groupId) return;
@@ -163,8 +172,8 @@ const InstructorGroupChat = () => {
           activeChat={{
             id: groupId,
             type: 'group',
-            name: group.name,
-            recipientName: group.name,
+            name: group.name || group.group_name,
+            recipientName: group.name || group.group_name,
             member_count: group.member_count || 0,
           }}
           messages={messages}

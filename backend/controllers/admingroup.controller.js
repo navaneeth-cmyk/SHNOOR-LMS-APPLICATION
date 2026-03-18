@@ -11,7 +11,7 @@ export const createGroup = async (req, res) => {
     const firebaseUid = req.firebase?.uid;
     if (!firebaseUid) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { name, description, studentIds } = req.body;
+    const { name, description, studentIds = [], instructorIds = [] } = req.body;
 
     if (!name?.trim()) return res.status(400).json({ message: 'Group name required' });
 
@@ -36,16 +36,34 @@ export const createGroup = async (req, res) => {
 
     const groupId = groupRes.rows[0].group_id;
 
-    // Add members if studentIds provided
+    // Add members (students + instructors)
     let memberCount = 0;
-    if (studentIds && Array.isArray(studentIds) && studentIds.length > 0) {
-      const values = studentIds.map(id => `('${groupId}', '${id}', 'member')`).join(', ');
-      await client.query(
-        `INSERT INTO admin_group_members (group_id, user_id, role_in_group)
-         VALUES ${values}
-         ON CONFLICT (group_id, user_id) DO NOTHING`
+    const requestedMemberIds = Array.from(
+      new Set([...(Array.isArray(studentIds) ? studentIds : []), ...(Array.isArray(instructorIds) ? instructorIds : [])])
+    );
+
+    if (requestedMemberIds.length > 0) {
+      const validMembersRes = await client.query(
+        `SELECT user_id
+         FROM users
+         WHERE user_id = ANY($1::uuid[])
+           AND status = 'active'
+           AND role IN ('student', 'instructor')`,
+        [requestedMemberIds]
       );
-      memberCount = studentIds.length;
+
+      const validMemberIds = validMembersRes.rows.map((row) => row.user_id);
+      if (validMemberIds.length > 0) {
+        await client.query(
+          `INSERT INTO admin_group_members (group_id, user_id, role_in_group)
+           SELECT $1, member_id, 'member'
+           FROM UNNEST($2::uuid[]) AS member_id
+           ON CONFLICT (group_id, user_id) DO NOTHING`,
+          [groupId, validMemberIds]
+        );
+      }
+
+      memberCount = validMemberIds.length;
     }
 
     await client.query('COMMIT');
@@ -496,7 +514,7 @@ export const createGroupByCollege = async (req, res) => {
     const adminUid = req.firebase?.uid;
     if (!adminUid) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { name, description, college_id, college_name, college } = req.body;
+    const { name, description, college_id, college_name, college, instructorIds = [] } = req.body;
     const collegeValue = (college || college_name || college_id || '').trim();
 
     if (!name?.trim() || !collegeValue) {
@@ -535,17 +553,32 @@ export const createGroupByCollege = async (req, res) => {
 
     const studentIds = studentsRes.rows.map(r => r.user_id);
 
-    if (studentIds.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ message: 'No students in this college' });
+    let validInstructorIds = [];
+    if (Array.isArray(instructorIds) && instructorIds.length > 0) {
+      const instructorRes = await client.query(
+        `SELECT user_id
+         FROM users
+         WHERE user_id = ANY($1::uuid[])
+           AND status = 'active'
+           AND role = 'instructor'`,
+        [instructorIds]
+      );
+      validInstructorIds = instructorRes.rows.map((row) => row.user_id);
     }
 
-    // Bulk insert into group_members
-    const values = studentIds.map(id => `('${groupId}', '${id}', 'member')`).join(', ');
+    const memberIds = Array.from(new Set([...studentIds, ...validInstructorIds]));
+
+    if (memberIds.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'No members found for this group' });
+    }
+
     await client.query(
       `INSERT INTO admin_group_members (group_id, user_id, role_in_group)
-       VALUES ${values}
-       ON CONFLICT (group_id, user_id) DO NOTHING`
+       SELECT $1, member_id, 'member'
+       FROM UNNEST($2::uuid[]) AS member_id
+       ON CONFLICT (group_id, user_id) DO NOTHING`,
+      [groupId, memberIds]
     );
 
     await client.query('COMMIT');
@@ -555,7 +588,7 @@ export const createGroupByCollege = async (req, res) => {
       name,
       college_id: collegeValue,
       college_name: collegeValue,
-      member_count: studentIds.length
+      member_count: memberIds.length
     });
   } catch (err) {
     await client.query('ROLLBACK');

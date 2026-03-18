@@ -565,12 +565,14 @@ const ChatWithStudents = () => {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
-  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [selectedInstructorIds, setSelectedInstructorIds] = useState([]);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [colleges, setColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState('');
   const [loadingColleges, setLoadingColleges] = useState(false);
-  const [members, setMembers] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [instructors, setInstructors] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
   const fetchExecuted = useRef(false);
@@ -845,20 +847,26 @@ const ChatWithStudents = () => {
       if (addMode === 'college') {
         if (!selectedCollege) return alert('Please select a college');
         payload.college_id = selectedCollege;
+        payload.instructorIds = selectedInstructorIds;
         endpoint = '/api/admingroups/by-college';
       } else {
-        if (selectedMembers.length === 0) return alert('Select at least one member');
-        payload.studentIds = selectedMembers;
+        if (selectedStudentIds.length === 0 && selectedInstructorIds.length === 0) {
+          return alert('Select at least one student or instructor');
+        }
+        payload.studentIds = selectedStudentIds;
+        payload.instructorIds = selectedInstructorIds;
       }
 
       const res = await api.post(endpoint, payload);
-      alert(`Group created successfully!\nAdded ${res.data.member_count || selectedMembers.length || '?'} members.`);
+      const selectedCount = selectedStudentIds.length + selectedInstructorIds.length;
+      alert(`Group created successfully!\nAdded ${res.data.member_count || selectedCount || '?'} members.`);
 
       setShowGroupModal(false);
       setGroupName('');
       setGroupDescription('');
       setSelectedCollege('');
-      setSelectedMembers([]);
+      setSelectedStudentIds([]);
+      setSelectedInstructorIds([]);
       setAddMode('college');
 
       // Refresh chat list & reset message cache so search stays fresh
@@ -884,18 +892,15 @@ const ChatWithStudents = () => {
     }
   }, [showGroupModal, addMode]);
 
-  // Fetch students + instructors when mode is 'manual'
+  // Fetch students + instructors for member pickers
   useEffect(() => {
-    if (showGroupModal && addMode === 'manual') {
+    if (showGroupModal) {
       setLoadingMembers(true);
       api.get('/api/admin/users')
         .then(res => {
           const list = Array.isArray(res.data) ? res.data : [];
-          setMembers(
-            list.filter(
-              u => ['student', 'instructor'].includes(u.role) && u.status === 'active'
-            )
-          );
+          setStudents(list.filter(u => u.role === 'student' && u.status === 'active'));
+          setInstructors(list.filter(u => u.role === 'instructor' && u.status === 'active'));
         })
         .catch(err => console.error('Failed to load members:', err))
         .finally(() => setLoadingMembers(false));
@@ -1164,7 +1169,7 @@ const ChatWithStudents = () => {
 
               {/* College mode */}
               {addMode === 'college' ? (
-                <div>
+                <div className="space-y-5">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select College <span className="text-red-500">*</span>
                   </label>
@@ -1191,46 +1196,117 @@ const ChatWithStudents = () => {
                   <p className="mt-2 text-sm text-gray-500">
                     All students from the selected college will be automatically added.
                   </p>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Instructors (Optional)
+                    </label>
+                    <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+                      {loadingMembers ? (
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <Loader2 className="h-5 w-5 animate-spin" /> Loading instructors...
+                        </div>
+                      ) : instructors.length === 0 ? (
+                        <p className="text-red-600">No active instructors found</p>
+                      ) : (
+                        instructors.map((instructor) => (
+                          <label key={instructor.user_id} className="flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedInstructorIds.includes(instructor.user_id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedInstructorIds((prev) => [...prev, instructor.user_id]);
+                                } else {
+                                  setSelectedInstructorIds((prev) => prev.filter((id) => id !== instructor.user_id));
+                                }
+                              }}
+                              className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                            />
+                            <span className="text-gray-900 font-medium">{instructor.full_name || instructor.name || instructor.email}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">
+                      {selectedInstructorIds.length} instructor{selectedInstructorIds.length !== 1 ? 's' : ''} selected
+                    </p>
+                  </div>
                 </div>
               ) : (
                 /* Manual mode */
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Members (Students / Instructors) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
-                    {loadingMembers ? (
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <Loader2 className="h-5 w-5 animate-spin" /> Loading members...
-                      </div>
-                    ) : members.length === 0 ? (
-                      <p className="text-red-600">No active members found</p>
-                    ) : (
-                      members.map(member => (
-                        <label key={member.user_id} className="flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedMembers.includes(member.user_id)}
-                            onChange={e => {
-                              if (e.target.checked) {
-                                setSelectedMembers(prev => [...prev, member.user_id]);
-                              } else {
-                                setSelectedMembers(prev => prev.filter(id => id !== member.user_id));
-                              }
-                            }}
-                            className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
-                          />
-                          <div className="flex items-center gap-2 text-gray-900 font-medium">
-                            <span>{member.full_name || member.name || member.email}</span>
-                            <span className="text-xs text-gray-500 capitalize">({member.role})</span>
-                          </div>
-                        </label>
-                      ))
-                    )}
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Students
+                    </label>
+                    <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+                      {loadingMembers ? (
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <Loader2 className="h-5 w-5 animate-spin" /> Loading students...
+                        </div>
+                      ) : students.length === 0 ? (
+                        <p className="text-red-600">No active students found</p>
+                      ) : (
+                        students.map((student) => (
+                          <label key={student.user_id} className="flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedStudentIds.includes(student.user_id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedStudentIds((prev) => [...prev, student.user_id]);
+                                } else {
+                                  setSelectedStudentIds((prev) => prev.filter((id) => id !== student.user_id));
+                                }
+                              }}
+                              className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                            />
+                            <span className="text-gray-900 font-medium">{student.full_name || student.name || student.email}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">
+                      {selectedStudentIds.length} student{selectedStudentIds.length !== 1 ? 's' : ''} selected
+                    </p>
                   </div>
-                  <p className="mt-2 text-sm text-gray-500">
-                    {selectedMembers.length} member{selectedMembers.length !== 1 ? 's' : ''} selected
-                  </p>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Instructors
+                    </label>
+                    <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+                      {loadingMembers ? (
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <Loader2 className="h-5 w-5 animate-spin" /> Loading instructors...
+                        </div>
+                      ) : instructors.length === 0 ? (
+                        <p className="text-red-600">No active instructors found</p>
+                      ) : (
+                        instructors.map((instructor) => (
+                          <label key={instructor.user_id} className="flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedInstructorIds.includes(instructor.user_id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedInstructorIds((prev) => [...prev, instructor.user_id]);
+                                } else {
+                                  setSelectedInstructorIds((prev) => prev.filter((id) => id !== instructor.user_id));
+                                }
+                              }}
+                              className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                            />
+                            <span className="text-gray-900 font-medium">{instructor.full_name || instructor.name || instructor.email}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">
+                      {selectedInstructorIds.length} instructor{selectedInstructorIds.length !== 1 ? 's' : ''} selected
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -1249,7 +1325,7 @@ const ChatWithStudents = () => {
                   creatingGroup ||
                   !groupName.trim() ||
                   (addMode === 'college' && (!selectedCollege || loadingColleges)) ||
-                  (addMode === 'manual' && selectedMembers.length === 0)
+                  (addMode === 'manual' && selectedStudentIds.length === 0 && selectedInstructorIds.length === 0)
                 }
                 className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >

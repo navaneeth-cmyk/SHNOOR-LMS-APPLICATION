@@ -13,8 +13,32 @@ const InstructorGroups = () => {
       setLoading(true);
       setError("");
       try {
-        const res = await api.get("/api/admingroups/my-groups");
-        setGroups(Array.isArray(res.data) ? res.data : []);
+        const [adminChatGroupsRes, adminSectionGroupsRes] = await Promise.all([
+          api.get("/api/admingroups/my-groups"),
+          api.get("/api/admin/groups/instructor/my-groups"),
+        ]);
+
+        const adminChatGroups = (Array.isArray(adminChatGroupsRes.data) ? adminChatGroupsRes.data : []).map((group) => ({
+          group_id: group.group_id,
+          name: group.name,
+          created_at: group.created_at,
+          member_count: group.member_count ?? 0,
+          source: "admin-chat",
+        }));
+
+        const adminSectionGroups = (Array.isArray(adminSectionGroupsRes.data) ? adminSectionGroupsRes.data : []).map((group) => ({
+          group_id: group.group_id,
+          name: group.group_name,
+          created_at: group.created_at,
+          member_count: group.user_count ?? 0,
+          source: "admin-section",
+        }));
+
+        const merged = [...adminChatGroups, ...adminSectionGroups].sort(
+          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+        );
+
+        setGroups(merged);
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load groups");
       } finally {
@@ -88,7 +112,7 @@ const InstructorGroups = () => {
                     </td>
                     <td className="py-4 px-6 text-right">
                       <Link
-                        to={`/instructor/groups/${group.group_id}`}
+                        to={`/instructor/groups/${group.group_id}?source=${group.source}`}
                         className="inline-flex items-center px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-semibold hover:bg-indigo-100 transition"
                       >
                         Open Chat
