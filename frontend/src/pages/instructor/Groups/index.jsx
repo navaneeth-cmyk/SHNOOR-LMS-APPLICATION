@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Users, Calendar, User } from "lucide-react";
 import api from "../../../api/axios";
 
@@ -12,7 +13,7 @@ const InstructorGroups = () => {
       setLoading(true);
       setError("");
       try {
-        const res = await api.get("/api/admin/groups/instructor/my-groups");
+        const res = await api.get("/api/admingroups/my-groups");
         setGroups(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load groups");
@@ -23,12 +24,6 @@ const InstructorGroups = () => {
 
     fetchGroups();
   }, []);
-
-  const getGroupTypeLabel = (group) => {
-    if (group.created_by) return "Manual";
-    if (group.start_date && group.end_date) return "Timestamp";
-    return "College";
-  };
 
   if (loading) {
     return (
@@ -49,8 +44,8 @@ const InstructorGroups = () => {
             <Users size={24} className="text-indigo-300" />
           </div>
           <div>
-            <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">Groups</h1>
-            <p className="text-slate-400 text-sm mt-0.5">Groups assigned to you by admin.</p>
+            <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">My Groups</h1>
+            <p className="text-slate-400 text-sm mt-0.5">Groups where admin has added you. Open any group to chat.</p>
           </div>
         </div>
       </div>
@@ -70,29 +65,34 @@ const InstructorGroups = () => {
               <thead className="bg-slate-50/80 border-b border-slate-100">
                 <tr>
                   <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Group Name</th>
-                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Type</th>
-                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Date Range</th>
+                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Created</th>
                   <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Members</th>
+                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {groups.map((group) => (
                   <tr key={group.group_id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-4 px-6 text-sm font-semibold text-primary-900">{group.group_name}</td>
-                    <td className="py-4 px-6 text-sm text-slate-600">{getGroupTypeLabel(group)}</td>
+                    <td className="py-4 px-6 text-sm font-semibold text-primary-900">{group.name}</td>
                     <td className="py-4 px-6 text-sm text-slate-500">
                       <div className="flex items-center gap-1.5">
                         <Calendar size={13} className="text-slate-300" />
-                        {group.start_date && group.end_date
-                          ? `${new Date(group.start_date).toLocaleDateString()} – ${new Date(group.end_date).toLocaleDateString()}`
-                          : "—"}
+                        {group.created_at ? new Date(group.created_at).toLocaleDateString() : "—"}
                       </div>
                     </td>
                     <td className="py-4 px-6 text-sm text-slate-600">
                       <div className="flex items-center gap-1.5">
                         <User size={13} className="text-slate-300" />
-                        <span className="font-semibold">{group.user_count ?? 0}</span>
+                        <span className="font-semibold">{group.member_count ?? 0}</span>
                       </div>
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <Link
+                        to={`/instructor/groups/${group.group_id}`}
+                        className="inline-flex items-center px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-semibold hover:bg-indigo-100 transition"
+                      >
+                        Open Chat
+                      </Link>
                     </td>
                   </tr>
                 ))}
