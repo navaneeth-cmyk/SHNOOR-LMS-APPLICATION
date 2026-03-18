@@ -688,3 +688,124 @@ export const deleteGroup = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+export const getInstructorGroups = async (req, res) => {
+  try {
+    const instructorId = req.user?.id;
+
+    if (!instructorId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const query = `
+      SELECT
+        g.group_id,
+        g.group_name,
+        g.start_date,
+        g.end_date,
+        g.created_by,
+        g.created_at,
+        (
+          SELECT COUNT(*)::int
+          FROM (
+            SELECT u.user_id
+            FROM users u
+            WHERE u.status = 'active'
+              AND u.role = 'student'
+              AND (
+                (g.created_by IS NOT NULL AND EXISTS (
+                  SELECT 1
+                  FROM group_users gu
+                  WHERE gu.group_id = g.group_id
+                    AND gu.user_id = u.user_id
+                ))
+                OR
+                (g.created_by IS NULL AND g.start_date IS NOT NULL AND g.end_date IS NOT NULL
+                  AND u.created_at >= g.start_date
+                  AND u.created_at <= g.end_date)
+                OR
+                (g.created_by IS NULL AND g.start_date IS NULL AND g.end_date IS NULL
+                  AND u."college" IS NOT NULL
+                  AND REGEXP_REPLACE(UPPER(TRIM(u."college")), '[,.\\-_() ]+', ' ', 'g')
+                    = REGEXP_REPLACE(UPPER(TRIM(g.group_name)), '[,.\\-_() ]+', ' ', 'g'))
+              )
+            UNION
+            SELECT u.user_id
+            FROM group_users gu
+            JOIN users u ON u.user_id = gu.user_id
+            WHERE gu.group_id = g.group_id
+              AND u.status = 'active'
+              AND u.role = 'instructor'
+          ) members
+        ) AS user_count
+      FROM groups g
+      JOIN group_users gi ON gi.group_id = g.group_id
+      JOIN users iu ON iu.user_id = gi.user_id
+      WHERE gi.user_id = $1
+        AND iu.status = 'active'
+        AND iu.role = 'instructor'
+      ORDER BY g.created_at DESC
+    `;
+
+    const result = await pool.query(query, [instructorId]);
+
+    const groupsWithType = result.rows.map((g) => {
+      let group_type = "college";
+      if (g.created_by) {
+        group_type = "manual";
+      } else if (g.start_date && g.end_date) {
+        group_type = "timestamp";
+      }
+      return { ...g, group_type };
+    });
+
+    return res.status(200).json(groupsWithType);
+  } catch (error) {
+    console.error("getInstructorGroups error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getInstructorGroup = async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    const instructorId = req.user?.id;
+    if (!instructorId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const membership = await pool.query(
+      `SELECT 1 FROM group_users WHERE group_id = $1 AND user_id = $2`,
+      [groupId, instructorId]
+    );
+
+    if (membership.rows.length === 0) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const groupResult = await pool.query(
+      `SELECT group_id, group_name, start_date, end_date, created_by, created_at
+       FROM groups WHERE group_id = $1`,
+      [groupId]
+    );
+
+    if (groupResult.rows.length === 0) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const group = groupResult.rows[0];
+    let group_type = "college";
+
+    if (group.created_by) {
+      group_type = "manual";
+    } else if (group.start_date && group.end_date) {
+      group_type = "timestamp";
+    }
+
+    return res.status(200).json({ ...group, group_type });
+  } catch (error) {
+    console.error("getInstructorGroup error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

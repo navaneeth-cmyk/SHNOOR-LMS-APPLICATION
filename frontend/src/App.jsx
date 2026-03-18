@@ -41,6 +41,7 @@ import MockTest from "./pages/student/MockTest";
 import MyCertificates from "./pages/student/MyCertificates";
 import StudentCourses from "./pages/student/StudentCourses";
 import StudentPerformance from "./pages/instructor/StudentPerformance";
+import InstructorGroups from "./pages/instructor/Groups";
 import CourseDetail from "./pages/student/CourseDetail/index";
 import ManageUsers from "./pages/admin/ManageUsers";
 import Suspended from "./pages/auth/Suspended";
@@ -150,6 +151,7 @@ function App() {
               <Route path="exams" element={<ExamBuilder />} />
               <Route path="learning-paths" element={<LearningPaths />} />
               <Route path="performance" element={<StudentPerformance />} />
+              <Route path="groups" element={<InstructorGroups />} />
               <Route path="settings" element={<ProfileSettings />} />
               <Route path="chat" element={<InstructorChat />} />
             </Route>

@@ -6,6 +6,7 @@ import {
     LayoutGrid,
     Upload,
     List,
+    Users,
     Trophy,
     Code,
     Map,
@@ -106,6 +107,7 @@ const InstructorLayoutView = ({
                         <NavItem path="practice" icon={Code} label="Practice Arena" />
                         <NavItem path="learning-paths" icon={Map} label="Learning Paths" />
                         <NavItem path="exams" icon={BookOpen} label="Exams" />
+                        <NavItem path="groups" icon={Users} label="Groups" />
                         <NavItem path="chat" icon={MessageSquare} label="Messages" badgeCount={totalUnread} />
 
                         <SectionHeader title="Settings" />

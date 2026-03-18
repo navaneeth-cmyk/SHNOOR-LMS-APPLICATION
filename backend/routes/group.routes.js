@@ -1,5 +1,16 @@
 import express from "express";
-import { createGroup, getGroups, getGroup, getGroupUsers, addUserToGroup, removeUserFromGroup, updateGroup, deleteGroup } from "../controllers/group.controller.js";
+import {
+	createGroup,
+	getGroups,
+	getGroup,
+	getGroupUsers,
+	addUserToGroup,
+	removeUserFromGroup,
+	updateGroup,
+	deleteGroup,
+	getInstructorGroups,
+	getInstructorGroup,
+} from "../controllers/group.controller.js";
 import firebaseAuth from "../middlewares/firebaseAuth.js";
 import attachUser from "../middlewares/attachUser.js";
 import roleGuard from "../middlewares/roleGuard.js";
@@ -9,6 +20,8 @@ const router = express.Router();
 // All admin-protected
 router.post("/", firebaseAuth, attachUser, roleGuard("admin"), createGroup);
 router.get("/", firebaseAuth, attachUser, roleGuard("admin"), getGroups);
+router.get("/instructor/my-groups", firebaseAuth, attachUser, roleGuard("instructor", "company"), getInstructorGroups);
+router.get("/instructor/:groupId", firebaseAuth, attachUser, roleGuard("instructor", "company"), getInstructorGroup);
 router.get("/:groupId", firebaseAuth, attachUser, roleGuard("admin"), getGroup);
 router.put("/:groupId", firebaseAuth, attachUser, roleGuard("admin"), updateGroup);
 router.delete("/:groupId", firebaseAuth, attachUser, roleGuard("admin"), deleteGroup);

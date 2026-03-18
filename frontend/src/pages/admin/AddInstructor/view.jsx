@@ -31,7 +31,7 @@ const AddInstructorView = ({
                         <GraduationCap size={24} className="text-indigo-300" />
                     </div>
                     <div>
-                        <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">Add Instructor</h1>
+                        <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">Add Instructor (Manual)</h1>
                         <p className="text-slate-400 text-sm mt-0.5">Fill in the details to register a new instructor.</p>
                     </div>
                 </div>
