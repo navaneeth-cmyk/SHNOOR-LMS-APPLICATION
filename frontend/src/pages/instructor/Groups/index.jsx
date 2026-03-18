@@ -1,37 +1,47 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Users, Calendar, User } from "lucide-react";
-import api from "../../../api/axios";
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../../../api/axios';
+import { MessageSquare, Users, Calendar, Loader2, Search, X } from 'lucide-react';
 
 const InstructorGroups = () => {
+  const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allMessages, setAllMessages] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
-    const fetchGroups = async () => {
-      setLoading(true);
-      setError("");
+    const fetchMyGroups = async () => {
       try {
+        setLoading(true);
+        setError(null);
+
         const [adminChatGroupsRes, adminSectionGroupsRes] = await Promise.all([
-          api.get("/api/admingroups/my-groups"),
-          api.get("/api/admin/groups/instructor/my-groups"),
+          api.get('/api/admingroups/my-groups'),
+          api.get('/api/admin/groups/instructor/my-groups'),
         ]);
 
         const adminChatGroups = (Array.isArray(adminChatGroupsRes.data) ? adminChatGroupsRes.data : []).map((group) => ({
           group_id: group.group_id,
           name: group.name,
+          description: group.description,
           created_at: group.created_at,
           member_count: group.member_count ?? 0,
-          source: "admin-chat",
+          source: 'admin-chat',
         }));
 
         const adminSectionGroups = (Array.isArray(adminSectionGroupsRes.data) ? adminSectionGroupsRes.data : []).map((group) => ({
           group_id: group.group_id,
           name: group.group_name,
+          description: null,
           created_at: group.created_at,
           member_count: group.user_count ?? 0,
-          source: "admin-section",
+          source: 'admin-section',
         }));
 
         const merged = [...adminChatGroups, ...adminSectionGroups].sort(
@@ -40,90 +50,258 @@ const InstructorGroups = () => {
 
         setGroups(merged);
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load groups");
+        console.error('Failed to load groups:', err);
+        setError(err.response?.data?.message || 'Could not load your groups.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchGroups();
+    fetchMyGroups();
   }, []);
+
+  const fetchAllMessages = async () => {
+    try {
+      setSearchLoading(true);
+      const groupMessages = [];
+
+      for (const group of groups) {
+        try {
+          const endpoint =
+            group.source === 'admin-section'
+              ? `/api/chats/groups/${group.group_id}/messages`
+              : `/api/admingroups/${group.group_id}/messages`;
+
+          const res = await api.get(endpoint);
+          const messagesWithGroup = (Array.isArray(res.data) ? res.data : []).map((m) => ({
+            ...m,
+            group_id: group.group_id,
+            group_name: group.name,
+            source: group.source,
+          }));
+          groupMessages.push(...messagesWithGroup);
+        } catch (err) {
+          console.error(`Failed to load messages for group ${group.group_id}:`, err);
+        }
+      }
+
+      setAllMessages(groupMessages);
+      setShowSearch(true);
+    } catch (err) {
+      console.error('Failed to fetch all messages:', err);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (searchQuery.trim() && allMessages.length > 0) {
+      const results = allMessages
+        .filter((msg) => msg.text?.toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery, allMessages]);
+
+  useEffect(() => {
+    if (showSearch && allMessages.length === 0 && groups.length > 0) {
+      fetchAllMessages();
+    }
+  }, [showSearch, groups]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[420px]">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin" />
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 px-4 text-red-600">
+        {error}
+      </div>
+    );
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="text-center py-16 px-4">
+        <Users className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+        <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+          No Groups Yet
+        </h2>
+        <p className="text-gray-600 max-w-md mx-auto">
+          Your admin hasn't added you to any group yet. Check back later or contact support.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col max-w-[1440px] mx-auto space-y-6">
-      <div
-        className="relative overflow-hidden rounded-2xl p-6 lg:p-8"
-        style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)" }}
-      >
-        <div className="relative z-10 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
-            <Users size={24} className="text-indigo-300" />
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col gap-6 mb-8">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">My Groups</h1>
+          <span className="text-sm text-gray-500">
+            {groups.length} {groups.length === 1 ? 'group' : 'groups'}
+          </span>
+        </div>
+
+        <div className="relative">
+          <div className="relative flex items-center">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search groups or messages..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setShowSearch(true)}
+              spellCheck={false}
+              autoComplete="off"
+              className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                  setShowSearch(false);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            )}
           </div>
-          <div>
-            <h1 className="text-xl lg:text-2xl font-bold text-white tracking-tight">My Groups</h1>
-            <p className="text-slate-400 text-sm mt-0.5">Groups where admin has added you. Open any group to chat.</p>
-          </div>
+
+          {showSearch && searchQuery.trim() && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+              {searchLoading ? (
+                <div className="p-6 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-orange-500 mx-auto" />
+                </div>
+              ) : (
+                <>
+                  {(() => {
+                    const matchedGroups = groups.filter((g) =>
+                      g.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                    return matchedGroups.length > 0 ? (
+                      <>
+                        <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b">
+                          Groups
+                        </div>
+                        {matchedGroups.map((group) => (
+                          <div
+                            key={`${group.source}-${group.group_id}`}
+                            onClick={() => {
+                              setShowSearch(false);
+                              setSearchQuery('');
+                              navigate(`/instructor/groups/${group.group_id}?source=${group.source}`);
+                            }}
+                            className="px-4 py-3 border-b cursor-pointer hover:bg-orange-50 transition-colors flex items-center gap-3"
+                          >
+                            <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">
+                              {group.name?.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900 text-sm">{group.name}</div>
+                              {group.description && (
+                                <div className="text-xs text-gray-500 line-clamp-1">{group.description}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    ) : null;
+                  })()}
+
+                  {searchResults.length > 0 ? (
+                    <>
+                      <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b">
+                        Messages
+                      </div>
+                      {searchResults.map((result, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setShowSearch(false);
+                            setSearchQuery('');
+                            navigate(`/instructor/groups/${result.group_id}?source=${result.source}`);
+                          }}
+                          className="p-4 border-b cursor-pointer hover:bg-orange-50 transition-colors last:border-b-0"
+                        >
+                          <div className="flex flex-col gap-1">
+                            <div className="font-semibold text-gray-900 text-sm">{result.group_name}</div>
+                            <div className="text-gray-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(result.created_at).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : null}
+
+                  {groups.filter((g) => g.name?.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 &&
+                   searchResults.length === 0 && (
+                    <div className="p-6 text-center text-gray-500">No groups or messages found</div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
-          {error}
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {groups.map((group) => (
+          <div
+            key={`${group.source}-${group.group_id}`}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden"
+          >
+            <div className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    {group.name}
+                  </h3>
+                  {group.description && (
+                    <p className="text-sm text-gray-600 line-clamp-2 mb-4">
+                      {group.description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-sm text-gray-500">
+                  <Calendar size={14} />
+                  {group.created_at ? new Date(group.created_at).toLocaleDateString() : '—'}
+                </div>
+              </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        {groups.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">No groups assigned yet.</div>
-        ) : (
-          <div className="overflow-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-50/80 border-b border-slate-100">
-                <tr>
-                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Group Name</th>
-                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Created</th>
-                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Members</th>
-                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {groups.map((group) => (
-                  <tr key={group.group_id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-4 px-6 text-sm font-semibold text-primary-900">{group.name}</td>
-                    <td className="py-4 px-6 text-sm text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar size={13} className="text-slate-300" />
-                        {group.created_at ? new Date(group.created_at).toLocaleDateString() : "—"}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-sm text-slate-600">
-                      <div className="flex items-center gap-1.5">
-                        <User size={13} className="text-slate-300" />
-                        <span className="font-semibold">{group.member_count ?? 0}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <Link
-                        to={`/instructor/groups/${group.group_id}?source=${group.source}`}
-                        className="inline-flex items-center px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-semibold hover:bg-indigo-100 transition"
-                      >
-                        Open Chat
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              <div className="flex items-center gap-2 mt-4 text-sm text-gray-600">
+                <Users size={16} />
+                <span>{group.member_count || '...'} members</span>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
+              <button
+                onClick={() => navigate(`/instructor/groups/${group.group_id}?source=${group.source}`)}
+                className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
+              >
+                <MessageSquare size={16} />
+                Open Chat
+              </button>
+            </div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
