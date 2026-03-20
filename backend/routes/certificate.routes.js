@@ -2,8 +2,6 @@ console.log("certificateRoutes.js loaded");
 
 import express from "express";
 import pool from "../db/postgres.js";
-import fs from "fs";
-import path from "path";
 import {
   generateQuizCertificate,
   issueExamCertificate,
@@ -120,7 +118,6 @@ router.get(
     try {
       const { certificate_id } = req.params;
       const rawCertificateId = String(certificate_id || "").trim();
-      const certIdNoPdf = rawCertificateId.replace(/\.pdf$/i, "");
       const certIdWithPdf = /\.pdf$/i.test(rawCertificateId)
         ? rawCertificateId
         : `${rawCertificateId}.pdf`;
@@ -148,25 +145,6 @@ router.get(
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const safeBaseName = path.basename(String(cert.certificate_id || rawCertificateId));
-      const safeBaseNoPdf = safeBaseName.replace(/\.pdf$/i, "");
-
-      const candidateFileNames = Array.from(
-        new Set([
-          safeBaseName,
-          `${safeBaseNoPdf}.pdf`,
-          `${safeBaseNoPdf}.pdf.pdf`,
-        ])
-      );
-
-      const findExistingFilePath = () => {
-        for (const name of candidateFileNames) {
-          const resolved = path.resolve(process.cwd(), "certificates", name);
-          if (fs.existsSync(resolved)) return resolved;
-        }
-        return null;
-      };
-
       const userRes = await pool.query(
         `SELECT full_name FROM users WHERE user_id = $1 LIMIT 1`,
         [cert.user_id]
@@ -181,13 +159,14 @@ router.get(
       const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${cert.certificate_id}`;
 
       await generatePDF(
+        res,
         cert.exam_name || "Certificate",
         Number(cert.score || 0),
         cert.user_id,
         Number(cert.score || 0),
         userRes.rows[0]?.full_name || "Student",
         {
-          certificateId: certIdNoPdf || cert.certificate_id,
+          certificateId: String(cert.certificate_id || rawCertificateId).replace(/\.pdf$/i, ""),
           verifyUrl,
           title: settings.title || null,
           logoUrl: settings.logo_url || null,
@@ -198,16 +177,10 @@ router.get(
         }
       );
 
-      let filePath = findExistingFilePath();
-
-      if (!filePath) {
-        return res.status(404).json({ message: "Certificate file not found" });
-      }
-
-      return res.download(filePath, `${(cert.exam_name || "certificate").replace(/[^a-z0-9_\- ]/gi, "")}.pdf`);
+      return;
     } catch (err) {
       console.error("GET /download/:certificate_id error:", err.message);
-      return res.status(500).json({ message: "Failed to download certificate" });
+      return res.status(500).json({ message: err.message || "Failed to download certificate" });
     }
   }
 );
