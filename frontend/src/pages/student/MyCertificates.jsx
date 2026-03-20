@@ -233,7 +233,8 @@ const MyCertificates = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Certificate download failed:", error);
-      alert("Failed to download certificate PDF from server.");
+      const message = error?.response?.data?.message || "Failed to download certificate PDF from server.";
+      alert(message);
     } finally {
       setIsGenerating(false);
     }

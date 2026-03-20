@@ -80,6 +80,7 @@ const generatePDF = async (
   const finalOptions = hasResponse ? options : studentName || {};
 
   const certificateId = finalOptions.certificateId || `cert_${Date.now()}`;
+  const normalizedCertificateId = String(certificateId).replace(/\.pdf$/i, "");
   const verifyUrl = finalOptions.verifyUrl || "";
   const configuredTitle = finalOptions.title || "CERTIFICATE OF COMPLETION";
   const configuredIssuerName = finalOptions.issuerName || "SHNOOR LMS";
@@ -123,7 +124,7 @@ const generatePDF = async (
   } else {
     const certDir = path.join(process.cwd(), "certificates");
     fs.mkdirSync(certDir, { recursive: true });
-    const fileName = `${certificateId}.pdf`;
+    const fileName = `${normalizedCertificateId}.pdf`;
     filePath = path.join(certDir, fileName);
     outputStream = fs.createWriteStream(filePath);
   }
@@ -259,7 +260,7 @@ const generatePDF = async (
   doc.moveDown(4);
   doc.fontSize(12);
   doc.text(`Date: ${new Date().toLocaleDateString()}`, 80, 720);
-  doc.text(`Certificate ID: ${certificateId}`, 80, 738);
+  doc.text(`Certificate ID: ${normalizedCertificateId}`, 80, 738);
   doc.text(configuredAuthorityName, 400, 720);
   doc.moveTo(380, 710).lineTo(540, 710).stroke();
 

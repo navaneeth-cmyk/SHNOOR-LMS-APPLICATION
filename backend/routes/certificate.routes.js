@@ -119,15 +119,21 @@ router.get(
   async (req, res) => {
     try {
       const { certificate_id } = req.params;
+      const rawCertificateId = String(certificate_id || "").trim();
+      const certIdNoPdf = rawCertificateId.replace(/\.pdf$/i, "");
+      const certIdWithPdf = /\.pdf$/i.test(rawCertificateId)
+        ? rawCertificateId
+        : `${rawCertificateId}.pdf`;
 
       const certRes = await pool.query(
         `
         SELECT id, user_id, certificate_id, exam_name, score
         FROM certificates
         WHERE certificate_id = $1
+           OR certificate_id = $2
         LIMIT 1
         `,
-        [certificate_id]
+        [rawCertificateId, certIdWithPdf]
       );
 
       if (!certRes.rows.length) {
@@ -142,11 +148,28 @@ router.get(
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const safeBaseName = path.basename(String(certificate_id));
-      const fileName = safeBaseName.endsWith(".pdf") ? safeBaseName : `${safeBaseName}.pdf`;
-      const filePath = path.resolve(process.cwd(), "certificates", fileName);
+      const safeBaseName = path.basename(String(cert.certificate_id || rawCertificateId));
+      const safeBaseNoPdf = safeBaseName.replace(/\.pdf$/i, "");
 
-      if (!fs.existsSync(filePath)) {
+      const candidateFileNames = Array.from(
+        new Set([
+          safeBaseName,
+          `${safeBaseNoPdf}.pdf`,
+          `${safeBaseNoPdf}.pdf.pdf`,
+        ])
+      );
+
+      const findExistingFilePath = () => {
+        for (const name of candidateFileNames) {
+          const resolved = path.resolve(process.cwd(), "certificates", name);
+          if (fs.existsSync(resolved)) return resolved;
+        }
+        return null;
+      };
+
+      let filePath = findExistingFilePath();
+
+      if (!filePath) {
         const userRes = await pool.query(
           `SELECT full_name FROM users WHERE user_id = $1 LIMIT 1`,
           [cert.user_id]
@@ -167,7 +190,7 @@ router.get(
           Number(cert.score || 0),
           userRes.rows[0]?.full_name || "Student",
           {
-            certificateId: cert.certificate_id,
+            certificateId: certIdNoPdf || cert.certificate_id,
             verifyUrl,
             title: settings.title || null,
             logoUrl: settings.logo_url || null,
@@ -178,7 +201,9 @@ router.get(
           }
         );
 
-        if (!fs.existsSync(filePath)) {
+        filePath = findExistingFilePath();
+
+        if (!filePath) {
           return res.status(404).json({ message: "Certificate file not found" });
         }
       }
