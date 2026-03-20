@@ -119,7 +119,8 @@ export const enrollStudent = async (req, res) => {
       SELECT 
         status,
         schedule_start_at,
-        price_type
+        price_type,
+        (schedule_start_at IS NULL OR schedule_start_at <= NOW()) AS enrollment_open
       FROM courses
       WHERE courses_id = $1
       `,
@@ -139,11 +140,8 @@ export const enrollStudent = async (req, res) => {
       });
     }
 
-    // 3️⃣ Schedule check
-    if (
-      course.schedule_start_at &&
-      new Date() < new Date(course.schedule_start_at)
-    ) {
+    // 3️⃣ Schedule check (DB time-based to avoid JS timezone parsing mismatches)
+    if (!course.enrollment_open) {
       return res.status(403).json({
         message: "Course enrollment has not started yet",
       });

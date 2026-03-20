@@ -105,7 +105,7 @@ const CourseDetail = () => {
       alert("Successfully enrolled!");
     } catch (err) {
       console.error("Enroll failed:", err);
-      alert("Failed to enroll");
+      alert(err?.response?.data?.message || "Failed to enroll");
     }
   };
 
