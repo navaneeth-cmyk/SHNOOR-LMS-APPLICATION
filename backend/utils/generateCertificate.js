@@ -82,7 +82,7 @@ const generatePDF = async (
   const certificateId = finalOptions.certificateId || `cert_${Date.now()}`;
   const normalizedCertificateId = String(certificateId).replace(/\.pdf$/i, "");
   const verifyUrl = finalOptions.verifyUrl || "";
-  const configuredTitle = finalOptions.title || "CERTIFICATE OF COMPLETION";
+  const configuredTitle = finalOptions.title || "CERTIFICATE OF ACHIEVEMENT";
   const configuredIssuerName = finalOptions.issuerName || "SHNOOR LMS";
   const configuredAuthorityName = finalOptions.authorityName || "Authorized Signature";
 
@@ -132,7 +132,10 @@ const generatePDF = async (
   doc.pipe(outputStream);
 
   const logoSource = await loadImageSource(
-    finalOptions.logoUrl || process.env.CERTIFICATE_LOGO_PATH || null
+    finalOptions.logoUrl
+    || process.env.CERTIFICATE_LOGO_PATH
+    || path.resolve(process.cwd(), "frontend/public/just_logo.svg")
+    || path.resolve(__dirname, "../../frontend/public/just_logo.svg")
   );
 
   const signatureSource = await loadImageSource(
@@ -163,17 +166,47 @@ const generatePDF = async (
     }
   }
 
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const frameX = 26;
+  const frameY = 26;
+  const frameW = pageWidth - 52;
+  const frameH = pageHeight - 52;
+  const cornerSize = 46;
+
   doc
-    .lineWidth(3)
-    .strokeColor("#b28a2e")
-    .rect(30, 30, doc.page.width - 60, doc.page.height - 60)
+    .lineWidth(4)
+    .strokeColor("#1f3f95")
+    .rect(frameX, frameY, frameW, frameH)
     .stroke();
+
+  doc.save().fillColor("#1f3f95")
+    .polygon(
+      frameX,
+      frameY,
+      frameX + cornerSize,
+      frameY,
+      frameX,
+      frameY + cornerSize
+    )
+    .fill().restore();
+
+  doc.save().fillColor("#1f3f95")
+    .polygon(
+      frameX + frameW,
+      frameY + frameH,
+      frameX + frameW - cornerSize,
+      frameY + frameH,
+      frameX + frameW,
+      frameY + frameH - cornerSize
+    )
+    .fill().restore();
 
   if (templateSource) {
     try {
       doc.save();
-      doc.opacity(0.12).image(templateSource, 34, 34, {
-        fit: [doc.page.width - 68, doc.page.height - 68],
+      doc.opacity(0.12).image(templateSource, frameX + 4, frameY + 4, {
+        fit: [frameW - 8, frameH - 8],
         align: "center",
         valign: "center",
       });
@@ -181,88 +214,124 @@ const generatePDF = async (
     } catch (_) { }
   }
 
-  if (logoSource) {
+  if (qrDataUrl) {
     try {
-      doc.image(logoSource, doc.page.width / 2 - 45, 55, { width: 90, height: 90 });
+      doc.image(qrDataUrl, frameX + frameW - 54, frameY + 18, { width: 36, height: 36 });
     } catch (_) { }
   }
 
-  doc.moveDown(3);
-  doc.font("Times-Bold").fontSize(34).text(
-    configuredTitle,
-    { align: "center" }
-  );
-
-  doc.moveDown(2);
-
-  // Body
-  doc.font("Times-Roman").fontSize(24).text(
-    "This is proudly presented to",
-    { align: "center" }
-  );
-
-  doc.moveDown(1);
-  doc.font("Times-Bold").fontSize(26).text(
-    student_name || `Student ID: ${user_id}`,
-    { align: "center", underline: true }
-  );
-
-  doc.moveDown(1);
-  doc.font("Times-Roman").fontSize(23).text(
-    "For successfully completing the training program with",
-    { align: "center" }
-  );
-
-  doc.moveDown(0.4);
-  doc.font("Times-Bold").fontSize(22).fillColor("#1e3a8a").text(
-    configuredIssuerName,
-    { align: "center" }
-  );
-  doc.fillColor("black");
-
-  doc.moveDown(1);
-  doc.font("Times-Bold").fontSize(22).text(
-    `Score Achieved: ${numericScore}`,
-    { align: "center" }
-  );
-
-  if (numericPercentage !== null) {
-    doc.moveDown(0.5);
-    doc.font("Times-Roman").fontSize(20).text(
-      `Percentage: ${numericPercentage}%`,
-      { align: "center" }
+  doc
+    .font("Helvetica")
+    .fontSize(7)
+    .fillColor("#8a97ad")
+    .text(
+      `ID: ${String(certificateId)}`,
+      frameX + frameW - 250,
+      frameY + 50,
+      { width: 230, align: "right" }
     );
+
+  if (logoSource) {
+    try {
+      doc.image(logoSource, pageWidth / 2 - 26, 130, { width: 52, height: 52 });
+    } catch (_) { }
   }
+
+  doc
+    .font("Times-BoldItalic")
+    .fontSize(28)
+    .fillColor("#1f2f56")
+    .text(
+    configuredTitle,
+    0,
+    212,
+    { align: "center" }
+    );
+
+  doc
+    .font("Times-Roman")
+    .fontSize(22)
+    .fillColor("#243a63")
+    .text("This is to certify that", 0, 278, { align: "center" });
+
+  const studentLabel = student_name || "Student";
+  doc
+    .font("Times-Bold")
+    .fontSize(40)
+    .fillColor("#0aa27b")
+    .text(studentLabel, 0, 334, { align: "center" });
+
+  doc
+    .lineWidth(1)
+    .strokeColor("#9fb1cb")
+    .moveTo(pageWidth / 2 - 150, 388)
+    .lineTo(pageWidth / 2 + 150, 388)
+    .stroke();
+
+  doc
+    .font("Times-Roman")
+    .fontSize(22)
+    .fillColor("#243a63")
+    .text("has successfully completed the training program with", 0, 425, { align: "center" });
+
+  doc
+    .font("Times-Bold")
+    .fontSize(30)
+    .fillColor("#173c91")
+    .text(configuredIssuerName, 0, 465, { align: "center" });
+
+  doc
+    .font("Times-Roman")
+    .fontSize(20)
+    .fillColor("#415b8c")
+    .text(`Issued on: ${new Date().toLocaleDateString()}`, 0, 528, { align: "center" });
 
   if (signatureSource) {
     try {
-      doc.image(signatureSource, 380, 660, { width: 140, height: 40 });
+      doc.image(signatureSource, pageWidth - 160, pageHeight - 173, { width: 55, height: 28 });
     } catch (_) { }
   }
 
   if (footerLogoSource) {
     try {
-      doc.image(footerLogoSource, 80, 675, { width: 90, height: 42 });
+      doc.image(footerLogoSource, 88, pageHeight - 154, { width: 58, height: 22 });
     } catch (_) { }
   }
 
-  if (qrDataUrl) {
-    try {
-      doc.image(qrDataUrl, 460, 600, { width: 95, height: 95 });
-      doc.font("Times-Roman").fontSize(9).fillColor("#222").text(
-        "Scan to verify",
-        462,
-        698
-      );
-    } catch (_) { }
-  }
+  doc
+    .font("Times-Bold")
+    .fontSize(13)
+    .fillColor("#bc1f2d")
+    .text("NASSCOM", 88, pageHeight - 127);
+  doc
+    .font("Times-Bold")
+    .fontSize(10)
+    .fillColor("#344d77")
+    .text("CERTIFIED MEMBER", 88, pageHeight - 105);
 
-  doc.moveDown(4);
-  doc.fontSize(12);
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 80, 720);
-  doc.text(`Certificate ID: ${normalizedCertificateId}`, 80, 738);
-  doc.text(configuredAuthorityName, 400, 720);
-  doc.moveTo(380, 710).lineTo(540, 710).stroke();
+  doc
+    .lineWidth(1)
+    .strokeColor("#223c65")
+    .moveTo(pageWidth - 185, pageHeight - 124)
+    .lineTo(pageWidth - 58, pageHeight - 124)
+    .stroke();
+
+  doc
+    .font("Times-Bold")
+    .fontSize(11)
+    .fillColor("#1f335c")
+    .text("AUTHORIZED SIGNATURE", pageWidth - 185, pageHeight - 116, {
+      width: 127,
+      align: "center",
+    });
+  doc
+    .font("Times-Roman")
+    .fontSize(9)
+    .fillColor("#445d87")
+    .text(configuredAuthorityName, pageWidth - 185, pageHeight - 99, {
+      width: 127,
+      align: "center",
+    });
 
   doc.end();
 

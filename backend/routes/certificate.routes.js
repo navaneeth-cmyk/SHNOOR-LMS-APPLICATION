@@ -167,45 +167,41 @@ router.get(
         return null;
       };
 
+      const userRes = await pool.query(
+        `SELECT full_name FROM users WHERE user_id = $1 LIMIT 1`,
+        [cert.user_id]
+      );
+
+      const settingsRes = await pool.query(
+        `SELECT title, logo_url, template_url, signature_url, authority_name, issuer_name FROM certificate_settings WHERE id = 1 LIMIT 1`
+      ).catch(() => ({ rows: [] }));
+
+      const settings = settingsRes.rows[0] || {};
+      const verifyBase = process.env.CERTIFICATE_VERIFY_BASE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
+      const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${cert.certificate_id}`;
+
+      await generatePDF(
+        cert.exam_name || "Certificate",
+        Number(cert.score || 0),
+        cert.user_id,
+        Number(cert.score || 0),
+        userRes.rows[0]?.full_name || "Student",
+        {
+          certificateId: certIdNoPdf || cert.certificate_id,
+          verifyUrl,
+          title: settings.title || null,
+          logoUrl: settings.logo_url || null,
+          templateUrl: settings.template_url || null,
+          signatureUrl: settings.signature_url || null,
+          authorityName: settings.authority_name || null,
+          issuerName: settings.issuer_name || null,
+        }
+      );
+
       let filePath = findExistingFilePath();
 
       if (!filePath) {
-        const userRes = await pool.query(
-          `SELECT full_name FROM users WHERE user_id = $1 LIMIT 1`,
-          [cert.user_id]
-        );
-
-        const settingsRes = await pool.query(
-          `SELECT title, logo_url, template_url, signature_url, authority_name, issuer_name FROM certificate_settings WHERE id = 1 LIMIT 1`
-        ).catch(() => ({ rows: [] }));
-
-        const settings = settingsRes.rows[0] || {};
-        const verifyBase = process.env.CERTIFICATE_VERIFY_BASE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
-        const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${cert.certificate_id}`;
-
-        await generatePDF(
-          cert.exam_name || "Certificate",
-          Number(cert.score || 0),
-          cert.user_id,
-          Number(cert.score || 0),
-          userRes.rows[0]?.full_name || "Student",
-          {
-            certificateId: certIdNoPdf || cert.certificate_id,
-            verifyUrl,
-            title: settings.title || null,
-            logoUrl: settings.logo_url || null,
-            templateUrl: settings.template_url || null,
-            signatureUrl: settings.signature_url || null,
-            authorityName: settings.authority_name || null,
-            issuerName: settings.issuer_name || null,
-          }
-        );
-
-        filePath = findExistingFilePath();
-
-        if (!filePath) {
-          return res.status(404).json({ message: "Certificate file not found" });
-        }
+        return res.status(404).json({ message: "Certificate file not found" });
       }
 
       return res.download(filePath, `${(cert.exam_name || "certificate").replace(/[^a-z0-9_\- ]/gi, "")}.pdf`);
