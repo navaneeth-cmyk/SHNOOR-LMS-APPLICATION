@@ -10,6 +10,45 @@ import {
 
 const baseUrl = process.env.BACKEND_URL;
 
+const toISTTimestamp = (value) => {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+  const localDateTimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+
+  if (localDateTimePattern.test(raw)) {
+    const [datePart, timePartRaw] = raw.split("T");
+    const timePart = timePartRaw.length === 5 ? `${timePartRaw}:00` : timePartRaw;
+    return `${datePart} ${timePart}`;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(parsed);
+
+  const partValue = (type) => parts.find((part) => part.type === type)?.value;
+  const year = partValue("year");
+  const month = partValue("month");
+  const day = partValue("day");
+  const hour = partValue("hour");
+  const minute = partValue("minute");
+  const second = partValue("second");
+
+  if (!year || !month || !day || !hour || !minute || !second) return null;
+
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+};
+
 const extractTextStreamContent = async ({ notes, contentUrl }) => {
   let text = String(notes || "").trim();
 
@@ -92,6 +131,7 @@ export const addCourse = async (req, res) => {
   try {
     // ✅ CALCULATE expires_at IN JS (no Postgres interval issues)
     let expiresAt = null;
+    let normalizedScheduleStartAt = null;
 
     if (validity_value && validity_unit) {
       const now = new Date();
@@ -106,6 +146,8 @@ export const addCourse = async (req, res) => {
 
       expiresAt = now;
     }
+
+    normalizedScheduleStartAt = toISTTimestamp(schedule_start_at);
 
     const query = `
       INSERT INTO courses (
@@ -143,7 +185,7 @@ export const addCourse = async (req, res) => {
       validity_value || null, // $8
       validity_unit || null, // $9
       expiresAt, // $10 ✅ SIMPLE TIMESTAMP
-      schedule_start_at || null, // $11
+      normalizedScheduleStartAt, // $11 (IST-normalized)
       price_type, // $12
       price_type === "paid" ? price_amount : null, // $13
       prereq_description || null,
@@ -494,7 +536,7 @@ export const exploreCourses = async (req, res) => {
           ON ca.course_id = c.courses_id
          AND ca.student_id = $1
         WHERE c.status = 'approved'
-        AND (c.schedule_start_at IS NULL OR c.schedule_start_at <= NOW())
+        AND (c.schedule_start_at IS NULL OR c.schedule_start_at <= (NOW() AT TIME ZONE 'Asia/Kolkata'))
         AND sc.student_id IS NULL
       ) AS subquery
       ORDER BY

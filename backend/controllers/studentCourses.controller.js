@@ -120,7 +120,7 @@ export const enrollStudent = async (req, res) => {
         status,
         schedule_start_at,
         price_type,
-        (schedule_start_at IS NULL OR schedule_start_at <= NOW()) AS enrollment_open
+        (schedule_start_at IS NULL OR schedule_start_at <= (NOW() AT TIME ZONE 'Asia/Kolkata')) AS enrollment_open
       FROM courses
       WHERE courses_id = $1
       `,
@@ -308,7 +308,7 @@ export const getRecommendedCourses = async (req, res) => {
         LEFT JOIN course_assignments ca
           ON ca.course_id = c.courses_id AND ca.student_id = $1
         WHERE c.status = 'approved'
-          AND (c.schedule_start_at IS NULL OR c.schedule_start_at <= NOW())
+          AND (c.schedule_start_at IS NULL OR c.schedule_start_at <= (NOW() AT TIME ZONE 'Asia/Kolkata'))
           AND (sc.student_id IS NOT NULL OR ca.student_id IS NOT NULL)
       )
       SELECT 

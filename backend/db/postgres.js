@@ -23,4 +23,11 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 });
+
+pool.on("connect", (client) => {
+  client.query("SET TIME ZONE 'Asia/Kolkata'").catch((error) => {
+    console.error("Failed to set DB timezone to IST:", error.message);
+  });
+});
+
 export default pool;
