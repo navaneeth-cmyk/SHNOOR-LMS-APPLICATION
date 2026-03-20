@@ -5,6 +5,14 @@ import api from "../api/axios"; // Keeps your existing axios path
 
 export const AuthContext = createContext();
 
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
+
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
 
