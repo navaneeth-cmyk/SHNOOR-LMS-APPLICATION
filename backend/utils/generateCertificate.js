@@ -113,23 +113,18 @@ const generatePDF = async (
 
   let outputStream = null;
   let filePath = null;
+  const responseChunks = [];
 
   if (res) {
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=certificate_${user_id}.pdf`
-    );
-    outputStream = res;
+    doc.on("data", (chunk) => responseChunks.push(chunk));
   } else {
     const certDir = path.join(process.cwd(), "certificates");
     fs.mkdirSync(certDir, { recursive: true });
     const fileName = `${normalizedCertificateId}.pdf`;
     filePath = path.join(certDir, fileName);
     outputStream = fs.createWriteStream(filePath);
+    doc.pipe(outputStream);
   }
-
-  doc.pipe(outputStream);
 
   const logoSource = await loadImageSource(
     finalOptions.logoUrl
@@ -333,7 +328,7 @@ const generatePDF = async (
       align: "center",
     });
 
-  const waitForStream = () => new Promise((resolve, reject) => {
+  const waitForFileStream = () => new Promise((resolve, reject) => {
     let settled = false;
 
     const done = (payload) => {
@@ -356,7 +351,26 @@ const generatePDF = async (
     doc.end();
   });
 
-  return waitForStream();
+  if (res) {
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      doc.on("error", reject);
+      doc.on("end", () => resolve(Buffer.concat(responseChunks)));
+      doc.end();
+    });
+
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Length", String(pdfBuffer.length));
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=certificate_${String(exam_name || "certificate").replace(/[^a-z0-9_\- ]/gi, "")}.pdf`
+    );
+    res.end(pdfBuffer);
+
+    return { generated: true, filePath: null };
+  }
+
+  return waitForFileStream();
 };
 
 export default generatePDF;

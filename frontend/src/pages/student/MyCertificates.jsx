@@ -221,8 +221,27 @@ const MyCertificates = () => {
         { responseType: "blob" }
       );
 
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
+      const contentType = response.headers?.["content-type"] || "";
+      const blob = response.data;
+
+      if (!contentType.includes("application/pdf")) {
+        let serverMessage = "Failed to download certificate PDF from server.";
+        try {
+          const text = await blob.text();
+          if (text) {
+            const parsed = JSON.parse(text);
+            serverMessage = parsed?.message || parsed?.error || serverMessage;
+          }
+        } catch (_) {}
+        throw new Error(serverMessage);
+      }
+
+      const pdfBlob = new Blob([blob], { type: "application/pdf" });
+      if (pdfBlob.size < 1024) {
+        throw new Error("Downloaded file is incomplete.");
+      }
+
+      const url = window.URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       const safeName = (selectedCert?.course || "certificate").replace(/[^a-z0-9_\- ]/gi, "");
       link.href = url;
@@ -233,7 +252,7 @@ const MyCertificates = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Certificate download failed:", error);
-      const message = error?.response?.data?.message || "Failed to download certificate PDF from server.";
+      const message = error?.message || error?.response?.data?.message || "Failed to download certificate PDF from server.";
       alert(message);
     } finally {
       setIsGenerating(false);
