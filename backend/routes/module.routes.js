@@ -3,7 +3,7 @@ import {
   addModules,
   getModulesByCourse,
   deleteModule,
-  getModulePdf,
+  getModuleView,
   getModuleStream,
   advanceModuleStream,
   updateModuleTime
@@ -48,8 +48,17 @@ router.delete(
 );
 
 router.get(
+  "/modules/:moduleId/view",
+  getModuleView
+);
+
+router.get(
   "/modules/:moduleId/pdf",
-  getModulePdf
+  (req, _res, next) => {
+    req.query.type = "pdf";
+    next();
+  },
+  getModuleView
 );
 
 router.get(
