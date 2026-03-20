@@ -2,6 +2,7 @@ console.log("certificateRoutes.js loaded");
 
 import express from "express";
 import pool from "../db/postgres.js";
+import fs from "fs";
 import {
   generateQuizCertificate,
   issueExamCertificate,
@@ -158,8 +159,7 @@ router.get(
       const verifyBase = process.env.CERTIFICATE_VERIFY_BASE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
       const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${cert.certificate_id}`;
 
-      await generatePDF(
-        res,
+      const generated = await generatePDF(
         cert.exam_name || "Certificate",
         Number(cert.score || 0),
         cert.user_id,
@@ -176,6 +176,21 @@ router.get(
           issuerName: settings.issuer_name || null,
         }
       );
+
+      if (!generated?.generated || !generated?.filePath) {
+        return res.status(500).json({ message: "Failed to generate certificate PDF" });
+      }
+
+      const pdfBuffer = await fs.promises.readFile(generated.filePath);
+
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Length", String(pdfBuffer.length));
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=certificate_${String(cert.exam_name || "certificate").replace(/[^a-z0-9_\- ]/gi, "")}.pdf`
+      );
+      res.end(pdfBuffer);
 
       return;
     } catch (err) {
