@@ -9,7 +9,6 @@ import {
   normalizeCertificateCourseName,
 } from "../../utils/certificateStorage";
 import "../../styles/Dashboard.css";
-import { exportToPDF } from "../../utils/certificatePDF";
 
 // Generate certificate PDF via backend (optional)
 const generateCertificateAPI = async (user_id, course, score) => {
@@ -209,7 +208,36 @@ const MyCertificates = () => {
   };
 
   // ================= PRINT =================
-  const handlePrint = () => window.print();
+  const handleDownloadCertificate = async () => {
+    if (!currentCertId) {
+      alert("Certificate file is not ready yet. Please generate certificate first.");
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      const response = await api.get(
+        `/api/certificate/download/${encodeURIComponent(currentCertId)}`,
+        { responseType: "blob" }
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const safeName = (selectedCert?.course || "certificate").replace(/[^a-z0-9_\- ]/gi, "");
+      link.href = url;
+      link.download = `Certificate_${safeName}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Certificate download failed:", error);
+      alert("Failed to download certificate PDF from server.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   if (loading) return <div className="p-8">Loading certificates…</div>;
 
@@ -221,7 +249,7 @@ const MyCertificates = () => {
           <button className="back-btn" onClick={() => setSelectedCert(null)}>Back to My Certificates</button>
           <button
             className="download-pdf-btn"
-            onClick={() => exportToPDF("certificate-to-print", `Certificate_${selectedCert.course.replace(/\s+/g, '_')}.pdf`)}
+            onClick={handleDownloadCertificate}
             disabled={isGenerating}
           >
             <FaDownload /> {isGenerating ? "Generating..." : "Download PDF"}

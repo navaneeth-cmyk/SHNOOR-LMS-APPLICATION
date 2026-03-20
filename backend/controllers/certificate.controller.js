@@ -168,6 +168,18 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
 
   const studentName = userRes.rows[0]?.full_name || null;
 
+  let certificateSettings = null;
+  try {
+    const settingsRes = await pool.query(
+      `SELECT title, logo_url, template_url, signature_url, authority_name, issuer_name FROM certificate_settings WHERE id = 1 LIMIT 1`
+    );
+    if (settingsRes.rows.length) {
+      certificateSettings = settingsRes.rows[0];
+    }
+  } catch (_) {
+    certificateSettings = null;
+  }
+
   const certificateId = `CERT-${randomUUID()}`;
   const verifyBase = process.env.CERTIFICATE_VERIFY_BASE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
   const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${certificateId}`;
@@ -178,7 +190,16 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
     userId,
     numericScore,
     studentName,
-    { certificateId, verifyUrl }
+    {
+      certificateId,
+      verifyUrl,
+      title: certificateSettings?.title || null,
+      logoUrl: certificateSettings?.logo_url || null,
+      templateUrl: certificateSettings?.template_url || null,
+      signatureUrl: certificateSettings?.signature_url || null,
+      authorityName: certificateSettings?.authority_name || null,
+      issuerName: certificateSettings?.issuer_name || null,
+    }
   );
 
   if (!pdfResult?.generated) {

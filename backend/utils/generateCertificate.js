@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import QRCode from "qrcode";
+import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,49 @@ const firstExistingPath = (paths = []) => {
     if (fs.existsSync(candidate)) return candidate;
   }
   return null;
+};
+
+const loadImageSource = async (value) => {
+  if (!value) return null;
+
+  if (Buffer.isBuffer(value)) return value;
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  if (text.startsWith("data:image")) {
+    const parts = text.split(",");
+    if (parts.length === 2) {
+      return Buffer.from(parts[1], "base64");
+    }
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(text)) {
+    try {
+      const response = await axios.get(text, {
+        responseType: "arraybuffer",
+        timeout: 7000,
+      });
+      return Buffer.from(response.data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  const localPath = firstExistingPath([
+    text,
+    path.resolve(process.cwd(), text),
+    path.resolve(__dirname, text),
+  ]);
+
+  if (!localPath) return null;
+
+  try {
+    return fs.readFileSync(localPath);
+  } catch (_) {
+    return null;
+  }
 };
 
 const generatePDF = async (
@@ -37,6 +81,9 @@ const generatePDF = async (
 
   const certificateId = finalOptions.certificateId || `cert_${Date.now()}`;
   const verifyUrl = finalOptions.verifyUrl || "";
+  const configuredTitle = finalOptions.title || "CERTIFICATE OF COMPLETION";
+  const configuredIssuerName = finalOptions.issuerName || "SHNOOR LMS";
+  const configuredAuthorityName = finalOptions.authorityName || "Authorized Signature";
 
   const numericScore = Number(scoreValue);
   const numericPercentage =
@@ -83,23 +130,24 @@ const generatePDF = async (
 
   doc.pipe(outputStream);
 
-  const logoPath = firstExistingPath([
-    process.env.CERTIFICATE_LOGO_PATH,
-    path.resolve(process.cwd(), "frontend/public/just_logo.svg"),
-    path.resolve(__dirname, "../../frontend/public/just_logo.svg")
-  ]);
+  const logoSource = await loadImageSource(
+    finalOptions.logoUrl || process.env.CERTIFICATE_LOGO_PATH || null
+  );
 
-  const signaturePath = firstExistingPath([
-    process.env.CERTIFICATE_SIGNATURE_PATH,
-    path.resolve(process.cwd(), "frontend/public/signatures/sign.png"),
-    path.resolve(__dirname, "../../frontend/public/signatures/sign.png")
-  ]);
+  const signatureSource = await loadImageSource(
+    finalOptions.signatureUrl
+    || process.env.CERTIFICATE_SIGNATURE_PATH
+    || path.resolve(process.cwd(), "frontend/public/signatures/sign.png")
+    || path.resolve(__dirname, "../../frontend/public/signatures/sign.png")
+  );
 
-  const footerLogoPath = firstExistingPath([
-    process.env.CERTIFICATE_FOOTER_LOGO_PATH,
-    path.resolve(process.cwd(), "frontend/public/nasscom.jpg"),
-    path.resolve(__dirname, "../../frontend/public/nasscom.jpg")
-  ]);
+  const footerLogoSource = await loadImageSource(
+    process.env.CERTIFICATE_FOOTER_LOGO_PATH
+    || path.resolve(process.cwd(), "frontend/public/nasscom.jpg")
+    || path.resolve(__dirname, "../../frontend/public/nasscom.jpg")
+  );
+
+  const templateSource = await loadImageSource(finalOptions.templateUrl || null);
 
   let qrDataUrl = null;
   if (verifyUrl) {
@@ -120,15 +168,27 @@ const generatePDF = async (
     .rect(30, 30, doc.page.width - 60, doc.page.height - 60)
     .stroke();
 
-  if (logoPath) {
+  if (templateSource) {
     try {
-      doc.image(logoPath, doc.page.width / 2 - 45, 55, { width: 90, height: 90 });
+      doc.save();
+      doc.opacity(0.12).image(templateSource, 34, 34, {
+        fit: [doc.page.width - 68, doc.page.height - 68],
+        align: "center",
+        valign: "center",
+      });
+      doc.restore();
+    } catch (_) { }
+  }
+
+  if (logoSource) {
+    try {
+      doc.image(logoSource, doc.page.width / 2 - 45, 55, { width: 90, height: 90 });
     } catch (_) { }
   }
 
   doc.moveDown(3);
   doc.font("Times-Bold").fontSize(34).text(
-    "CERTIFICATE OF COMPLETION",
+    configuredTitle,
     { align: "center" }
   );
 
@@ -148,9 +208,16 @@ const generatePDF = async (
 
   doc.moveDown(1);
   doc.font("Times-Roman").fontSize(23).text(
-    `For successfully completing the exam "${exam_name}"`,
+    "For successfully completing the training program with",
     { align: "center" }
   );
+
+  doc.moveDown(0.4);
+  doc.font("Times-Bold").fontSize(22).fillColor("#1e3a8a").text(
+    configuredIssuerName,
+    { align: "center" }
+  );
+  doc.fillColor("black");
 
   doc.moveDown(1);
   doc.font("Times-Bold").fontSize(22).text(
@@ -166,15 +233,15 @@ const generatePDF = async (
     );
   }
 
-  if (signaturePath) {
+  if (signatureSource) {
     try {
-      doc.image(signaturePath, 380, 660, { width: 140, height: 40 });
+      doc.image(signatureSource, 380, 660, { width: 140, height: 40 });
     } catch (_) { }
   }
 
-  if (footerLogoPath) {
+  if (footerLogoSource) {
     try {
-      doc.image(footerLogoPath, 80, 675, { width: 90, height: 42 });
+      doc.image(footerLogoSource, 80, 675, { width: 90, height: 42 });
     } catch (_) { }
   }
 
@@ -193,7 +260,7 @@ const generatePDF = async (
   doc.fontSize(12);
   doc.text(`Date: ${new Date().toLocaleDateString()}`, 80, 720);
   doc.text(`Certificate ID: ${certificateId}`, 80, 738);
-  doc.text("Authorized Signature", 400, 720);
+  doc.text(configuredAuthorityName, 400, 720);
   doc.moveTo(380, 710).lineTo(540, 710).stroke();
 
   doc.end();

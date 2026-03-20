@@ -2,15 +2,194 @@ console.log("certificateRoutes.js loaded");
 
 import express from "express";
 import pool from "../db/postgres.js";
+import fs from "fs";
+import path from "path";
 import {
   generateQuizCertificate,
   issueExamCertificate,
   resolveExamByName
 } from "../controllers/certificate.controller.js";
+import generatePDF from "../utils/generateCertificate.js";
 import firebaseAuth from "../middlewares/firebaseAuth.js";
 import attachUser from "../middlewares/attachUser.js";
+import roleGuard from "../middlewares/roleGuard.js";
 
 const router = express.Router();
+
+const ensureCertificateSettingsTable = async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS certificate_settings (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      title TEXT,
+      logo_url TEXT,
+      template_url TEXT,
+      signature_url TEXT,
+      authority_name TEXT,
+      issuer_name TEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT certificate_settings_singleton CHECK (id = 1)
+    )
+  `);
+};
+
+const mapSettingsFromDb = (row = {}) => ({
+  title: row.title || "Certificate of Achievement",
+  logoUrl: row.logo_url || "",
+  templateUrl: row.template_url || "",
+  signatureUrl: row.signature_url || "",
+  authorityName: row.authority_name || "Director of Education",
+  issuerName: row.issuer_name || "Shnoor LMS",
+});
+
+router.get("/settings/config", async (_req, res) => {
+  try {
+    await ensureCertificateSettingsTable();
+
+    const result = await pool.query(
+      `SELECT * FROM certificate_settings WHERE id = 1 LIMIT 1`
+    );
+
+    if (!result.rows.length) {
+      return res.json(mapSettingsFromDb());
+    }
+
+    return res.json(mapSettingsFromDb(result.rows[0]));
+  } catch (err) {
+    console.error("GET /settings/config error:", err.message);
+    return res.status(500).json({ message: "Failed to load certificate configuration" });
+  }
+});
+
+router.post(
+  "/settings/config",
+  firebaseAuth,
+  attachUser,
+  roleGuard("admin"),
+  async (req, res) => {
+    try {
+      await ensureCertificateSettingsTable();
+
+      const {
+        title,
+        logoUrl,
+        templateUrl,
+        signatureUrl,
+        authorityName,
+        issuerName,
+      } = req.body || {};
+
+      await pool.query(
+        `
+        INSERT INTO certificate_settings
+          (id, title, logo_url, template_url, signature_url, authority_name, issuer_name, updated_at)
+        VALUES
+          (1, $1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+        ON CONFLICT (id)
+        DO UPDATE SET
+          title = EXCLUDED.title,
+          logo_url = EXCLUDED.logo_url,
+          template_url = EXCLUDED.template_url,
+          signature_url = EXCLUDED.signature_url,
+          authority_name = EXCLUDED.authority_name,
+          issuer_name = EXCLUDED.issuer_name,
+          updated_at = CURRENT_TIMESTAMP
+        `,
+        [
+          title || null,
+          logoUrl || null,
+          templateUrl || null,
+          signatureUrl || null,
+          authorityName || null,
+          issuerName || null,
+        ]
+      );
+
+      return res.json({ success: true, message: "Configuration saved" });
+    } catch (err) {
+      console.error("POST /settings/config error:", err.message);
+      return res.status(500).json({ message: "Failed to save certificate configuration" });
+    }
+  }
+);
+
+router.get(
+  "/download/:certificate_id",
+  firebaseAuth,
+  attachUser,
+  async (req, res) => {
+    try {
+      const { certificate_id } = req.params;
+
+      const certRes = await pool.query(
+        `
+        SELECT id, user_id, certificate_id, exam_name, score
+        FROM certificates
+        WHERE certificate_id = $1
+        LIMIT 1
+        `,
+        [certificate_id]
+      );
+
+      if (!certRes.rows.length) {
+        return res.status(404).json({ message: "Certificate not found" });
+      }
+
+      const cert = certRes.rows[0];
+      const isOwner = String(cert.user_id) === String(req.user.id);
+      const isAdmin = req.user.role === "admin";
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const safeBaseName = path.basename(String(certificate_id));
+      const fileName = safeBaseName.endsWith(".pdf") ? safeBaseName : `${safeBaseName}.pdf`;
+      const filePath = path.resolve(process.cwd(), "certificates", fileName);
+
+      if (!fs.existsSync(filePath)) {
+        const userRes = await pool.query(
+          `SELECT full_name FROM users WHERE user_id = $1 LIMIT 1`,
+          [cert.user_id]
+        );
+
+        const settingsRes = await pool.query(
+          `SELECT title, logo_url, template_url, signature_url, authority_name, issuer_name FROM certificate_settings WHERE id = 1 LIMIT 1`
+        ).catch(() => ({ rows: [] }));
+
+        const settings = settingsRes.rows[0] || {};
+        const verifyBase = process.env.CERTIFICATE_VERIFY_BASE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
+        const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${cert.certificate_id}`;
+
+        await generatePDF(
+          cert.exam_name || "Certificate",
+          Number(cert.score || 0),
+          cert.user_id,
+          Number(cert.score || 0),
+          userRes.rows[0]?.full_name || "Student",
+          {
+            certificateId: cert.certificate_id,
+            verifyUrl,
+            title: settings.title || null,
+            logoUrl: settings.logo_url || null,
+            templateUrl: settings.template_url || null,
+            signatureUrl: settings.signature_url || null,
+            authorityName: settings.authority_name || null,
+            issuerName: settings.issuer_name || null,
+          }
+        );
+
+        if (!fs.existsSync(filePath)) {
+          return res.status(404).json({ message: "Certificate file not found" });
+        }
+      }
+
+      return res.download(filePath, `${(cert.exam_name || "certificate").replace(/[^a-z0-9_\- ]/gi, "")}.pdf`);
+    } catch (err) {
+      console.error("GET /download/:certificate_id error:", err.message);
+      return res.status(500).json({ message: "Failed to download certificate" });
+    }
+  }
+);
 
 // ---------------------------
 // POST → Add certificate data
