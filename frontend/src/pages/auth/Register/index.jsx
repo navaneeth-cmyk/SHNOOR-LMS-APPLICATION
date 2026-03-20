@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import api from "../../../api/axios";
-import { auth } from "../../../auth/firebase";
+import { auth, googleProvider } from "../../../auth/firebase";
+import { useAuth } from "../../../auth/useAuth";
 import RegisterView from "./view.jsx";
 
 const Register = () => {
+  const { userData, loading: authLoading } = useAuth();
   const [step, setStep] = useState(1); // ✅ REQUIRED
   const [formData, setFormData] = useState({
     fullName: "",
@@ -95,6 +97,29 @@ const Register = () => {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      // 💡 Store role briefly in session so AuthContext can use it for auto-registration
+      sessionStorage.setItem("pendingRegistrationRole", formData.role || "student");
+      
+      // Firebase Google Sign In - AuthContext will handle backend sync
+      await signInWithPopup(auth, googleProvider);
+
+      // Navigation will happen via AuthContext logic
+    } catch (err) {
+      console.error("Google handleGoogleSignIn error:", err);
+      if (err.code === "auth/popup-closed-by-user") {
+        setError("Sign-in cancelled.");
+      } else {
+        setError("Google Sign-In failed. Please try again.");
+      }
+      setLoading(false);
+    }
+  };
+
   return (
     <RegisterView
       step={step} // ✅ REQUIRED
@@ -108,6 +133,7 @@ const Register = () => {
       handleRoleSelect={handleRoleSelect} // ✅ REQUIRED
       handleBack={handleBack}             // ✅ REQUIRED
       handleRegister={handleRegister}
+      handleGoogleSignIn={handleGoogleSignIn} // ✅ ADD THIS
       togglePasswordVisibility={togglePasswordVisibility}
       toggleConfirmPasswordVisibility={toggleConfirmPasswordVisibility}
     />

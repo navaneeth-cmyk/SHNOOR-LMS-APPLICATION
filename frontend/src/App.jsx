@@ -5,7 +5,8 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
-import { AuthProvider } from "./auth/AuthContext";
+import { AuthProvider, AuthContext } from "./auth/AuthContext";
+import { useAuth } from "./auth/useAuth";
 import ProtectedRoute from "./auth/ProtectedRoute";
 
 import Login from "./pages/auth/Login";
@@ -97,7 +98,6 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/create-password" element={<CreatePassword />} />
-            <Route path="/verify/:certId" element={<VerifyCertificate />} />
 
             <Route
               path="/admin"

@@ -11,6 +11,8 @@ export const bulkUploadModules = async (req, res) => {
     const client = await pool.connect();
     let csvFile = null;
     let resourceFiles = [];
+    let uploadedResourceUrlByName = {};
+    let uploadedProviderByName = {};
 
     try {
         const { courseId } = req.body;
@@ -31,7 +33,6 @@ export const bulkUploadModules = async (req, res) => {
         resourceFiles.forEach(f => {
             fileMap[f.originalname] = f;
         });
-        const uploadedResourceUrlByName = {};
 
         const results = [];
         const errors = [];
@@ -145,6 +146,7 @@ export const bulkUploadModules = async (req, res) => {
                         })}`,
                     });
                     uploadedResourceUrlByName[f.originalname] = uploaded.url;
+                    uploadedProviderByName[f.originalname] = uploaded.provider;
                 }
                 contentUrl = uploadedResourceUrlByName[f.originalname];
                 uploadedFile = f;
@@ -301,7 +303,10 @@ export const bulkUploadModules = async (req, res) => {
             await removeLocalFileSafe(csvFile.path);
         }
         for (const file of resourceFiles) {
-            await removeLocalFileSafe(file?.path);
+            const provider = uploadedProviderByName[file?.originalname];
+            if (!provider || provider === "supabase") {
+                await removeLocalFileSafe(file?.path);
+            }
         }
         client.release();
     }

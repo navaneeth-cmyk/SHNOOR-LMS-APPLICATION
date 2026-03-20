@@ -160,8 +160,10 @@ export const searchLearningPaths = async (req, res) => {
              c.instructor_id,
              u.full_name AS instructor_name,
              lpc.order_index,
-             CASE WHEN sc.course_id IS NOT NULL OR ca.course_id IS NOT NULL
-               THEN true ELSE false END AS is_enrolled,
+             (
+               EXISTS(SELECT 1 FROM student_courses sc WHERE sc.course_id = c.courses_id AND sc.student_id = $2)
+               OR EXISTS(SELECT 1 FROM course_assignments ca WHERE ca.course_id = c.courses_id AND ca.student_id = $2)
+             ) AS is_enrolled,
              CASE
                WHEN (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.courses_id) > 0
                  AND (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.courses_id)
@@ -171,10 +173,6 @@ export const searchLearningPaths = async (req, res) => {
            FROM learning_path_courses lpc
            JOIN courses c ON c.courses_id = lpc.course_id
            LEFT JOIN users u ON u.user_id = c.instructor_id
-           LEFT JOIN student_courses sc
-             ON sc.course_id = c.courses_id AND sc.student_id = $2
-           LEFT JOIN course_assignments ca
-             ON ca.course_id = c.courses_id AND ca.student_id = $2
            WHERE lpc.learning_path_id = $1
              AND c.status = 'approved'
            ORDER BY lpc.order_index ASC`,
@@ -214,8 +212,10 @@ export const getAllLearningPaths = async (req, res) => {
              c.instructor_id,
              u.full_name AS instructor_name,
              lpc.order_index,
-             CASE WHEN sc.course_id IS NOT NULL OR ca.course_id IS NOT NULL
-               THEN true ELSE false END AS is_enrolled,
+             (
+               EXISTS(SELECT 1 FROM student_courses sc WHERE sc.course_id = c.courses_id AND sc.student_id = $2)
+               OR EXISTS(SELECT 1 FROM course_assignments ca WHERE ca.course_id = c.courses_id AND ca.student_id = $2)
+             ) AS is_enrolled,
              CASE
                WHEN (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.courses_id) > 0
                  AND (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.courses_id)
@@ -225,10 +225,6 @@ export const getAllLearningPaths = async (req, res) => {
            FROM learning_path_courses lpc
            JOIN courses c ON c.courses_id = lpc.course_id
            LEFT JOIN users u ON u.user_id = c.instructor_id
-           LEFT JOIN student_courses sc
-             ON sc.course_id = c.courses_id AND sc.student_id = $2
-           LEFT JOIN course_assignments ca
-             ON ca.course_id = c.courses_id AND ca.student_id = $2
            WHERE lpc.learning_path_id = $1
              AND c.status = 'approved'
            ORDER BY lpc.order_index ASC`,

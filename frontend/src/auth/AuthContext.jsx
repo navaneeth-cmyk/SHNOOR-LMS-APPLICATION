@@ -3,12 +3,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import api from "../api/axios"; // Keeps your existing axios path
 
-const AuthContext = createContext();
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
@@ -20,140 +15,121 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // Only set syncing if we are not in initial load (loading handles that)
+      // Set syncing if we are re-authing (not initial load)
       if (!loading) setIsSyncing(true);
 
-      if (user) {
-        try {
+      try {
+        if (user) {
           const token = await user.getIdToken(true);
 
-          const res = await api.post(
-            "/api/auth/login",
-            {},
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
+          try {
+            const res = await api.post(
+              "/api/auth/login",
+              {},
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
               },
-            },
-          );
+            );
 
-          // 3. Status Check (Critical for new DB)
-          // The DB returns 'pending', 'active', or 'blocked'.
-          // We must block access if not active.
-          const dbStatus = res.data.user.status.toLowerCase();
+            const dbStatus = res.data.user.status.toLowerCase();
 
-          if (dbStatus === 'blocked' || dbStatus === 'pending') {
-            throw new Error("Account is not active");
-          }
+            if (dbStatus === 'blocked' || dbStatus === 'pending') {
+              throw new Error("Account is not active");
+            }
 
-          // 4. Save User Data (The Fix)
-          // We save the UUID (user_id) so we can use it for course enrollment later
-          setCurrentUser(user);
-          setUserData({
-            user_id: res.data.user.user_id, // <--- THIS IS THE KEY FIX
-            role: res.data.user.role.toLowerCase(),
-            status: dbStatus,
-            full_name: user.displayName,
-            email: user.email
-          });
+            setCurrentUser(user);
+            setUserData({
+              user_id: res.data.user.user_id,
+              role: res.data.user.role.toLowerCase(),
+              status: dbStatus,
+              full_name: res.data.user.full_name || user.displayName || user.email.split('@')[0],
+              email: user.email
+            });
 
-        } catch (error) {
-          console.error("AuthContext backend sync failed:", error);
-          console.error("Error response:", error.response?.status, error.response?.data);
+          } catch (error) {
+            console.error("AuthContext backend sync failed:", error);
 
-          // Auto-register new Google users as students (status='pending')
-          if (error.response?.status === 404) {
-            try {
-              const token = await user.getIdToken(true);
+            // AUTO-REGISTER if user not found (404)
+            if (error.response?.status === 404) {
+              try {
+                // Get selected role from session if it exists (set by Register page)
+                const pendingRole = sessionStorage.getItem("pendingRegistrationRole") || "student";
+                sessionStorage.removeItem("pendingRegistrationRole");
 
-              // Register the user in PostgreSQL
-              await api.post("/api/auth/register", {
-                token,
-                fullName: user.displayName || user.email.split('@')[0],
-                role: "student"
-              });
+                // Register the user in PostgreSQL
+                await api.post("/api/auth/register", {
+                  token,
+                  fullName: user.displayName || user.email.split('@')[0],
+                  role: pendingRole
+                });
 
-              // Retry login after registration
-              const loginRes = await api.post(
-                "/api/auth/login",
-                {},
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
+                // Retry login after registration
+                const loginRes = await api.post(
+                  "/api/auth/login",
+                  {},
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                    },
+                  }
+                );
+
+                const dbStatus = loginRes.data.user.status.toLowerCase();
+
+                if (dbStatus === 'blocked' || dbStatus === 'pending') {
+                  throw new Error("Account is not active");
                 }
-              );
 
-              const dbStatus = loginRes.data.user.status.toLowerCase();
+                setCurrentUser(user);
+                setUserData({
+                  user_id: loginRes.data.user.user_id,
+                  role: loginRes.data.user.role.toLowerCase(),
+                  status: dbStatus,
+                  full_name: loginRes.data.user.full_name || user.displayName || user.email.split('@')[0],
+                  email: user.email
+                });
 
-              // Check if account is pending or blocked
-              if (dbStatus === 'blocked' || dbStatus === 'pending') {
-                throw new Error("Account is not active");
+              } catch (registerError) {
+                console.error("Auto-registration/Retry login failed:", registerError);
+                await signOut(auth);
+                setCurrentUser(null);
+                setUserData(null);
+
+                if (registerError.message === "Account is not active" || registerError.response?.status === 403) {
+                  alert("Account created! Status: Pending Approval. Contact your admin.");
+                } else {
+                  alert(`Registration failed: ${registerError.response?.data?.message || registerError.message}`);
+                }
               }
-
-              // Successfully registered and logged in
-              setCurrentUser(user);
-              setUserData({
-                user_id: loginRes.data.user.user_id,
-                role: loginRes.data.user.role.toLowerCase(),
-                status: dbStatus,
-                full_name: user.displayName,
-                email: user.email
-              });
-
-              setLoading(false);
-              setIsSyncing(false);
-              return;
-            } catch (registerError) {
-              console.error("Auto-registration failed:", registerError);
-
-              // Reset loading state BEFORE showing alerts
+            } else if (error.response?.status === 403 || error.message === "Account is not active") {
+              await signOut(auth);
               setCurrentUser(null);
               setUserData(null);
-              setLoading(false);
-              setIsSyncing(false);
-
-              // If registration succeeded but account is pending
-              if (registerError.message === "Account is not active") {
-                await signOut(auth);
-                alert("Account created successfully! Your account is pending admin approval.");
-              } else {
-                await signOut(auth);
-                alert("Failed to create your account. Please try again or contact support.");
-              }
-
-              return;
+              alert("Access Denied: Your account is pending approval or blocked.");
+            } else {
+              // Network or other critical error
+              const errMsg = error.response?.data?.message || error.message || "Unknown error";
+              console.error(`[LOGIN ERROR] Status: ${error.response?.status}, Message: ${errMsg}`);
+              
+              await signOut(auth);
+              setCurrentUser(null);
+              setUserData(null);
+              alert(`Login failed: ${errMsg}\n\nPlease check if your backend is running.`);
             }
           }
-
-
-          // Handle blocked/pending users (403)
-          if (error.response?.status === 403 || error.message === "Account is not active") {
-            setCurrentUser(null);
-            setUserData(null);
-            setLoading(false);
-            setIsSyncing(false);
-            await signOut(auth);
-            alert("Access Denied: Your account is pending approval or blocked.");
-            return;
-          }
-
-          // For any other error - show visible message to diagnose
-          const errMsg = error.response?.data?.message || error.message || "Unknown error";
-          const errStatus = error.response?.status || "Network Error";
-          console.error(`[LOGIN ERROR] Status: ${errStatus}, Message: ${errMsg}`);
-          alert(`Login failed (${errStatus}): ${errMsg}\n\nPlease check if the backend is running on port 5000.`);
-
+        } else {
+          // User logged out
           setCurrentUser(null);
           setUserData(null);
         }
-      } else {
-        // User logged out
-        setCurrentUser(null);
-        setUserData(null);
+      } catch (fatalError) {
+        console.error("AuthContext fatal error:", fatalError);
+      } finally {
+        setLoading(false);
+        setIsSyncing(false);
       }
-      setLoading(false);
-      setIsSyncing(false);
     });
 
     return () => unsubscribe();

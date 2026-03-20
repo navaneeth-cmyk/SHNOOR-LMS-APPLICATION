@@ -189,7 +189,7 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
                   type="url"
                   value={contentUrl}
                   onChange={(e) => setContentUrl(e.target.value)}
-                  placeholder={type === "video" ? "https://..." : "https://example.com/article-or-text"}
+                  placeholder={type === "video" ? "https://..." : "https://example.com/article-or-html"}
                   className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 outline-none transition-all"
                 />
               </div>

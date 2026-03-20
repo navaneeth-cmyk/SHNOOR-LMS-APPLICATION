@@ -36,6 +36,7 @@ export const addModules = async (req, res) => {
       const m = modules[i];
       const pdf = pdfFiles[i] || null;
       let finalContentUrl = m.content_url || null;
+      let uploadProvider = null;
 
       if (pdf) {
         const uploadResult = await uploadLocalFileToSupabase(pdf.path, {
@@ -48,6 +49,7 @@ export const addModules = async (req, res) => {
           })}`,
         });
         finalContentUrl = uploadResult.url;
+        uploadProvider = uploadResult.provider;
       }
 
       const result = await pool.query(
@@ -116,7 +118,12 @@ export const addModules = async (req, res) => {
           }
         }
 
-        if (textToChunk && /\.html?($|\?)/i.test(finalContentUrl || "")) {
+        const isHtmlContent = (textResData) => /<[a-z][\s\S]*>/i.test(textResData || "");
+        const shouldStripTags = 
+          /\.html?($|\?)/i.test(finalContentUrl || "") || 
+          isHtmlContent(textToChunk);
+
+        if (textToChunk && shouldStripTags && !finalContentUrl?.includes("i=open")) {
           textToChunk = textToChunk.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
         }
 
@@ -153,7 +160,9 @@ export const addModules = async (req, res) => {
       }
 
       if (pdf?.path) {
-        await removeLocalFileSafe(pdf.path);
+        if (!uploadProvider || uploadProvider === "supabase") {
+          await removeLocalFileSafe(pdf.path);
+        }
       }
     }
 
@@ -180,7 +189,8 @@ export const getModulesByCourse = async (req, res) => {
         title,
         type,
         CASE 
-          WHEN type = 'pdf' OR pdf_filename IS NOT NULL THEN '${baseUrl}/api/modules/' || module_id || '/pdf'
+          WHEN type = 'pdf' OR pdf_filename IS NOT NULL OR content_url LIKE '%.pdf%' THEN '${baseUrl}/api/modules/' || module_id || '/view?type=pdf'
+          WHEN type = 'html' OR content_url LIKE '%.html%' THEN '${baseUrl}/api/modules/' || module_id || '/view?type=html'
           ELSE content_url 
         END AS content_url,
         duration_mins,
@@ -202,8 +212,9 @@ export const getModulesByCourse = async (req, res) => {
   }
 };
 
-export const getModulePdf = async (req, res) => {
+export const getModuleView = async (req, res) => {
   const { moduleId } = req.params;
+  const { type: queryType } = req.query;
 
   try {
     const result = await pool.query(
@@ -238,12 +249,29 @@ export const getModulePdf = async (req, res) => {
       return res.send(moduleData.pdf_data);
     }
 
-    // 2️⃣ URL fallback — redirect directly to the stored file
+    // 2️⃣ URL — proxy the content to maintain our security headers
     if (moduleData.content_url) {
-      return res.redirect(moduleData.content_url);
+      try {
+        const urlObj = new URL(moduleData.content_url);
+        const fileName = urlObj.pathname.split("/").pop() || "document";
+        const isHtml = queryType === 'html' || fileName.match(/\.html?($|\?)/i) || moduleData.type === 'html';
+        const isPdf = queryType === 'pdf' || fileName.match(/\.pdf($|\?)/i) || moduleData.type === 'pdf';
+
+        if (isHtml) {
+          res.setHeader("Content-Type", "text/html");
+        } else if (isPdf) {
+          res.setHeader("Content-Type", "application/pdf");
+        }
+
+        const response = await axios.get(moduleData.content_url, { responseType: "stream" });
+        return response.data.pipe(res);
+      } catch (proxyErr) {
+        console.warn("Proxy fallback failed, redirecting:", proxyErr.message);
+        return res.redirect(moduleData.content_url);
+      }
     }
 
-    res.status(404).json({ message: "PDF content not found" });
+    res.status(404).json({ message: "Content not found" });
   } catch (error) {
     console.error("getModulePdf error:", error);
     res.status(500).json({ message: "Server error" });

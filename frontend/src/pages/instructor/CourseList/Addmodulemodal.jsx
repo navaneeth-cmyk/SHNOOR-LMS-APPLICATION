@@ -21,7 +21,7 @@ const AddModuleModal = ({ onClose, onSave }) => {
   const ACCEPT_MAP = {
     video:       "video/*",
     pdf:         "application/pdf",
-    text_stream: ".txt,.md,text/plain",
+    text_stream: ".txt,.md,.html,.htm,text/plain",
   };
 
   const switchType = (newType) => {
@@ -101,7 +101,7 @@ const AddModuleModal = ({ onClose, onSave }) => {
   const uploadLabels = {
     video:       "video file",
     pdf:         "PDF file",
-    text_stream: "text file (.txt, .md)",
+    text_stream: "text file (.txt, .md, .html)",
   };
 
   return (
@@ -219,7 +219,7 @@ const AddModuleModal = ({ onClose, onSave }) => {
                       <p className="text-xs text-slate-400">
                         {type === "video"       && "MP4, MOV, WebM, etc."}
                         {type === "pdf"         && "PDF files only"}
-                        {type === "text_stream" && ".txt or .md files"}
+                        {type === "text_stream" && ".txt, .md or .html files"}
                       </p>
                     </>
                   )}

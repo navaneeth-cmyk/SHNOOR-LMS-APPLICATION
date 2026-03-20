@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Mail, Phone, Building, UserPlus, CheckCircle2, ArrowLeft, Upload, FileText, X, Info, LockKeyhole } from 'lucide-react';
+import { User, Mail, Phone, Building, UserPlus, CheckCircle2, ArrowLeft, Upload, FileText, X, Info, LockKeyhole, Check, AlertCircle } from 'lucide-react';
 
 const AddStudentView = ({
     loading, data, handleChange, handleSubmit, navigate, showSuccessPopup, setShowSuccessPopup, error,

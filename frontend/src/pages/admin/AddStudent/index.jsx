@@ -79,11 +79,11 @@ const AddStudent = () => {
         setBulkUploadProgress(0);
 
         const formData = new FormData();
-        formData.append("file", bulkFile);
+        formData.append("csv", bulkFile);
 
         try {
             const token = await auth.currentUser.getIdToken();
-            const res = await api.post("/api/users/students/bulk-upload", formData, {
+            const res = await api.post("/api/users/students/bulk", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                     Authorization: `Bearer ${token}`,

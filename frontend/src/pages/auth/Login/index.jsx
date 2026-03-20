@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../../../auth/firebase";
-import { useAuth } from "../../../auth/AuthContext";
+import { useAuth } from "../../../auth/useAuth";
 import LoginView from "./view";
 
 const Login = () => {

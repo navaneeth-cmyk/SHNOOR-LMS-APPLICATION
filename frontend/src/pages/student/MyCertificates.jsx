@@ -9,6 +9,10 @@ import {
   normalizeCertificateCourseName,
 } from "../../utils/certificateStorage";
 import "../../styles/Dashboard.css";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { db } from "../../auth/firebase";
+import { getOrGenerateCertificateId } from "../../utils/idService";
+import { exportToPDF } from "../../utils/certificatePDF";
 
 // Generate certificate PDF via backend (optional)
 const generateCertificateAPI = async (user_id, course, score) => {
@@ -18,17 +22,23 @@ const generateCertificateAPI = async (user_id, course, score) => {
       exam_name: normalizeCertificateCourseName(course),
       score,
     });
-    if (res.data?.generated) {
-      return {
-        generated: true,
-        certificateId: res.data?.data?.certificate_id || null,
-      };
-    }
-    return { generated: false };
+    return res.data?.generated ? { generated: true } : { generated: false };
   } catch (err) {
     return { generated: false };
   }
 };
+
+// Merge backend certs with local, dedupe by course+date
+function mergeCertificates(local, backendFormatted) {
+  const keys = new Set(local.map((c) => ${c.course}|${c.date}));
+  const fromBackend = (backendFormatted || []).filter((c) => {
+    const k = ${c.course}|${c.date};
+    if (keys.has(k)) return false;
+    keys.add(k);
+    return true;
+  });
+  return [...local, ...fromBackend];
+}
 
 // ----------------------------------------------------------------------
 // DEFAULT CONFIGURATION & LOCAL OVERRIDES (Frontend Only)
@@ -56,6 +66,8 @@ const MyCertificates = () => {
   const [certConfig, setCertConfig] = useState(null);
   const [currentCertId, setCurrentCertId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  // Pre-generated ID map: { [course]: certId } — populated in background so QR is instant
+  const [certIds, setCertIds] = useState({});
 
   useEffect(() => {
     const fetchCertConfig = async () => {
@@ -67,8 +79,8 @@ const MyCertificates = () => {
           ...defaultConfig,
           ...firestoreData,
           ...localOverrides,
-          logoUrl: firestoreData.logoUrl || defaultConfig.logoUrl,
-          signatureUrl: firestoreData.signatureUrl || firestoreData.imageUrl || defaultConfig.signatureUrl,
+          logoUrl: String(firestoreData.logoUrl || defaultConfig.logoUrl).replace('/public/', '/'),
+          signatureUrl: String(firestoreData.signatureUrl || firestoreData.imageUrl || defaultConfig.signatureUrl).replace('/public/', '/'),
           authorityName: firestoreData.authorityName || defaultConfig.authorityName,
           title: firestoreData.title || defaultConfig.title,
         };
@@ -102,7 +114,7 @@ const MyCertificates = () => {
       claimAnonymousCertificates(userId);
     }
 
-    // 1) Local fallback only (used if backend is unavailable)
+    // 1) Always show local certificates first (no backend needed)
     const local = getLocalCertificates();
     setCertificates(local);
     setLoading(false);
@@ -128,11 +140,28 @@ const MyCertificates = () => {
       // Non-blocking: keep showing local/backend data if exams endpoint is unavailable
     }
 
+    // Pre-generate certificate IDs in background so QR renders instantly
+    const preGenIds = async (certs) => {
+      const uid = localStorage.getItem("user_id") || "guest";
+      const name = localStorage.getItem("full_name") || "Student";
+      const map = {};
+      await Promise.all(
+        certs.map(async (cert) => {
+          try {
+            const id = await getOrGenerateCertificateId(uid, cert.course, name);
+            map[cert.course] = id;
+          } catch (_) { }
+        })
+      );
+      setCertIds(map);
+    };
+    preGenIds(getLocalCertificates());
+
     // 2) Optionally merge in backend certificates if server is available
     if (!userId) return;
 
     try {
-      const res = await api.get(`/api/certificate/${userId}`);
+      const res = await api.get(/api/certificate/${userId});
       const data = res.data;
       if (res.status === 404 || (data?.message?.includes("not found"))) {
         setBackendUnavailable(false);
@@ -144,14 +173,11 @@ const MyCertificates = () => {
         course: normalizeCertificateCourseName(c.exam_name),
         date: c.issued_at ? new Date(c.issued_at).toLocaleDateString() : new Date().toLocaleDateString(),
         score: c.score,
-        certificateId: c.certificate_id || null,
         previewColor: "#003366",
       }));
-      // Backend is source of truth (exam-only certificates from API)
-      setCertificates(formatted);
+      setCertificates((prev) => mergeCertificates(prev, formatted));
       setBackendUnavailable(false);
     } catch (_) {
-      setCertificates(local);
       setBackendUnavailable(true);
     }
   }, []);
@@ -160,115 +186,49 @@ const MyCertificates = () => {
     loadCertificates();
   }, [loadCertificates]);
 
+  // Use pre-generated ID instantly; fall back to async fetch if not ready yet
   useEffect(() => {
     if (!selectedCert) { setCurrentCertId(""); return; }
-    if (selectedCert.certificateId) {
-      setCurrentCertId(String(selectedCert.certificateId));
-      return;
+    const cached = certIds[selectedCert.course];
+    if (cached) {
+      setCurrentCertId(cached);
+    } else {
+      // Not pre-generated yet (edge case) — fetch now
+      const fetchCertId = async () => {
+        const userId = localStorage.getItem("user_id") || "guest";
+        const studentName = localStorage.getItem("full_name") || "Student";
+        const certId = await getOrGenerateCertificateId(userId, selectedCert.course, studentName);
+        setCurrentCertId(certId);
+        setCertIds((prev) => ({ ...prev, [selectedCert.course]: certId }));
+      };
+      fetchCertId();
     }
-
-    setCurrentCertId("");
-  }, [selectedCert]);
+  }, [selectedCert, certIds]);
 
   // ================= GENERATE CERTIFICATE (PDF via backend, optional) =================
   const handleGenerateCertificate = async (cert) => {
     const userId = localStorage.getItem("user_id");
     if (!userId) {
+      // No user id – open the viewer directly so the student can still download
       setSelectedCert(cert);
       return;
     }
 
-    setIsGenerating(true);
+    // Try backend generation; if it succeeds (new or already exists) open the viewer
     const result = await generateCertificateAPI(userId, cert.course, cert.score || 90);
-    setIsGenerating(false);
 
-    const updatedCert = result.generated && result.certificateId
-      ? { ...cert, certificateId: result.certificateId }
-      : cert;
-
-    if (result.generated && result.certificateId) {
-      setCertificates((prev) =>
-        prev.map((item) =>
-          item.id === cert.id ? { ...item, certificateId: result.certificateId } : item
-        )
-      );
+    if (result.generated) {
+      // Open the certificate viewer so the student can download the PDF immediately
+      setSelectedCert(cert);
+    } else {
+      // Backend unavailable or truly not eligible – still open the viewer
+      // so the student can at least see and download the client-side PDF
+      setSelectedCert(cert);
     }
-
-    setSelectedCert(updatedCert);
   };
 
   // ================= PRINT =================
-  const handleDownloadCertificate = async () => {
-    if (!currentCertId) {
-      alert("Certificate file is not ready yet. Please generate certificate first.");
-      return;
-    }
-
-    try {
-      setIsGenerating(true);
-      const response = await api.get(
-        `/api/certificate/download/${encodeURIComponent(currentCertId)}`,
-        { responseType: "blob" }
-      );
-
-      const contentType = response.headers?.["content-type"] || "";
-      const blob = response.data;
-
-      if (!contentType.includes("application/pdf")) {
-        let serverMessage = "Failed to download certificate PDF from server.";
-        try {
-          const text = await blob.text();
-          if (text) {
-            const parsed = JSON.parse(text);
-            serverMessage = parsed?.message || parsed?.error || serverMessage;
-          }
-        } catch (_) {}
-        throw new Error(serverMessage);
-      }
-
-      const pdfBlob = new Blob([blob], { type: "application/pdf" });
-      if (pdfBlob.size < 1024) {
-        throw new Error("Downloaded file is incomplete.");
-      }
-
-      const url = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      const safeName = (selectedCert?.course || "certificate").replace(/[^a-z0-9_\- ]/gi, "");
-      link.href = url;
-      link.download = `Certificate_${safeName}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Certificate download failed:", error);
-      let message = "Failed to download certificate PDF from server.";
-
-      try {
-        if (error?.response?.data instanceof Blob) {
-          const text = await error.response.data.text();
-          if (text) {
-            try {
-              const parsed = JSON.parse(text);
-              message = parsed?.message || parsed?.error || text || message;
-            } catch {
-              message = text;
-            }
-          }
-        } else if (error?.response?.data?.message) {
-          message = error.response.data.message;
-        } else if (error?.message) {
-          message = error.message;
-        }
-      } catch (_) {
-        message = error?.message || message;
-      }
-
-      alert(message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  const handlePrint = () => window.print();
 
   if (loading) return <div className="p-8">Loading certificates…</div>;
 
@@ -280,14 +240,13 @@ const MyCertificates = () => {
           <button className="back-btn" onClick={() => setSelectedCert(null)}>Back to My Certificates</button>
           <button
             className="download-pdf-btn"
-            onClick={handleDownloadCertificate}
+            onClick={() => exportToPDF("certificate-to-print", Certificate_${selectedCert.course.replace(/\s+/g, '_')}.pdf)}
             disabled={isGenerating}
           >
             <FaDownload /> {isGenerating ? "Generating..." : "Download PDF"}
           </button>
         </div>
-
-        {/*<div className="certificate-paper">start
+{/*<div className="certificate-paper">start
           <img
             src="/just_logo.svg"
             alt="Company Logo"
@@ -297,7 +256,7 @@ const MyCertificates = () => {
           <h2>{localStorage.getItem("full_name") || "Student Name"}</h2>
           <p className="certificate-subtitle">has successfully completed</p>
           <h3>{selectedCert.course}</h3>
-          <p className="certificate-score">Score: {selectedCert.score || selectedCert.score === 0 ? `${selectedCert.score}%` : 'Score not available'}</p>
+          <p className="certificate-score">Score: {selectedCert.score || selectedCert.score === 0 ? ${selectedCert.score}% : 'Score not available'}</p>
           <p className="certificate-date">Date: {selectedCert.date}</p>
           <div className="certificate-signature-section">
   <div className="signature-box">
@@ -366,7 +325,7 @@ const MyCertificates = () => {
           <div className="qr-id-overlay">
             {currentCertId && (
               <QRCodeSVG
-                value={`${window.location.origin}/verify/${currentCertId}`}
+                value={${window.location.origin}/verify/${currentCertId}}
                 size={40}
               />
             )}
@@ -431,9 +390,9 @@ const MyCertificates = () => {
                 style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #312e81 100%)' }}
               >
                 <FaMedal className="text-amber-400/60 group-hover:text-amber-400/90 transition-colors" size={52} />
-                {cert.certificateId && (
+                {certIds[cert.course] && (
                   <span className="absolute bottom-2 right-3 text-[10px] font-mono text-slate-400/70">
-                    {cert.certificateId}
+                    {certIds[cert.course]}
                   </span>
                 )}
               </div>
