@@ -139,7 +139,7 @@ const AdminDashboardView = ({
         <div className="space-y-6 font-sans max-w-[1440px] mx-auto">
 
             {/* ── WELCOME BANNER ── */}
-            <div className="relative overflow-hidden rounded-2xl p-7 lg:p-9 shadow-2xl" style={{ background: 'linear-gradient(90deg, #0F172A 0%, #1E293B 50%, #312E81 100%)' }}>
+            <div className="relative rounded-2xl p-7 lg:p-9 shadow-2xl" style={{ background: 'linear-gradient(90deg, #0F172A 0%, #1E293B 50%, #312E81 100%)' }}>
                 <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <p className="text-sm font-bold mb-1.5 flex items-center gap-2">

@@ -123,7 +123,7 @@ const StudentDashboardView = ({
         <div className="space-y-6 font-sans max-w-[1440px] mx-auto">
 
             {/* WELCOME BANNER */}
-            <div className="relative overflow-hidden rounded-2xl p-6 lg:p-8" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)' }}>
+            <div className="relative rounded-2xl p-6 lg:p-8" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)' }}>
                 <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <p className="text-indigo-300 text-sm font-medium mb-1">👋 {greeting}, {studentName}</p>

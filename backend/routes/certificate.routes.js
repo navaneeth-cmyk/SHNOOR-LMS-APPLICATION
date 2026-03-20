@@ -4,8 +4,7 @@ import express from "express";
 import pool from "../db/postgres.js";
 import {
   generateQuizCertificate,
-  issueExamCertificate,
-  resolveExamByName
+  issueExamCertificate
 } from "../controllers/certificate.controller.js";
 import firebaseAuth from "../middlewares/firebaseAuth.js";
 import attachUser from "../middlewares/attachUser.js";
@@ -26,13 +25,16 @@ router.post("/add", async (req, res) => {
       });
     }
 
-    const exam = await resolveExamByName(exam_name);
+    const examRes = await pool.query(
+      `SELECT exam_id FROM exams WHERE title = $1`,
+      [exam_name]
+    );
 
-    if (!exam) {
+    if (examRes.rows.length === 0) {
       return res.status(404).json({ message: "Exam not found" });
     }
 
-    const exam_id = exam.exam_id;
+    const exam_id = examRes.rows[0].exam_id;
 
     const certificateResult = await issueExamCertificate({
       userId: user_id,
@@ -157,5 +159,16 @@ router.post(
   attachUser,
   generateQuizCertificate
 );
+
+// ---------------------------
+// GET/POST → Dynamic Certificate Settings Bridge
+// ---------------------------
+import {
+  getCertificateSettings,
+  saveCertificateSettings
+} from "../controllers/certificate.controller.js";
+
+router.get("/settings/config", firebaseAuth, getCertificateSettings);
+router.post("/settings/config", firebaseAuth, saveCertificateSettings);
 
 export default router;
