@@ -845,26 +845,64 @@ const StudentChat = () => {
         setChats(mergedChats);
       } else if (activeTab === "groups") {
         console.log("📥 Fetching my groups...");
-        const groupsRes = await api.get("/api/chats/groups/my");
-        console.log("📥 Fetched groups raw:", groupsRes.data);
-        const groupsData = Array.isArray(groupsRes.data) ? groupsRes.data : [];
-        console.log("📥 Groups array:", groupsData);
-        setGroups(
-          groupsData.map((g) => ({
-            id: g.group_id,
-            name: g.name,
-            description: g.description,
-            meeting_link: g.meeting_link,
-            creator_id: g.creator_id,
-            created_at: g.created_at,
-            member_count: g.member_count,
-            lastMessage: g.last_message || "No messages yet",
-            unread: 0,
-            exists: true,
-            type: "group",
-            groupType: "student",
-          })),
+        const [studentGroupsRes, adminGroupsRes] = await Promise.allSettled([
+          api.get("/api/chats/groups/my"),
+          api.get("/api/admingroups/my-groups"),
+        ]);
+
+        const studentGroupsData =
+          studentGroupsRes.status === "fulfilled" && Array.isArray(studentGroupsRes.value?.data)
+            ? studentGroupsRes.value.data
+            : [];
+
+        const adminGroupsData =
+          adminGroupsRes.status === "fulfilled" && Array.isArray(adminGroupsRes.value?.data)
+            ? adminGroupsRes.value.data
+            : [];
+
+        const normalizedStudentGroups = studentGroupsData.map((g) => ({
+          id: g.group_id,
+          name: g.name,
+          description: g.description,
+          meeting_link: g.meeting_link,
+          creator_id: g.creator_id,
+          created_at: g.created_at,
+          member_count: g.member_count,
+          lastMessage: g.last_message || "No messages yet",
+          unread: 0,
+          exists: true,
+          type: "group",
+          groupType: "student",
+        }));
+
+        const normalizedAdminGroups = adminGroupsData.map((g) => ({
+          id: g.group_id,
+          name: g.name,
+          description: g.description,
+          meeting_link: g.meeting_link,
+          creator_id: g.admin_id,
+          created_at: g.created_at,
+          member_count: g.member_count,
+          lastMessage: g.last_message || "No messages yet",
+          unread: 0,
+          exists: true,
+          type: "group",
+          groupType: "admin",
+        }));
+
+        const mergedGroupsMap = new Map();
+        [...normalizedAdminGroups, ...normalizedStudentGroups].forEach((g) => {
+          mergedGroupsMap.set(g.id, g);
+        });
+
+        const mergedGroups = Array.from(mergedGroupsMap.values()).sort(
+          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
         );
+
+        console.log("📥 Student groups:", studentGroupsData.length);
+        console.log("📥 Admin groups:", adminGroupsData.length);
+        console.log("📥 Merged groups:", mergedGroups.length);
+        setGroups(mergedGroups);
       } else if (activeTab === "discover") {
         console.log("📥 Fetching available groups...");
         const discoverRes = await api.get("/api/chats/groups/available");

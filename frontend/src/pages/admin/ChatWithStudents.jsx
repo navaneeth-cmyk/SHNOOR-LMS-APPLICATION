@@ -583,19 +583,54 @@ const ChatWithStudents = () => {
       setLoadingChats(true);
       setError(null);
 
-      const groupsRes = await api.get('/api/admingroups');
-      const adminGroups = groupsRes.data.map(g => ({
-        id: g.group_id,
-        type: 'group',
-        name: g.name,
-        recipientName: g.name,
-        lastMessage: 'Group chat',
-        unread: 0,
-        memberCount: g.member_count || 0,
-        groupType: 'admin',
-      }));
+      const [adminChatGroupsRes, adminSectionGroupsRes] = await Promise.allSettled([
+        api.get('/api/admingroups'),
+        api.get('/api/admin/groups'),
+      ]);
 
-      setChats(adminGroups);
+      const adminChatGroups =
+        adminChatGroupsRes.status === 'fulfilled' && Array.isArray(adminChatGroupsRes.value?.data)
+          ? adminChatGroupsRes.value.data.map((g) => ({
+              id: g.group_id,
+              type: 'group',
+              source: 'admin-chat',
+              name: g.name,
+              recipientName: g.name,
+              lastMessage: 'Group chat',
+              unread: 0,
+              memberCount: g.member_count || 0,
+              groupType: 'admin',
+              created_at: g.created_at,
+            }))
+          : [];
+
+      const adminSectionGroups =
+        adminSectionGroupsRes.status === 'fulfilled' && Array.isArray(adminSectionGroupsRes.value?.data)
+          ? adminSectionGroupsRes.value.data.map((g) => ({
+              id: g.group_id,
+              type: 'group',
+              source: 'admin-section',
+              name: g.group_name,
+              recipientName: g.group_name,
+              lastMessage: 'Group chat',
+              unread: 0,
+              memberCount: g.user_count || 0,
+              groupType: 'admin',
+              created_at: g.created_at,
+            }))
+          : [];
+
+      const mergedGroupsMap = new Map();
+      [...adminChatGroups, ...adminSectionGroups].forEach((group) => {
+        const dedupeKey = `${group.source}-${group.id}`;
+        mergedGroupsMap.set(dedupeKey, group);
+      });
+
+      const mergedGroups = Array.from(mergedGroupsMap.values()).sort(
+        (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+      );
+
+      setChats(mergedGroups);
     } catch (err) {
       console.error('Failed to load admin groups:', err);
       setError('Failed to load groups');
@@ -615,7 +650,12 @@ const ChatWithStudents = () => {
 
       for (const chat of list) {
         try {
-          const res = await api.get(`/api/admingroups/${chat.id}/messages`);
+          const endpoint =
+            chat.source === 'admin-section'
+              ? `/api/chats/groups/${chat.id}/messages`
+              : `/api/admingroups/${chat.id}/messages`;
+
+          const res = await api.get(endpoint);
           const messagesWithChat = res.data.map(m => ({
             ...m,
             chat_id: chat.id,
@@ -721,7 +761,7 @@ const ChatWithStudents = () => {
     setLoadingMessages(true);
     setMessages([]);
 
-    if (chat.id.startsWith('new_')) {
+    if (String(chat.id).startsWith('new_')) {
       setLoadingMessages(false);
       return;
     }
@@ -732,7 +772,11 @@ const ChatWithStudents = () => {
         if (socket) {
           socket.emit('join_group', chat.id);
         }
-        res = await api.get(`/api/admingroups/${chat.id}/messages`);
+        const endpoint =
+          chat.source === 'admin-section'
+            ? `/api/chats/groups/${chat.id}/messages`
+            : `/api/admingroups/${chat.id}/messages`;
+        res = await api.get(endpoint);
       } else {
         res = await api.get(`/api/chats/messages/${chat.id}`);
       }
