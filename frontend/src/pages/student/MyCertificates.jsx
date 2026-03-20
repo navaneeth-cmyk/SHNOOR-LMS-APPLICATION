@@ -252,7 +252,28 @@ const MyCertificates = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Certificate download failed:", error);
-      const message = error?.message || error?.response?.data?.message || "Failed to download certificate PDF from server.";
+      let message = "Failed to download certificate PDF from server.";
+
+      try {
+        if (error?.response?.data instanceof Blob) {
+          const text = await error.response.data.text();
+          if (text) {
+            try {
+              const parsed = JSON.parse(text);
+              message = parsed?.message || parsed?.error || text || message;
+            } catch {
+              message = text;
+            }
+          }
+        } else if (error?.response?.data?.message) {
+          message = error.response.data.message;
+        } else if (error?.message) {
+          message = error.message;
+        }
+      } catch (_) {
+        message = error?.message || message;
+      }
+
       alert(message);
     } finally {
       setIsGenerating(false);
