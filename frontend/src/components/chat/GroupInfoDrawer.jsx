@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaUser, FaPen, FaCheck, FaUsers, FaSignOutAlt, FaTrash, FaUserShield } from 'react-icons/fa';
 import api from '../../api/axios';
-import { useSocket } from '../../context/SocketContext';
+import { useSocket } from '@context/useSocket';
 
 const GroupInfoDrawer = ({ chat, isOpen, onClose, onLeaveSuccess, onDeleteSuccess }) => {
     const { dbUser } = useSocket();

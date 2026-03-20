@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
-import { useSocket } from '../../context/SocketContext';
+import { useSocket } from '@context/useSocket';
 import ChatWindow from '../../components/chat/ChatWindow';
 import '../../styles/Chat.css';
 

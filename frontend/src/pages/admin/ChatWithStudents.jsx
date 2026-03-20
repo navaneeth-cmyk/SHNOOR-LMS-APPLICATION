@@ -1,7 +1,7 @@
 // src/pages/admin/ChatWithStudents.jsx
 {/*import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, X, Loader2 } from 'lucide-react';
-import { useSocket } from '../../context/SocketContext';
+import { useSocket } from '@context/useSocket';
 import ChatList from '../../components/chat/ChatList';
 import ChatWindow from '../../components/chat/ChatWindow';
 import api from '../../api/axios';

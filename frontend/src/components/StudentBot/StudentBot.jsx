@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send, X } from "lucide-react";
 import botAvatarSvg from "../../assets/bot-avatar.avif";
-import { useAuth } from "../../auth/AuthContext";
+import { useAuth } from "@auth/useAuth";
 
 const avatarModules = import.meta.glob("/src/assets/bot-avatar.*", {
   eager: true,

@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../../../auth/firebase";
 import api from "../../../api/axios";
 import StudentCoursesView from "./view";
-import { useSocket } from "../../../context/SocketContext";
+import { useSocket } from "@context/useSocket";
 
 const StudentCourses = () => {
   const navigate = useNavigate();
