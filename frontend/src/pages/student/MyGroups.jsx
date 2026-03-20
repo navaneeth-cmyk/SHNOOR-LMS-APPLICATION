@@ -26,11 +26,50 @@ const MyGroups = () => {
     const freshToken = await user.getIdToken(true);
     console.log('[MyGroups] Fresh token generated');
 
-    const res = await api.get('/api/admingroups/my-groups', {
-      headers: {
-        Authorization: `Bearer ${freshToken}`
-      }
+    const [adminChatGroupsRes, studentSectionGroupsRes] = await Promise.allSettled([
+      api.get('/api/admingroups/my-groups', {
+        headers: {
+          Authorization: `Bearer ${freshToken}`
+        }
+      }),
+      api.get('/api/chats/groups/my', {
+        headers: {
+          Authorization: `Bearer ${freshToken}`
+        }
+      }),
+    ]);
+
+    const adminChatGroups =
+      adminChatGroupsRes.status === 'fulfilled' && Array.isArray(adminChatGroupsRes.value?.data)
+        ? adminChatGroupsRes.value.data.map((group) => ({
+            ...group,
+            source: 'admin-chat',
+          }))
+        : [];
+
+    const studentSectionGroups =
+      studentSectionGroupsRes.status === 'fulfilled' && Array.isArray(studentSectionGroupsRes.value?.data)
+        ? studentSectionGroupsRes.value.data.map((group) => ({
+            ...group,
+            source: 'student-chat',
+          }))
+        : [];
+
+    const mergedMap = new Map();
+    [...adminChatGroups, ...studentSectionGroups].forEach((group) => {
+      const key = `${group.source}-${group.group_id}`;
+      mergedMap.set(key, group);
     });
+
+    const mergedGroups = Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    );
+
+    console.log('[MyGroups] Admin groups:', adminChatGroups.length);
+    console.log('[MyGroups] Student groups:', studentSectionGroups.length);
+    console.log('[MyGroups] Merged groups:', mergedGroups.length);
+
+    const res = { status: 200, data: mergedGroups };
 
     console.log('[MyGroups] Success - status:', res.status);
     console.log('[MyGroups] Groups data:', res.data);
@@ -231,11 +270,17 @@ const MyGroups = () => {
       
       for (const group of groups) {
         try {
-          const res = await api.get(`/api/admingroups/${group.group_id}/messages`);
+          const endpoint =
+            group.source === 'student-chat'
+              ? `/api/chats/groups/${group.group_id}/messages`
+              : `/api/admingroups/${group.group_id}/messages`;
+
+          const res = await api.get(endpoint);
           const messagesWithGroup = res.data.map(m => ({
             ...m,
             group_id: group.group_id,
             group_name: group.name,
+            source: group.source,
           }));
           groupMessages.push(...messagesWithGroup);
         } catch (err) {
@@ -365,7 +410,7 @@ return (
                             onClick={() => {
                               setShowSearch(false);
                               setSearchQuery('');
-                              navigate(`/student/groups/${group.group_id}`);
+                              navigate(`/student/groups/${group.group_id}?source=${group.source || 'admin-chat'}`);
                             }}
                             className="px-4 py-3 border-b cursor-pointer hover:bg-orange-50 transition-colors flex items-center gap-3"
                           >
@@ -396,7 +441,7 @@ return (
                           onClick={() => {
                             setShowSearch(false);
                             setSearchQuery('');
-                            navigate(`/student/groups/${result.group_id}`);
+                            navigate(`/student/groups/${result.group_id}?source=${result.source || 'admin-chat'}`);
                           }}
                           className="p-4 border-b cursor-pointer hover:bg-orange-50 transition-colors last:border-b-0"
                         >
@@ -461,7 +506,7 @@ return (
               </div>
               <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
                 <Link
-                  to={`/student/groups/${group.group_id}`}
+                  to={`/student/groups/${group.group_id}?source=${group.source || 'admin-chat'}`}
                   className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
                 >
                   <MessageSquare size={16} />

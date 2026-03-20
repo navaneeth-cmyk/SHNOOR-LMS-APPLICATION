@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { ArrowLeft, Users, Loader2, AlertCircle } from 'lucide-react';
 import { useSocket } from '@context/useSocket';
@@ -8,7 +8,10 @@ import '../../styles/Chat.css';
 
 const GroupChat = () => {
   const { groupId } = useParams();
+  const [searchParams] = useSearchParams();
   const { socket, dbUser } = useSocket();
+  const source = searchParams.get('source') || 'admin-chat';
+  const isStudentSourceGroup = source === 'student-chat';
 
   const [group, setGroup] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -31,10 +34,18 @@ const GroupChat = () => {
         setLoading(true);
         setError(null);
 
-        const groupRes = await api.get(`/api/admingroups/${groupId}`);
+        const groupEndpoint = isStudentSourceGroup
+          ? `/api/chats/groups/${groupId}`
+          : `/api/admingroups/${groupId}`;
+
+        const messageEndpoint = isStudentSourceGroup
+          ? `/api/chats/groups/${groupId}/messages`
+          : `/api/admingroups/${groupId}/messages`;
+
+        const groupRes = await api.get(groupEndpoint);
         setGroup(groupRes.data);
 
-        const msgRes = await api.get(`/api/admingroups/${groupId}/messages`);
+        const msgRes = await api.get(messageEndpoint);
         setMessages(
           msgRes.data.map(msg => ({
             ...msg,
@@ -52,7 +63,7 @@ const GroupChat = () => {
     };
 
     fetchGroupAndMessages();
-  }, [groupId, dbUser?.id]);
+  }, [groupId, dbUser?.id, isStudentSourceGroup]);
 
   // Socket join + listen
   useEffect(() => {

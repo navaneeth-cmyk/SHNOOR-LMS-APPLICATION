@@ -258,7 +258,12 @@ export const AddCourse = () => {
         [fieldName]: res.data.url,
       }));
 
-      alert(`${fieldName === 'url' ? 'Video' : 'File'} uploaded successfully!`);
+      const displayType = fieldName === 'notes' ? 'Notes PDF' : 
+                         moduleForm.type === 'video' ? 'Video' : 
+                         moduleForm.type === 'pdf' ? 'PDF' : 
+                         moduleForm.type === 'text_stream' ? 'Text Stream' : 'File';
+      
+      alert(`${displayType} uploaded successfully!`);
 
     } catch (err) {
       console.error("Upload error:", err);
