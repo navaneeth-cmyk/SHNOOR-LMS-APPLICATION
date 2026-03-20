@@ -18,7 +18,7 @@ async function seedData() {
             // Corrected columns based on schema check: 
             // title, description, duration, pass_percentage, status
             const newExamRes = await pool.query(
-                "INSERT INTO exams (title, description, duration, pass_percentage, status) VALUES ($1, $2, $3, $4, $5) RETURNING exam_id",
+                "INSERT INTO exams (title, description, duration, pass_percentage, status, exam_type) VALUES ($1, $2, $3, $4, $5, 'exam') RETURNING exam_id",
                 ["PRACTICE QUIZ", "General practice assessment for students.", 30, 40, "published"]
             );
             examId = newExamRes.rows[0].exam_id;

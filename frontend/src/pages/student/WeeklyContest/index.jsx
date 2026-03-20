@@ -65,7 +65,13 @@ const WeeklyContest = () => {
       try {
         const res = await api.get("/api/contests/available");
 
-        const enriched = res.data.map((c) => ({
+        const onlyContests = Array.isArray(res.data)
+          ? res.data.filter((item) =>
+            String(item?.exam_type || "").toLowerCase() === "contest"
+          )
+          : [];
+
+        const enriched = onlyContests.map((c) => ({
           ...c,
           status: computeStatus(c),
           endDate: computeEndDate(c)

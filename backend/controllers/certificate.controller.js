@@ -2,6 +2,7 @@ import pool from "../db/postgres.js";
 import generatePDF from "../utils/generateCertificate.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,8 +45,8 @@ const resolveExamByName = async (examName) => {
 
     // Auto-create the PRACTICE QUIZ exam record if it doesn't exist in the DB
     const insertResult = await pool.query(`
-      INSERT INTO exams (title, description, duration, pass_percentage)
-      SELECT 'PRACTICE QUIZ', 'General practice assessment for students.', 30, 40
+      INSERT INTO exams (title, description, duration, pass_percentage, exam_type)
+      SELECT 'PRACTICE QUIZ', 'General practice assessment for students.', 30, 40, 'exam'
       WHERE NOT EXISTS (SELECT 1 FROM exams WHERE title = 'PRACTICE QUIZ')
       RETURNING exam_id, title
     `);
@@ -167,21 +168,22 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
 
   const studentName = userRes.rows[0]?.full_name || null;
 
+  const certificateId = `CERT-${randomUUID()}`;
+  const verifyBase = process.env.CERTIFICATE_VERIFY_BASE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
+  const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${certificateId}`;
+
   const pdfResult = await generatePDF(
     exam.title,
     numericScore,
     userId,
     numericScore,
-    studentName
+    studentName,
+    { certificateId, verifyUrl }
   );
 
   if (!pdfResult?.generated) {
     return { issued: false, reason: "pdf_failed" };
   }
-
-  const certificateId = pdfResult.filePath
-    ? path.basename(pdfResult.filePath)
-    : null;
 
   const insertRes = await pool.query(
     `

@@ -110,6 +110,42 @@ router.get(
   }
 );
 
+router.get("/verify/:certificate_id", async (req, res) => {
+  try {
+    const { certificate_id } = req.params;
+
+    if (!certificate_id) {
+      return res.status(400).json({ message: "certificate_id is required" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.certificate_id,
+        c.exam_name,
+        c.score,
+        c.issued_at,
+        u.full_name AS student_name
+      FROM certificates c
+      LEFT JOIN users u ON u.user_id = c.user_id
+      WHERE c.certificate_id = $1
+      LIMIT 1
+      `,
+      [certificate_id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "Invalid certificate" });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error("GET /verify/:certificate_id error:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------------------------
 // GET → Fetch certificate by user_id
 // ---------------------------

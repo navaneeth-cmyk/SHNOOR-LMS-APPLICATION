@@ -97,6 +97,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/create-password" element={<CreatePassword />} />
+            <Route path="/verify/:certId" element={<VerifyCertificate />} />
 
             <Route
               path="/admin"

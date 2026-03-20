@@ -29,8 +29,8 @@ export const createExam = async (req, res) => {
     const { rows } = await pool.query(
       `
         INSERT INTO exams
-          (title, description, duration, pass_percentage, instructor_id, course_id, validity_value, validity_unit)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          (title, description, duration, pass_percentage, instructor_id, course_id, validity_value, validity_unit, exam_type)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'exam')
         RETURNING exam_id, title, duration, pass_percentage
         `,
       [title, description, duration, passPercentage, instructorId, courseId || null, validity_value || null, validity_unit || null]
@@ -52,6 +52,7 @@ export const getInstructorExams = async (req, res) => {
         SELECT exam_id, title, duration, pass_percentage, created_at
         FROM exams
         WHERE instructor_id = $1
+          AND exam_type = 'exam'
         ORDER BY created_at DESC
         `,
       [instructorId]
@@ -92,9 +93,12 @@ export const getAllExamsForStudents = async (req, res) => {
         LEFT JOIN exam_results er
           ON er.exam_id = e.exam_id
           AND er.student_id = $1
-        WHERE e.course_id IS NULL
-           OR sc.student_id IS NOT NULL
-           OR ca.student_id IS NOT NULL
+        WHERE e.exam_type = 'exam'
+          AND (
+            e.course_id IS NULL
+            OR sc.student_id IS NOT NULL
+            OR ca.student_id IS NOT NULL
+          )
         ORDER BY created_at DESC
         `,
       [studentId]
@@ -158,6 +162,7 @@ export const getAllExamsAdmin = async (req, res) => {
     const { rows } = await pool.query(`
       SELECT exam_id, title, duration, disconnect_grace_time
       FROM exams
+      WHERE exam_type = 'exam'
       ORDER BY created_at DESC
     `);
 

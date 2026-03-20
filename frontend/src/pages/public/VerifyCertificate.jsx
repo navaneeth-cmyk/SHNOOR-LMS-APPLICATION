@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../../auth/firebase";
+import api from "../../api/axios";
 import { FaCheckCircle, FaTimesCircle, FaCertificate, FaArrowLeft } from "react-icons/fa";
 import "../../styles/Dashboard.css";
 
@@ -20,21 +19,15 @@ const VerifyCertificate = () => {
             }
 
             try {
-                const q = query(
-                    collection(db, "issued_certificates"),
-                    where("certificateId", "==", certId)
-                );
-                const querySnapshot = await getDocs(q);
-
-                if (!querySnapshot.empty) {
-                    const doc = querySnapshot.docs[0];
-                    setCertData(doc.data());
-                } else {
-                    setError("Invalid Certificate: Record not found in our system.");
-                }
+                const res = await api.get(`/api/certificate/verify/${encodeURIComponent(certId)}`);
+                setCertData(res.data);
             } catch (err) {
-                console.error("Verification error:", err);
-                setError("An error occurred during verification. Please try again.");
+                if (err?.response?.status === 404) {
+                    setError("Invalid Certificate: Record not found in our system.");
+                } else {
+                    console.error("Verification error:", err);
+                    setError("An error occurred during verification. Please try again.");
+                }
             } finally {
                 setLoading(false);
             }
@@ -70,20 +63,20 @@ const VerifyCertificate = () => {
                         <div className="cert-details">
                             <div className="detail-row">
                                 <span className="label">Student Name:</span>
-                                <span className="value">{certData.studentName}</span>
+                                <span className="value">{certData.student_name || "N/A"}</span>
                             </div>
                             <div className="detail-row">
                                 <span className="label">Course Name:</span>
-                                <span className="value">{certData.courseName}</span>
+                                <span className="value">{certData.exam_name}</span>
                             </div>
                             <div className="detail-row">
                                 <span className="label">Certificate ID:</span>
-                                <span className="value highlight">{certData.certificateId}</span>
+                                <span className="value highlight">{certData.certificate_id}</span>
                             </div>
                             <div className="detail-row">
                                 <span className="label">Issue Date:</span>
                                 <span className="value">
-                                    {certData.issuedAt?.toDate ? certData.issuedAt.toDate().toLocaleDateString() : "Present"}
+                                    {certData.issued_at ? new Date(certData.issued_at).toLocaleDateString() : "Present"}
                                 </span>
                             </div>
                         </div>

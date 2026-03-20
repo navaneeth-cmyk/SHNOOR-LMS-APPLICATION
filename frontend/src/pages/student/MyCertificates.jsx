@@ -9,9 +9,6 @@ import {
   normalizeCertificateCourseName,
 } from "../../utils/certificateStorage";
 import "../../styles/Dashboard.css";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
-import { db } from "../../auth/firebase";
-import { getOrGenerateCertificateId } from "../../utils/idService";
 import { exportToPDF } from "../../utils/certificatePDF";
 
 // Generate certificate PDF via backend (optional)
@@ -22,7 +19,13 @@ const generateCertificateAPI = async (user_id, course, score) => {
       exam_name: normalizeCertificateCourseName(course),
       score,
     });
-    return res.data?.generated ? { generated: true } : { generated: false };
+    if (res.data?.generated) {
+      return {
+        generated: true,
+        certificateId: res.data?.data?.certificate_id || null,
+      };
+    }
+    return { generated: false };
   } catch (err) {
     return { generated: false };
   }
@@ -66,8 +69,6 @@ const MyCertificates = () => {
   const [certConfig, setCertConfig] = useState(null);
   const [currentCertId, setCurrentCertId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  // Pre-generated ID map: { [course]: certId } — populated in background so QR is instant
-  const [certIds, setCertIds] = useState({});
 
   useEffect(() => {
     const fetchCertConfig = async () => {
@@ -140,23 +141,6 @@ const MyCertificates = () => {
       // Non-blocking: keep showing local/backend data if exams endpoint is unavailable
     }
 
-    // Pre-generate certificate IDs in background so QR renders instantly
-    const preGenIds = async (certs) => {
-      const uid = localStorage.getItem("user_id") || "guest";
-      const name = localStorage.getItem("full_name") || "Student";
-      const map = {};
-      await Promise.all(
-        certs.map(async (cert) => {
-          try {
-            const id = await getOrGenerateCertificateId(uid, cert.course, name);
-            map[cert.course] = id;
-          } catch (_) {}
-        })
-      );
-      setCertIds(map);
-    };
-    preGenIds(getLocalCertificates());
-
     // 2) Optionally merge in backend certificates if server is available
     if (!userId) return;
 
@@ -173,6 +157,7 @@ const MyCertificates = () => {
         course: normalizeCertificateCourseName(c.exam_name),
         date: c.issued_at ? new Date(c.issued_at).toLocaleDateString() : new Date().toLocaleDateString(),
         score: c.score,
+        certificateId: c.certificate_id || null,
         previewColor: "#003366",
       }));
       setCertificates((prev) => mergeCertificates(prev, formatted));
@@ -186,45 +171,41 @@ const MyCertificates = () => {
     loadCertificates();
   }, [loadCertificates]);
 
-  // Use pre-generated ID instantly; fall back to async fetch if not ready yet
   useEffect(() => {
     if (!selectedCert) { setCurrentCertId(""); return; }
-    const cached = certIds[selectedCert.course];
-    if (cached) {
-      setCurrentCertId(cached);
-    } else {
-      // Not pre-generated yet (edge case) — fetch now
-      const fetchCertId = async () => {
-        const userId = localStorage.getItem("user_id") || "guest";
-        const studentName = localStorage.getItem("full_name") || "Student";
-        const certId = await getOrGenerateCertificateId(userId, selectedCert.course, studentName);
-        setCurrentCertId(certId);
-        setCertIds((prev) => ({ ...prev, [selectedCert.course]: certId }));
-      };
-      fetchCertId();
+    if (selectedCert.certificateId) {
+      setCurrentCertId(String(selectedCert.certificateId));
+      return;
     }
-  }, [selectedCert, certIds]);
+
+    setCurrentCertId("");
+  }, [selectedCert]);
 
   // ================= GENERATE CERTIFICATE (PDF via backend, optional) =================
   const handleGenerateCertificate = async (cert) => {
     const userId = localStorage.getItem("user_id");
     if (!userId) {
-      // No user id – open the viewer directly so the student can still download
       setSelectedCert(cert);
       return;
     }
 
-    // Try backend generation; if it succeeds (new or already exists) open the viewer
+    setIsGenerating(true);
     const result = await generateCertificateAPI(userId, cert.course, cert.score || 90);
+    setIsGenerating(false);
 
-    if (result.generated) {
-      // Open the certificate viewer so the student can download the PDF immediately
-      setSelectedCert(cert);
-    } else {
-      // Backend unavailable or truly not eligible – still open the viewer
-      // so the student can at least see and download the client-side PDF
-      setSelectedCert(cert);
+    const updatedCert = result.generated && result.certificateId
+      ? { ...cert, certificateId: result.certificateId }
+      : cert;
+
+    if (result.generated && result.certificateId) {
+      setCertificates((prev) =>
+        prev.map((item) =>
+          item.id === cert.id ? { ...item, certificateId: result.certificateId } : item
+        )
+      );
     }
+
+    setSelectedCert(updatedCert);
   };
 
   // ================= PRINT =================
@@ -391,9 +372,9 @@ const MyCertificates = () => {
                 style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #312e81 100%)' }}
               >
                 <FaMedal className="text-amber-400/60 group-hover:text-amber-400/90 transition-colors" size={52} />
-                {certIds[cert.course] && (
+                {cert.certificateId && (
                   <span className="absolute bottom-2 right-3 text-[10px] font-mono text-slate-400/70">
-                    {certIds[cert.course]}
+                    {cert.certificateId}
                   </span>
                 )}
               </div>
