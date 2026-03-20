@@ -268,7 +268,12 @@ const InstructorDashboardView = ({
 
             {/* Search Results Dropdown — file2 content, file1 style */}
             {isSearchExpanded && searchQuery && (
-              <div className="absolute top-full right-0 mt-2 w-full sm:w-96 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-96 overflow-y-auto z-[60]">
+              <div
+                className="absolute top-full right-0 mt-2 w-full sm:w-96 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-96 overflow-y-auto overscroll-contain z-[60]"
+                onWheel={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+                style={{ touchAction: "pan-y" }}
+              >
                 {searchLoading ? (
                   <div className="p-6 text-center text-slate-500 text-sm">Searching...</div>
                 ) : searchResults && searchResults.length > 0 ? (

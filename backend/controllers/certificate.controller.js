@@ -2,12 +2,66 @@ import pool from "../db/postgres.js";
 import generatePDF from "../utils/generateCertificate.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import admin from "../services/firebaseAdmin.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 console.log("CERTIFICATE CONTROLLER LOADED");
+
+const PRACTICE_QUIZ_ALIASES = [
+  "PRACTICE QUIZ",
+  "Practice Quiz",
+  "React Fundamentals Quiz",
+];
+
+const normalizeExamName = (examName) => String(examName || "").trim();
+
+const resolveExamByName = async (examName) => {
+  const normalizedName = normalizeExamName(examName);
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  const exactMatch = await pool.query(
+    `SELECT exam_id, title FROM exams WHERE title = $1 LIMIT 1`,
+    [normalizedName]
+  );
+
+  if (exactMatch.rows.length > 0) {
+    return exactMatch.rows[0];
+  }
+
+  if (PRACTICE_QUIZ_ALIASES.includes(normalizedName)) {
+    const practiceMatch = await pool.query(
+      `SELECT exam_id, title FROM exams WHERE title = ANY($1::text[]) LIMIT 1`,
+      [PRACTICE_QUIZ_ALIASES]
+    );
+
+    if (practiceMatch.rows.length > 0) {
+      return practiceMatch.rows[0];
+    }
+
+    // Auto-create the PRACTICE QUIZ exam record if it doesn't exist in the DB
+    const insertResult = await pool.query(`
+      INSERT INTO exams (title, description, duration, pass_percentage)
+      SELECT 'PRACTICE QUIZ', 'General practice assessment for students.', 30, 40
+      WHERE NOT EXISTS (SELECT 1 FROM exams WHERE title = 'PRACTICE QUIZ')
+      RETURNING exam_id, title
+    `);
+
+    if (insertResult.rows.length > 0) {
+      return insertResult.rows[0];
+    }
+
+    const retryMatch = await pool.query(
+      `SELECT exam_id, title FROM exams WHERE title = 'PRACTICE QUIZ' LIMIT 1`
+    );
+    return retryMatch.rows[0] || null;
+  }
+
+  return null;
+};
 
 
 const generateCertificate = async (user_id) => {
@@ -93,12 +147,17 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
   }
 
   const existingCert = await pool.query(
-    `SELECT 1 FROM certificates WHERE user_id = $1 AND exam_id = $2`,
+    `SELECT * FROM certificates WHERE user_id = $1 AND exam_id = $2`,
     [userId, examId]
   );
 
   if (existingCert.rows.length > 0) {
-    return { issued: false, reason: "already_issued" };
+    return {
+      issued: true,
+      certificate: existingCert.rows[0],
+      filePath: existingCert.rows[0].certificate_id || null,
+      alreadyExisted: true
+    };
   }
 
   const userRes = await pool.query(
@@ -171,16 +230,13 @@ const generateQuizCertificate = async (req, res) => {
       });
     }
 
-    const examRes = await pool.query(
-      `SELECT exam_id FROM exams WHERE title = $1`,
-      [exam_name]
-    );
+    const exam = await resolveExamByName(exam_name);
 
-    if (examRes.rows.length === 0) {
+    if (!exam) {
       return res.status(404).json({ message: "Exam not found" });
     }
 
-    const exam_id = examRes.rows[0].exam_id;
+    const exam_id = exam.exam_id;
 
     const certificateResult = await issueExamCertificate({
       userId: user_id,
@@ -219,43 +275,10 @@ const generateQuizCertificate = async (req, res) => {
   }
 };
 
-/* =========================
-   CERTIFICATE CONFIG SETTINGS (BACKEND BRIDGE)
-   ========================= */
-const getCertificateSettings = async (req, res) => {
-  try {
-    const docRef = admin.firestore().collection('settings').doc('certificate');
-    const docSnap = await docRef.get();
-
-    if (docSnap.exists) {
-      res.status(200).json(docSnap.data());
-    } else {
-      res.status(200).json({});
-    }
-  } catch (error) {
-    console.error("Error fetching admin certificate settings:", error);
-    res.status(500).json({ message: "Failed to fetch settings" });
-  }
-};
-
-const saveCertificateSettings = async (req, res) => {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ success: false, message: "Unauthorized: Admins only" });
-  }
-  try {
-    const docRef = admin.firestore().collection('settings').doc('certificate');
-    await docRef.set(req.body, { merge: true });
-    res.status(200).json({ success: true, message: "Settings saved securely" });
-  } catch (error) {
-    console.error("Error saving admin certificate settings:", error);
-    res.status(500).json({ success: false, message: "Failed to save settings" });
-  }
-};
 
 export {
   generateCertificate,
   issueExamCertificate,
   generateQuizCertificate,
-  getCertificateSettings,
-  saveCertificateSettings
+  resolveExamByName
 };
