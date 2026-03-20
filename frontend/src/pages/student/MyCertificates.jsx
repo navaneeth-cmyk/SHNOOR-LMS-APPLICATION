@@ -9,8 +9,6 @@ import {
   normalizeCertificateCourseName,
 } from "../../utils/certificateStorage";
 import "../../styles/Dashboard.css";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
-import { db } from "../../auth/firebase";
 import { getOrGenerateCertificateId } from "../../utils/idService";
 import { exportToPDF } from "../../utils/certificatePDF";
 
@@ -30,9 +28,9 @@ const generateCertificateAPI = async (user_id, course, score) => {
 
 // Merge backend certs with local, dedupe by course+date
 function mergeCertificates(local, backendFormatted) {
-  const keys = new Set(local.map((c) => ${c.course}|${c.date}));
+  const keys = new Set(local.map((c) => `${c.course}|${c.date}`));
   const fromBackend = (backendFormatted || []).filter((c) => {
-    const k = ${c.course}|${c.date};
+    const k = `${c.course}|${c.date}`;
     if (keys.has(k)) return false;
     keys.add(k);
     return true;
@@ -46,16 +44,14 @@ function mergeCertificates(local, backendFormatted) {
 const defaultConfig = {
   title: "Certificate of Achievement",
   authorityName: "Director of Education",
-  issuerName: "Shnoor LMS", // Added default
+  issuerName: "Shnoor LMS",
   logoUrl: "/just_logo.svg",
   signatureUrl: "/signatures/sign.png",
-  templateUrl: "", // Empty string means no background by default
+  templateUrl: "",
 };
 
-// OPTIONAL: Override specific fields here locally without changing Firestore
-// Example: { authorityName: "Chief Instructor" }
 const localOverrides = {
-  // authorityName: "Chief Instructor", 
+  // authorityName: "Chief Instructor",
 };
 
 const MyCertificates = () => {
@@ -66,7 +62,6 @@ const MyCertificates = () => {
   const [certConfig, setCertConfig] = useState(null);
   const [currentCertId, setCurrentCertId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  // Pre-generated ID map: { [course]: certId } — populated in background so QR is instant
   const [certIds, setCertIds] = useState({});
 
   useEffect(() => {
@@ -88,13 +83,12 @@ const MyCertificates = () => {
         setCertConfig(finalConfig);
       } catch (err) {
         console.error("Error fetching certificate configuration:", err);
-        setCertConfig(defaultConfig); // Fallback to defaults
+        setCertConfig(defaultConfig);
       }
     };
 
     fetchCertConfig();
   }, []);
-
 
   const loadCertificates = useCallback(async () => {
     let userId = localStorage.getItem("user_id");
@@ -108,18 +102,16 @@ const MyCertificates = () => {
       if (meRes.data?.full_name) {
         localStorage.setItem("full_name", meRes.data.full_name);
       }
-    } catch (_) { }
+    } catch (_) {}
 
     if (userId) {
       claimAnonymousCertificates(userId);
     }
 
-    // 1) Always show local certificates first (no backend needed)
     const local = getLocalCertificates();
     setCertificates(local);
     setLoading(false);
 
-    // 1b) Backfill local certificates from passed exams (for users who passed before local save existed)
     try {
       const examsRes = await api.get("/api/exams", { timeout: 2500 });
       const exams = Array.isArray(examsRes.data) ? examsRes.data : [];
@@ -136,9 +128,7 @@ const MyCertificates = () => {
         const refreshedLocal = getLocalCertificates();
         setCertificates(refreshedLocal);
       }
-    } catch (_) {
-      // Non-blocking: keep showing local/backend data if exams endpoint is unavailable
-    }
+    } catch (_) {}
 
     // Pre-generate certificate IDs in background so QR renders instantly
     const preGenIds = async (certs) => {
@@ -150,20 +140,19 @@ const MyCertificates = () => {
           try {
             const id = await getOrGenerateCertificateId(uid, cert.course, name);
             map[cert.course] = id;
-          } catch (_) { }
+          } catch (_) {}
         })
       );
       setCertIds(map);
     };
     preGenIds(getLocalCertificates());
 
-    // 2) Optionally merge in backend certificates if server is available
     if (!userId) return;
 
     try {
-      const res = await api.get(/api/certificate/${userId});
+      const res = await api.get(`/api/certificate/${userId}`);
       const data = res.data;
-      if (res.status === 404 || (data?.message?.includes("not found"))) {
+      if (res.status === 404 || data?.message?.includes("not found")) {
         setBackendUnavailable(false);
         return;
       }
@@ -186,14 +175,12 @@ const MyCertificates = () => {
     loadCertificates();
   }, [loadCertificates]);
 
-  // Use pre-generated ID instantly; fall back to async fetch if not ready yet
   useEffect(() => {
     if (!selectedCert) { setCurrentCertId(""); return; }
     const cached = certIds[selectedCert.course];
     if (cached) {
       setCurrentCertId(cached);
     } else {
-      // Not pre-generated yet (edge case) — fetch now
       const fetchCertId = async () => {
         const userId = localStorage.getItem("user_id") || "guest";
         const studentName = localStorage.getItem("full_name") || "Student";
@@ -205,34 +192,19 @@ const MyCertificates = () => {
     }
   }, [selectedCert, certIds]);
 
-  // ================= GENERATE CERTIFICATE (PDF via backend, optional) =================
   const handleGenerateCertificate = async (cert) => {
     const userId = localStorage.getItem("user_id");
     if (!userId) {
-      // No user id – open the viewer directly so the student can still download
       setSelectedCert(cert);
       return;
     }
 
-    // Try backend generation; if it succeeds (new or already exists) open the viewer
-    const result = await generateCertificateAPI(userId, cert.course, cert.score || 90);
-
-    if (result.generated) {
-      // Open the certificate viewer so the student can download the PDF immediately
-      setSelectedCert(cert);
-    } else {
-      // Backend unavailable or truly not eligible – still open the viewer
-      // so the student can at least see and download the client-side PDF
-      setSelectedCert(cert);
-    }
+    await generateCertificateAPI(userId, cert.course, cert.score || 90);
+    setSelectedCert(cert);
   };
-
-  // ================= PRINT =================
-  const handlePrint = () => window.print();
 
   if (loading) return <div className="p-8">Loading certificates…</div>;
 
-  // ================= CERTIFICATE VIEW =================
   if (selectedCert) {
     return (
       <div className="certificate-view-container">
@@ -240,58 +212,31 @@ const MyCertificates = () => {
           <button className="back-btn" onClick={() => setSelectedCert(null)}>Back to My Certificates</button>
           <button
             className="download-pdf-btn"
-            onClick={() => exportToPDF("certificate-to-print", Certificate_${selectedCert.course.replace(/\s+/g, '_')}.pdf)}
+            onClick={() => exportToPDF("certificate-to-print", `Certificate_${selectedCert.course.replace(/\s+/g, '_')}.pdf`)}
             disabled={isGenerating}
           >
             <FaDownload /> {isGenerating ? "Generating..." : "Download PDF"}
           </button>
         </div>
-{/*<div className="certificate-paper">start
-          <img
-            src="/just_logo.svg"
-            alt="Company Logo"
-            className="certificate-logo"
-          />
-          <h1>Certificate Of Achievement</h1>
-          <h2>{localStorage.getItem("full_name") || "Student Name"}</h2>
-          <p className="certificate-subtitle">has successfully completed</p>
-          <h3>{selectedCert.course}</h3>
-          <p className="certificate-score">Score: {selectedCert.score || selectedCert.score === 0 ? ${selectedCert.score}% : 'Score not available'}</p>
-          <p className="certificate-date">Date: {selectedCert.date}</p>
-          <div className="certificate-signature-section">
-  <div className="signature-box">
-    <img
-      src="/signatures/sign.png"
-      alt="Authorized Signature"
-      className="signature-img"
-    />
-    <p>Authorized Signatory</p>
-  </div>
-</div>
-        </div> endnow*/}
+
         <div className="certificate-paper" id="certificate-to-print">
-          {/* Triangle accents */}
           <div className="triangle top-left"></div>
           <div className="triangle top-right"></div>
           <div className="triangle bottom-left"></div>
           <div className="triangle bottom-right"></div>
-          {/* 1. Centered Logo */}
+
           {certConfig?.logoUrl ? (
             <img src={certConfig.logoUrl} alt="Company Logo" className="certificate-logo" />
           ) : (
             <img src="/just_logo.svg" alt="Company Logo" className="certificate-logo" />
           )}
 
-          {/* 2. Professional Title */}
           <h1>{certConfig?.title || "CERTIFICATE OF COMPLETION"}</h1>
 
-          {/* 3. Intro Text */}
           <p className="this-is-to-certify">This is to certify that</p>
 
-          {/* 4. Student Name (Bold & Centered) */}
           <h2 className="student-name-bold">{localStorage.getItem("full_name") || "Student Name"}</h2>
 
-          {/* 5. Completion Statement */}
           <p className="program-completion-text">
             has successfully completed the training program with
           </p>
@@ -299,15 +244,13 @@ const MyCertificates = () => {
             {certConfig?.issuerName || "SHNOOR International LLC"}
           </p>
 
-          {/* 6. Issued Date */}
           <p className="issued-on-date">Issued on: {selectedCert.date}</p>
 
-          {/* 7. Authorized Signature */}
           <div className="signature-section">
             {certConfig?.signatureUrl ? (
-              <img src={certConfig.signatureUrl} alt="Signature" className="signature-image" rotate="0" />
+              <img src={certConfig.signatureUrl} alt="Signature" className="signature-image" />
             ) : (
-              <img src="/signatures/sign.png" alt="Signature" className="signature-image" rotate="0" />
+              <img src="/signatures/sign.png" alt="Signature" className="signature-image" />
             )}
             <p className="signature-label">Authorized Signature</p>
             <p className="authority-name-text" style={{ fontSize: '10px', marginTop: '2px', color: '#64748b' }}>
@@ -315,32 +258,27 @@ const MyCertificates = () => {
             </p>
           </div>
 
-          {/* 8. NASSCOM Footer Logo */}
           <div className="nasscom-footer">
             <img src="/nasscom.jpg" alt="NASSCOM logo" className="nasscom-footer-logo" />
             <p className="nasscom-certified-text">Certified Member</p>
           </div>
 
-          {/* Hidden QR and ID from "Front View" as requested */}
           <div className="qr-id-overlay">
             {currentCertId && (
               <QRCodeSVG
-                value={${window.location.origin}/verify/${currentCertId}}
+                value={`${window.location.origin}/verify/${currentCertId}`}
                 size={40}
               />
             )}
             <span>ID: {currentCertId}</span>
           </div>
         </div>
-
       </div>
     );
   }
 
-  // ================= DASHBOARD =================
   return (
     <div className="w-full pb-12 space-y-6">
-      {/* HEADER */}
       <div
         className="relative overflow-hidden rounded-2xl p-6 lg:p-8"
         style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)' }}
@@ -384,7 +322,6 @@ const MyCertificates = () => {
               key={cert.id}
               className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col hover:border-indigo-200 hover:shadow-md transition-all duration-300 group"
             >
-              {/* Certificate thumbnail */}
               <div
                 className="h-36 flex flex-col items-center justify-center relative"
                 style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #312e81 100%)' }}
@@ -397,7 +334,6 @@ const MyCertificates = () => {
                 )}
               </div>
 
-              {/* Content */}
               <div className="p-5 flex flex-col flex-1">
                 <h4 className="text-sm font-bold text-slate-900 mb-3 line-clamp-2 group-hover:text-indigo-600 transition-colors">
                   {cert.course}
