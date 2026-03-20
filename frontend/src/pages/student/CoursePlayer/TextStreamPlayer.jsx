@@ -9,7 +9,7 @@ import {
   disconnectSocket,
 } from "../../../services/socket";
 import StudentLayoutView from "./view";
-import StudentBot from "../../StudentBot/StudentBot";
+import StudentBot from "../../../components/StudentBot/StudentBot";
 
 const StudentLayout = () => {
   const navigate = useNavigate();
