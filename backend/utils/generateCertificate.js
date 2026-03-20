@@ -333,19 +333,30 @@ const generatePDF = async (
       align: "center",
     });
 
-  doc.end();
+  const waitForStream = () => new Promise((resolve, reject) => {
+    let settled = false;
 
-  if (res) {
-    return { generated: true };
-  }
+    const done = (payload) => {
+      if (settled) return;
+      settled = true;
+      resolve(payload);
+    };
 
-  return new Promise((resolve, reject) => {
-    outputStream.on("finish", () =>
-      resolve({ generated: true, filePath })
-    );
-    outputStream.on("error", (err) => reject(err));
-    doc.on("error", (err) => reject(err));
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    };
+
+    outputStream.on("finish", () => done({ generated: true, filePath: filePath || null }));
+    outputStream.on("close", () => done({ generated: true, filePath: filePath || null }));
+    outputStream.on("error", fail);
+    doc.on("error", fail);
+
+    doc.end();
   });
+
+  return waitForStream();
 };
 
 export default generatePDF;
