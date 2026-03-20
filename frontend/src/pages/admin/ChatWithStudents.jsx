@@ -536,7 +536,7 @@ import {
   BookOpen, Clock, Send, Hash, MoreVertical, Paperclip, 
   ChevronRight, UserPlus, Info, CheckCircle, ShieldCheck
 } from 'lucide-react';
-import { useSocket } from '../../context/SocketContext';
+import { useSocket } from '@context/useSocket';
 import ChatWindow from '../../components/chat/ChatWindow';
 import api from '../../api/axios';
 import '../../styles/Chat.css';

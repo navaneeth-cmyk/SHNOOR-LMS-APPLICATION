@@ -737,7 +737,7 @@ export default StudentChat;
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
 import api from "../../api/axios";
-import { useSocket } from "../../context/SocketContext";
+import { useSocket } from '@context/useSocket';
 import { useAuth } from "../../auth/AuthContext";
 import ChatList from "../../components/chat/ChatList";
 import ChatWindow from "../../components/chat/ChatWindow";
