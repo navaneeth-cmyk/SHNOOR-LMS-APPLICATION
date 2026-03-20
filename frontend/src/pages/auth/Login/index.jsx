@@ -91,14 +91,30 @@ const Login = () => {
       // Navigation will happen via useEffect when userData updates
 
     } catch (err) {
-      console.error("Google Sign-In error:", err);
+      console.error("Google Sign-In error:", {
+        code: err?.code,
+        message: err?.message,
+        full: err,
+      });
 
       if (err.code === "auth/popup-closed-by-user") {
         setError("Sign-in cancelled.");
       } else if (err.code === "auth/popup-blocked") {
         setError("Pop-up blocked. Please allow pop-ups and try again.");
+      } else if (err.code === "auth/unauthorized-domain") {
+        setError(
+          "This domain is not authorized for Firebase Google login. Add this domain in Firebase Console -> Authentication -> Settings -> Authorized domains.",
+        );
+      } else if (err.code === "auth/operation-not-allowed") {
+        setError(
+          "Google sign-in is not enabled in Firebase. Enable Google provider in Firebase Authentication -> Sign-in method.",
+        );
+      } else if (err.code === "auth/invalid-api-key") {
+        setError("Firebase API key is invalid or missing in frontend environment variables.");
+      } else if (err.code === "auth/network-request-failed") {
+        setError("Network error during Google sign-in. Check internet and try again.");
       } else {
-        setError("Google Sign-In failed. Please try again.");
+        setError(`Google Sign-In failed (${err?.code || "unknown_error"}). Please try again.`);
       }
       setLoading(false);
     }
