@@ -30,18 +30,6 @@ const generateCertificateAPI = async (user_id, course, score) => {
   }
 };
 
-// Merge backend certs with local, dedupe by course+date
-function mergeCertificates(local, backendFormatted) {
-  const keys = new Set(local.map((c) => `${c.course}|${c.date}`));
-  const fromBackend = (backendFormatted || []).filter((c) => {
-    const k = `${c.course}|${c.date}`;
-    if (keys.has(k)) return false;
-    keys.add(k);
-    return true;
-  });
-  return [...local, ...fromBackend];
-}
-
 // ----------------------------------------------------------------------
 // DEFAULT CONFIGURATION & LOCAL OVERRIDES (Frontend Only)
 // ----------------------------------------------------------------------
@@ -114,7 +102,7 @@ const MyCertificates = () => {
       claimAnonymousCertificates(userId);
     }
 
-    // 1) Always show local certificates first (no backend needed)
+    // 1) Local fallback only (used if backend is unavailable)
     const local = getLocalCertificates();
     setCertificates(local);
     setLoading(false);
@@ -159,9 +147,11 @@ const MyCertificates = () => {
         certificateId: c.certificate_id || null,
         previewColor: "#003366",
       }));
-      setCertificates((prev) => mergeCertificates(prev, formatted));
+      // Backend is source of truth (exam-only certificates from API)
+      setCertificates(formatted);
       setBackendUnavailable(false);
     } catch (_) {
+      setCertificates(local);
       setBackendUnavailable(true);
     }
   }, []);

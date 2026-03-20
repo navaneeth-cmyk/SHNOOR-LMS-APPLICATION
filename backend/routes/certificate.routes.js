@@ -9,6 +9,11 @@ import {
   resolveExamByName
 } from "../controllers/certificate.controller.js";
 import generatePDF from "../utils/generateCertificate.js";
+import {
+  downloadCertificatePdfFromSupabase,
+  uploadCertificatePdfFileToSupabase,
+  removeLocalFileSafe,
+} from "../services/supabaseStorage.service.js";
 import firebaseAuth from "../middlewares/firebaseAuth.js";
 import attachUser from "../middlewares/attachUser.js";
 import roleGuard from "../middlewares/roleGuard.js";
@@ -125,10 +130,12 @@ router.get(
 
       const certRes = await pool.query(
         `
-        SELECT id, user_id, certificate_id, exam_name, score
-        FROM certificates
-        WHERE certificate_id = $1
-           OR certificate_id = $2
+        SELECT c.id, c.user_id, c.certificate_id, c.exam_name, c.score
+        FROM certificates c
+        JOIN exams e ON e.exam_id = c.exam_id
+          WHERE (c.certificate_id = $1
+            OR c.certificate_id = $2)
+          AND e.exam_type = 'exam'
         LIMIT 1
         `,
         [rawCertificateId, certIdWithPdf]
@@ -159,29 +166,37 @@ router.get(
       const verifyBase = process.env.CERTIFICATE_VERIFY_BASE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
       const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${cert.certificate_id}`;
 
-      const generated = await generatePDF(
-        cert.exam_name || "Certificate",
-        Number(cert.score || 0),
-        cert.user_id,
-        Number(cert.score || 0),
-        userRes.rows[0]?.full_name || "Student",
-        {
-          certificateId: String(cert.certificate_id || rawCertificateId).replace(/\.pdf$/i, ""),
-          verifyUrl,
-          title: settings.title || null,
-          logoUrl: settings.logo_url || null,
-          templateUrl: settings.template_url || null,
-          signatureUrl: settings.signature_url || null,
-          authorityName: settings.authority_name || null,
-          issuerName: settings.issuer_name || null,
+      const normalizedCertId = String(cert.certificate_id || rawCertificateId).replace(/\.pdf$/i, "");
+
+      let pdfBuffer = await downloadCertificatePdfFromSupabase(normalizedCertId);
+
+      if (!pdfBuffer) {
+        const generated = await generatePDF(
+          cert.exam_name || "Certificate",
+          Number(cert.score || 0),
+          cert.user_id,
+          Number(cert.score || 0),
+          userRes.rows[0]?.full_name || "Student",
+          {
+            certificateId: normalizedCertId,
+            verifyUrl,
+            title: settings.title || null,
+            logoUrl: settings.logo_url || null,
+            templateUrl: settings.template_url || null,
+            signatureUrl: settings.signature_url || null,
+            authorityName: settings.authority_name || null,
+            issuerName: settings.issuer_name || null,
+          }
+        );
+
+        if (!generated?.generated || !generated?.filePath) {
+          return res.status(500).json({ message: "Failed to generate certificate PDF" });
         }
-      );
 
-      if (!generated?.generated || !generated?.filePath) {
-        return res.status(500).json({ message: "Failed to generate certificate PDF" });
+        await uploadCertificatePdfFileToSupabase(generated.filePath, normalizedCertId);
+        pdfBuffer = await fs.promises.readFile(generated.filePath);
+        await removeLocalFileSafe(generated.filePath);
       }
-
-      const pdfBuffer = await fs.promises.readFile(generated.filePath);
 
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/pdf");
@@ -233,8 +248,10 @@ router.post("/add", async (req, res) => {
       const messageMap = {
         coding_present: "Coding questions are not eligible for certificates yet",
         not_passed: "Score below pass percentage. Certificate not eligible.",
+        not_exam_type: "Certificates are issued only for exams, not contests",
         already_issued: "Certificate already issued for this exam",
-        pdf_failed: "PDF generation failed"
+        pdf_failed: "PDF generation failed",
+        pdf_upload_failed: "Certificate storage upload failed"
       };
 
       return res.status(400).json({
@@ -284,8 +301,11 @@ router.get(
       }
 
       const result = await pool.query(
-        `SELECT * FROM certificates 
-         WHERE user_id = $1
+        `SELECT c.*
+         FROM certificates c
+         JOIN exams e ON e.exam_id = c.exam_id
+         WHERE c.user_id = $1
+           AND e.exam_type = 'exam'
          ORDER BY issued_at DESC`,
         [userId]
       );
@@ -317,7 +337,9 @@ router.get("/verify/:certificate_id", async (req, res) => {
         u.full_name AS student_name
       FROM certificates c
       LEFT JOIN users u ON u.user_id = c.user_id
+      JOIN exams e ON e.exam_id = c.exam_id
       WHERE c.certificate_id = $1
+        AND e.exam_type = 'exam'
       LIMIT 1
       `,
       [certificate_id]
@@ -352,9 +374,14 @@ router.get("/:user_id", async (req, res) => {
     );
 
     const result = await pool.query(
-      `SELECT * FROM certificates 
-       WHERE user_id::text = $1 
-       OR user_id::text = (SELECT firebase_uid FROM users WHERE user_id::text = $1 OR firebase_uid = $1)`,
+      `SELECT c.*
+       FROM certificates c
+       JOIN exams e ON e.exam_id = c.exam_id
+       WHERE e.exam_type = 'exam'
+         AND (
+           c.user_id::text = $1 
+           OR c.user_id::text = (SELECT firebase_uid FROM users WHERE user_id::text = $1 OR firebase_uid = $1)
+         )`,
       [user_id]
     );
 

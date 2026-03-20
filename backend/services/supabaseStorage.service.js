@@ -6,10 +6,12 @@ const {
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   SUPABASE_BUCKET_MODULES,
+  SUPABASE_BUCKET_CERTIFICATES,
   SUPABASE_STORAGE_PUBLIC,
 } = process.env;
 
 const bucketName = SUPABASE_BUCKET_MODULES || "modules-media";
+const certificateBucketName = SUPABASE_BUCKET_CERTIFICATES || bucketName;
 const isPublicBucket = String(SUPABASE_STORAGE_PUBLIC || "true").toLowerCase() === "true";
 
 let supabaseClient = null;
@@ -117,4 +119,59 @@ export const removeLocalFileSafe = async (filePath) => {
   } catch (_err) {
     // no-op
   }
+};
+
+const normalizeCertificateId = (certificateId = "") =>
+  String(certificateId || "").trim().replace(/\.pdf$/i, "");
+
+export const getCertificateObjectPath = (certificateId) => {
+  const normalized = normalizeCertificateId(certificateId);
+  return `certificates/${normalized}.pdf`;
+};
+
+export const uploadCertificatePdfBufferToSupabase = async (buffer, certificateId) => {
+  const normalized = normalizeCertificateId(certificateId);
+  if (!normalized) {
+    throw new Error("certificateId is required for Supabase upload");
+  }
+
+  const client = getClient();
+  const storage = client.storage.from(certificateBucketName);
+  const objectPath = getCertificateObjectPath(normalized);
+
+  const { error } = await storage.upload(objectPath, buffer, {
+    contentType: "application/pdf",
+    upsert: true,
+  });
+
+  if (error) {
+    throw new Error(`Supabase certificate upload failed: ${error.message}`);
+  }
+
+  const url = await getPublicOrSignedUrl(storage, objectPath);
+  return { objectPath, url, bucket: certificateBucketName };
+};
+
+export const uploadCertificatePdfFileToSupabase = async (filePath, certificateId) => {
+  const buffer = await fs.readFile(filePath);
+  return uploadCertificatePdfBufferToSupabase(buffer, certificateId);
+};
+
+export const downloadCertificatePdfFromSupabase = async (certificateId) => {
+  const normalized = normalizeCertificateId(certificateId);
+  if (!normalized) {
+    throw new Error("certificateId is required for Supabase download");
+  }
+
+  const client = getClient();
+  const storage = client.storage.from(certificateBucketName);
+  const objectPath = getCertificateObjectPath(normalized);
+
+  const { data, error } = await storage.download(objectPath);
+  if (error || !data) {
+    return null;
+  }
+
+  const arrayBuffer = await data.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 };

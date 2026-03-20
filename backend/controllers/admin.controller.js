@@ -40,7 +40,12 @@ export const getDashboardStats = async (req, res) => {
       );
       
       const certificatesRes = await pool.query(
-        `SELECT COUNT(*) FROM certificates`
+        `
+        SELECT COUNT(*)
+        FROM certificates c
+        JOIN exams e ON e.exam_id = c.exam_id
+        WHERE e.exam_type = 'exam'
+        `
       );
       const certificates = Number(certificatesRes.rows[0].count || 0);
 
@@ -179,7 +184,13 @@ export const getDashboardStats = async (req, res) => {
     const prevPendingCourses = Number(prevPendingCoursesResult.rows[0].count);
 
     const certificatesRes = await pool.query(
-      `SELECT COUNT(*) FROM certificates WHERE issued_at::date BETWEEN $1 AND $2`,
+      `
+      SELECT COUNT(*)
+      FROM certificates c
+      JOIN exams e ON e.exam_id = c.exam_id
+      WHERE e.exam_type = 'exam'
+        AND c.issued_at::date BETWEEN $1 AND $2
+      `,
       [startDate, endDate]
     );
     const certificates = Number(certificatesRes.rows[0].count || 0);

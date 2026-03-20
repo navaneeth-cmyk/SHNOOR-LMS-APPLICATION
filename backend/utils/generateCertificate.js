@@ -25,6 +25,9 @@ const loadImageSource = async (value) => {
   if (!text) return null;
 
   if (text.startsWith("data:image")) {
+    if (text.startsWith("data:image/svg")) {
+      return null;
+    }
     const parts = text.split(",");
     if (parts.length === 2) {
       return Buffer.from(parts[1], "base64");
@@ -33,6 +36,9 @@ const loadImageSource = async (value) => {
   }
 
   if (/^https?:\/\//i.test(text)) {
+    if (/\.svg(\?|$)/i.test(text)) {
+      return null;
+    }
     try {
       const response = await axios.get(text, {
         responseType: "arraybuffer",
@@ -53,6 +59,9 @@ const loadImageSource = async (value) => {
   if (!localPath) return null;
 
   try {
+    if (/\.svg$/i.test(localPath)) {
+      return null;
+    }
     return fs.readFileSync(localPath);
   } catch (_) {
     return null;
@@ -129,8 +138,8 @@ const generatePDF = async (
   const logoSource = await loadImageSource(
     finalOptions.logoUrl
     || process.env.CERTIFICATE_LOGO_PATH
-    || path.resolve(process.cwd(), "frontend/public/just_logo.svg")
-    || path.resolve(__dirname, "../../frontend/public/just_logo.svg")
+    || path.resolve(process.cwd(), "frontend/src/assets/just_logo.jpeg")
+    || path.resolve(__dirname, "../../frontend/src/assets/just_logo.jpeg")
   );
 
   const signatureSource = await loadImageSource(

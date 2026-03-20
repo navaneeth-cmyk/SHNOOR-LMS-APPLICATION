@@ -3,6 +3,10 @@ import generatePDF from "../utils/generateCertificate.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
+import {
+  uploadCertificatePdfFileToSupabase,
+  removeLocalFileSafe,
+} from "../services/supabaseStorage.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +29,7 @@ const resolveExamByName = async (examName) => {
   }
 
   const exactMatch = await pool.query(
-    `SELECT exam_id, title FROM exams WHERE title = $1 LIMIT 1`,
+    `SELECT exam_id, title FROM exams WHERE title = $1 AND exam_type = 'exam' LIMIT 1`,
     [normalizedName]
   );
 
@@ -35,7 +39,7 @@ const resolveExamByName = async (examName) => {
 
   if (PRACTICE_QUIZ_ALIASES.includes(normalizedName)) {
     const practiceMatch = await pool.query(
-      `SELECT exam_id, title FROM exams WHERE title = ANY($1::text[]) LIMIT 1`,
+      `SELECT exam_id, title FROM exams WHERE title = ANY($1::text[]) AND exam_type = 'exam' LIMIT 1`,
       [PRACTICE_QUIZ_ALIASES]
     );
 
@@ -56,7 +60,7 @@ const resolveExamByName = async (examName) => {
     }
 
     const retryMatch = await pool.query(
-      `SELECT exam_id, title FROM exams WHERE title = 'PRACTICE QUIZ' LIMIT 1`
+      `SELECT exam_id, title FROM exams WHERE title = 'PRACTICE QUIZ' AND exam_type = 'exam' LIMIT 1`
     );
     return retryMatch.rows[0] || null;
   }
@@ -113,7 +117,7 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
   }
 
   const examRes = await pool.query(
-    `SELECT exam_id, title, pass_percentage FROM exams WHERE exam_id = $1`,
+    `SELECT exam_id, title, pass_percentage, exam_type FROM exams WHERE exam_id = $1`,
     [examId]
   );
 
@@ -122,6 +126,9 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
   }
 
   const exam = examRes.rows[0];
+  if (String(exam.exam_type || "").toLowerCase() !== "exam") {
+    return { issued: false, reason: "not_exam_type" };
+  }
   const passPercentage = Number(exam.pass_percentage);
   const numericScore = Number(score);
 
@@ -206,6 +213,16 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
     return { issued: false, reason: "pdf_failed" };
   }
 
+  try {
+    if (pdfResult?.filePath) {
+      await uploadCertificatePdfFileToSupabase(pdfResult.filePath, certificateId);
+      await removeLocalFileSafe(pdfResult.filePath);
+    }
+  } catch (uploadError) {
+    console.error("Certificate Supabase upload failed:", uploadError.message);
+    return { issued: false, reason: "pdf_upload_failed" };
+  }
+
   const insertRes = await pool.query(
     `
     INSERT INTO certificates
@@ -272,8 +289,10 @@ const generateQuizCertificate = async (req, res) => {
       const messageMap = {
         coding_present: "Coding questions are not eligible for certificates yet",
         not_passed: "Score below pass percentage. Certificate not eligible.",
+        not_exam_type: "Certificates are issued only for exams, not contests",
         already_issued: "Certificate already issued for this exam",
-        pdf_failed: "PDF generation failed"
+        pdf_failed: "PDF generation failed",
+        pdf_upload_failed: "Certificate storage upload failed"
       };
 
       return res.status(400).json({
