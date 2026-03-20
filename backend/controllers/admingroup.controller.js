@@ -487,15 +487,14 @@ export const getColleges = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
-         u.college AS college_id,
-         u.college AS name,
+         COALESCE(NULLIF(u.college, ''), NULLIF(u.college_name, '')) AS college_id,
+         COALESCE(NULLIF(u.college, ''), NULLIF(u.college_name, '')) AS name,
          COUNT(*) AS student_count
        FROM users u
        WHERE u.role = 'student'
-         AND u.college IS NOT NULL
-         AND u.college <> ''
-       GROUP BY u.college
-       ORDER BY u.college ASC`
+         AND COALESCE(NULLIF(u.college, ''), NULLIF(u.college_name, '')) IS NOT NULL
+       GROUP BY COALESCE(NULLIF(u.college, ''), NULLIF(u.college_name, ''))
+       ORDER BY COALESCE(NULLIF(u.college, ''), NULLIF(u.college_name, '')) ASC`
     );
 
     res.json(result.rows);
@@ -547,7 +546,8 @@ export const createGroupByCollege = async (req, res) => {
     const studentsRes = await client.query(
       `SELECT user_id
        FROM users
-       WHERE role = 'student' AND college = $1`,
+       WHERE role = 'student'
+         AND COALESCE(NULLIF(college, ''), NULLIF(college_name, '')) = $1`,
       [collegeValue]
     );
 
@@ -615,7 +615,8 @@ export const getStudentsByCollege = async (req, res) => {
       query = `
         SELECT user_id, full_name, email, college_name
         FROM users
-        WHERE role = 'student' AND college_name = $1
+        WHERE role = 'student'
+          AND COALESCE(NULLIF(college, ''), NULLIF(college_name, '')) = $1
         ORDER BY full_name ASC
       `;
       params = [college];
