@@ -4,11 +4,13 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
   const [fetchedHtml, setFetchedHtml] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
   const [gammaUrl, setGammaUrl] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     setGammaUrl(null);
     setFetchedHtml(null);
     setLoadingHtml(false);
+    setError(null);
 
     // Check if URL itself is gamma.app first
     if (url && typeof url === "string" && url.includes("gamma.app")) {
@@ -16,16 +18,18 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
       return;
     }
 
-    // Only fetch to detect gamma.app in HTML, otherwise use direct URL
+    // Fetch HTML files (from any source: supabase, backend, etc) to clean them
     if (
       url &&
       typeof url === "string" &&
-      url.toLowerCase().endsWith(".html") &&
-      url.includes("supabase.co")
+      url.toLowerCase().endsWith(".html")
     ) {
       setLoadingHtml(true);
       fetch(url)
-        .then((res) => res.text())
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        })
         .then((htmlText) => {
           // Look for gamma.app URLs in iframes
           const gammaMatch = htmlText.match(
@@ -33,13 +37,21 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
           );
           if (gammaMatch) {
             setGammaUrl(gammaMatch[1]);
-            return;
           }
-          // If no gamma URL found, don't use srcDoc - just use direct URL
-          setFetchedHtml(null);
+
+          // Remove gamma.app iframes from HTML to prevent CORS errors
+          let cleanedHtml = htmlText.replace(
+            /<iframe[^>]*(?:src|href)\s*=\s*["'][^"']*gamma\.app[^"']*["'][^>]*>[\s\S]*?<\/iframe>/gi,
+            ""
+          );
+
+          // Set the cleaned HTML
+          setFetchedHtml(cleanedHtml);
+          setError(null);
         })
         .catch((err) => {
           console.error("Failed to fetch HTML:", err);
+          setError(err.message || "Failed to load document");
           setFetchedHtml(null);
         })
         .finally(() => setLoadingHtml(false));
@@ -73,6 +85,16 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
       <div className="flex flex-col items-center justify-center w-full h-full text-slate-400 bg-slate-900 border-2 border-dashed border-slate-700 p-8 rounded-xl">
         <h3 className="text-xl font-bold mb-2">Text Stream Unavailable</h3>
         <p>The URL for this reading material is missing or invalid.</p>
+      </div>
+    );
+  }
+
+  // Error loading
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full text-red-400 bg-slate-900 border-2 border-red-500 border-dashed p-8 rounded-xl">
+        <h3 className="text-xl font-bold mb-2">⚠️ Error Loading Document</h3>
+        <p className="text-sm text-center max-w-sm">{error}</p>
       </div>
     );
   }
