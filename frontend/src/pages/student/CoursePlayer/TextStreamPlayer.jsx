@@ -75,8 +75,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
           srcDoc={fetchedHtml}
           className="w-full h-full border-0 bg-white"
           title="Reading Material"
-          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen; clipboard-read"
         />
       </div>
     );
