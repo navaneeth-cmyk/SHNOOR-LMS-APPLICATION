@@ -8,8 +8,15 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
   useEffect(() => {
     setGammaUrl(null);
     setFetchedHtml(null);
+    setLoadingHtml(false);
 
-    // Only fetch to detect gamma.app, otherwise use direct URL
+    // Check if URL itself is gamma.app first
+    if (url && typeof url === "string" && url.includes("gamma.app")) {
+      setGammaUrl(url);
+      return;
+    }
+
+    // Only fetch to detect gamma.app in HTML, otherwise use direct URL
     if (
       url &&
       typeof url === "string" &&
@@ -95,27 +102,6 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     );
   }
 
-  // Direct gamma URL
-  if (url.includes("gamma.app")) {
-    return (
-      <div className="flex flex-col items-center justify-center w-full h-full bg-slate-900 p-8 gap-4">
-        <div className="text-5xl">🎯</div>
-        <h3 className="text-white text-xl font-bold">Presentation Ready</h3>
-        <p className="text-slate-400 text-sm text-center max-w-sm">
-          This presentation cannot be embedded directly. Click below to open it.
-        </p>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all"
-        >
-          Open Presentation ↗
-        </a>
-      </div>
-    );
-  }
-
   // Embed code pasted directly (e.g. <iframe ...>)
   const isEmbedCode =
     url.trim().toLowerCase().startsWith("<iframe") ||
@@ -137,7 +123,28 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     );
   }
 
-  // All other URLs (including HTML files without gamma)
+  // Final fallback: don't embed gamma.app URLs - show button instead
+  if (url && typeof url === "string" && url.includes("gamma.app")) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full bg-slate-900 p-8 gap-4">
+        <div className="text-5xl">🎯</div>
+        <h3 className="text-white text-xl font-bold">Presentation Ready</h3>
+        <p className="text-slate-400 text-sm text-center max-w-sm">
+          This presentation cannot be embedded directly. Click below to open it.
+        </p>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all"
+        >
+          Open Presentation ↗
+        </a>
+      </div>
+    );
+  }
+
+  // All other URLs
   return (
     <div className="relative w-full h-full bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-200">
       <iframe
