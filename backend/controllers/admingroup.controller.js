@@ -688,7 +688,50 @@ export const getAdminGroupMembers = async (req, res) => {
 
     return res.status(200).json(membersQuery.rows);
   } catch (err) {
-    console.error("getAdminGroupMembers error:", err);
+    console.error("getAdminGroupMembers error:", error);
     return res.status(500).json({ message: "Failed to load group members" });
+  }
+};
+
+export const deleteGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const adminUid = req.firebase?.uid;
+
+    if (!adminUid) return res.status(401).json({ message: 'Unauthorized' });
+
+    // Verify admin
+    const adminRes = await pool.query(
+      'SELECT user_id, role FROM users WHERE firebase_uid = $1',
+      [adminUid]
+    );
+
+    if (adminRes.rows.length === 0 || adminRes.rows[0].role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access only' });
+    }
+
+    const adminId = adminRes.rows[0].user_id;
+
+    // Check if the group exists and belongs to this admin (or just allow any admin to delete others' groups? Usually Admin role is enough)
+    // We'll allow any admin to delete any group for now, but we can restrict to owner if needed.
+    const groupCheck = await pool.query(
+      'SELECT admin_id FROM admin_groups WHERE group_id = $1',
+      [groupId]
+    );
+
+    if (groupCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    // Delete members and messages first if CASCADE is not set, but standard is CASCADE on group_id
+    // We'll perform explicit deletes for safety
+    await pool.query('DELETE FROM admin_group_members WHERE group_id = $1', [groupId]);
+    await pool.query('DELETE FROM admin_group_messages WHERE group_id = $1', [groupId]);
+    await pool.query('DELETE FROM admin_groups WHERE group_id = $1', [groupId]);
+
+    res.json({ message: 'Group deleted successfully' });
+  } catch (err) {
+    console.error('deleteGroup error:', err);
+    res.status(500).json({ message: 'Failed to delete group' });
   }
 };

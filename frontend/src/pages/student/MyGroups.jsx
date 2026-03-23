@@ -228,16 +228,45 @@ const MyGroups = () => {
     const freshToken = await user.getIdToken(true);
     console.log('[MyGroups] Fresh token generated');
 
-    const res = await api.get('/api/admingroups/my-groups', {
-      headers: {
-        Authorization: `Bearer ${freshToken}`
-      }
+    // Use allSettled to prevent one endpoint crashing the entire view
+    const results = await Promise.allSettled([
+      api.get('/api/admingroups/my-groups', { headers: { Authorization: `Bearer ${freshToken}` } }),
+      api.get('/api/chats/groups/my', { headers: { Authorization: `Bearer ${freshToken}` } }),
+      api.get('/api/admin/groups/my-groups', { headers: { Authorization: `Bearer ${freshToken}` } })
+    ]);
+
+    const [adminChatRes, collegeGroupsRes, adminSectionRes] = results;
+
+    if (adminChatRes.status === 'rejected') console.error('Admin Groups call failed:', adminChatRes.reason);
+    if (collegeGroupsRes.status === 'rejected') console.error('College Groups call failed:', collegeGroupsRes.reason);
+    if (adminSectionRes.status === 'rejected') console.error('Admin Section Groups call failed:', adminSectionRes.reason);
+
+    const adminChatGroups = (adminChatRes.status === 'fulfilled' ? adminChatRes.value.data : []).map(g => ({
+      ...g,
+      source: 'admin-chat'
+    }));
+
+    const collegeGroups = (collegeGroupsRes.status === 'fulfilled' ? collegeGroupsRes.value.data : []).map(g => ({
+      ...g,
+      source: 'student-chat'
+    }));
+
+    const adminSectionGroups = (adminSectionRes.status === 'fulfilled' ? adminSectionRes.value.data : []).map(g => ({
+      ...g,
+      source: 'admin-section'
+    }));
+
+    const merged = [...adminChatGroups, ...collegeGroups, ...adminSectionGroups].sort(
+      (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    );
+
+    console.log('[MyGroups] Total Groups found:', {
+      adminChat: adminChatGroups.length,
+      college: collegeGroups.length,
+      adminSection: adminSectionGroups.length,
+      merged: merged.length
     });
-
-    console.log('[MyGroups] Success - status:', res.status);
-    console.log('[MyGroups] Groups data:', res.data);
-
-    setGroups(res.data || []);
+    setGroups(merged);
   } catch (err) {
     console.error('Failed to load groups:', err);
 

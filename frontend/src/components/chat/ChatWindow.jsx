@@ -18,7 +18,8 @@ const ChatWindow = ({
     onLeaveGroup,
     onDeleteGroup,
     onReact,
-    onRemoveReaction
+    onRemoveReaction,
+    onClose
 }) => {
     const [text, setText] = useState("");
     const [file, setFile] = useState(null);
@@ -63,17 +64,14 @@ const ChatWindow = ({
         setText(e.target.value);
         if (!socket || !activeChat) return;
 
-        // Emit typing
         socket.emit("typing", {
             roomId: activeChat.id,
             userName: currentUser?.name || "Someone",
             isGroup: activeChat.type === 'group'
         });
 
-        // Clear existing timeout
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
-        // Set new timeout to stop typing
         typingTimeoutRef.current = setTimeout(() => {
             socket.emit("stop_typing", {
                 roomId: activeChat.id,
@@ -88,7 +86,6 @@ const ChatWindow = ({
 
         onSendMessage(text, file, replyingTo?.message_id);
 
-        // Reset
         setText("");
         setFile(null);
         setShowEmoji(false);
@@ -110,12 +107,11 @@ const ChatWindow = ({
 
     const handleEndMeeting = () => {
         if (window.confirm("Are you sure you want to end the meeting for everyone?")) {
-            onUpdateMeetingLink(null); // Parent handles API + State + Socket
+            onUpdateMeetingLink(null);
         }
     };
 
     const handleGenerateMeetLink = () => {
-        // Use a clean UUID to avoid 'Moderator' locks on public Jitsi instances
         const uuid = crypto.randomUUID().substring(0, 13);
         setNewMeetingLink(`https://meet.jit.si/shnoor-v2-${uuid}`);
     };
@@ -134,10 +130,21 @@ const ChatWindow = ({
 
     return (
         <div className="chat-main">
-            <div className="chat-header flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-white">
+            <div
+                className="chat-header flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-white cursor-pointer select-none"
+                onDoubleClick={() => onClose && onClose()}
+                title="Double-click to close chat"
+            >
                 <div
                     className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => activeChat.type === 'group' && setShowGroupInfo(true)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        activeChat.type === 'group' && setShowGroupInfo(true);
+                    }}
+                    onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        onClose && onClose();
+                    }}
                     role="button"
                     tabIndex={0}
                 >
@@ -162,7 +169,14 @@ const ChatWindow = ({
                     )}
                 </div>
 
-                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    <button
+                        onClick={() => onClose && onClose()}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        title="Close chat"
+                    >
+                        <FaTimes size={20} />
+                    </button>
                     {activeChat.type === 'group' && (
                         <>
                             {activeChat.meeting_link ? (
@@ -427,11 +441,11 @@ const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onRe
 
     const renderAttachment = () => {
         if (!msg.attachment_url && !msg.attachment_file_id) return null;
-        
+
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const url = msg.attachment_url || `${API_URL}/api/chats/media/${msg.attachment_file_id}`;
         const type = msg.attachment_type || 'file';
-        
+
         if (type.includes('image')) {
             return <img src={url} alt="attachment" className="max-w-full rounded-lg mb-2 cursor-pointer max-h-60 object-cover" onClick={() => window.open(url, '_blank')} />;
         }
@@ -448,7 +462,6 @@ const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onRe
     const renderReactions = () => {
         if (!msg.reactions || msg.reactions.length === 0) return null;
 
-        // Group reactions by emoji
         const grouped = msg.reactions.reduce((acc, curr) => {
             if (!curr) return acc;
             acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
@@ -482,7 +495,6 @@ const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onRe
         const el = document.getElementById(`msg-${msgId}`);
         if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            // WhatsApp-style highlight
             el.classList.add('bg-indigo-50/50', 'ring-2', 'ring-indigo-500/20', 'duration-500');
             setTimeout(() => {
                 el.classList.remove('bg-indigo-50/50', 'ring-2', 'ring-indigo-500/20');
@@ -499,11 +511,10 @@ const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onRe
                     <div className="flex items-center gap-2 ml-2 mb-1">
                         <span className="text-[10px] font-bold text-slate-400">{msg.sender_name}</span>
                         {msg.sender_role && (
-                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest ${
-                                msg.sender_role === 'admin' ? 'bg-amber-100 text-amber-700' :
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest ${msg.sender_role === 'admin' ? 'bg-amber-100 text-amber-700' :
                                 msg.sender_role === 'instructor' ? 'bg-blue-100 text-blue-700' :
-                                'bg-slate-100 text-slate-700'
-                            }`}>
+                                    'bg-slate-100 text-slate-700'
+                                }`}>
                                 {msg.sender_role}
                             </span>
                         )}
@@ -522,11 +533,10 @@ const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onRe
                 <div className="flex items-center gap-2 ml-3 mb-1">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{msg.sender_name}</span>
                     {msg.sender_role && (
-                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest ${
-                            msg.sender_role === 'admin' ? 'bg-amber-100 text-amber-700' :
+                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest ${msg.sender_role === 'admin' ? 'bg-amber-100 text-amber-700' :
                             msg.sender_role === 'instructor' ? 'bg-blue-100 text-blue-700' :
-                            'bg-slate-100 text-slate-700'
-                        }`}>
+                                'bg-slate-100 text-slate-700'
+                            }`}>
                             {msg.sender_role}
                         </span>
                     )}
@@ -535,7 +545,6 @@ const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onRe
 
             <div className={`flex items-start gap-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className={`message-bubble relative shadow-sm ${isEditing ? 'w-full' : ''} ${isMe ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
-
                     {/* Reply Context */}
                     {msg.reply_to_message_id && (
                         <div

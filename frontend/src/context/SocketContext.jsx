@@ -1,7 +1,7 @@
 {/*import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 import api from '../api/axios';
-import { useAuth } from "@auth/useAuth";
+import { useAuth } from '../auth/AuthContext';
 
 const SocketContext = createContext();
 
@@ -103,7 +103,7 @@ export const SocketProvider = ({ children }) => {
             // Browser Notification
             if ('Notification' in window && Notification.permission === 'granted') {
                 try {
-                    const n = new Notification(`${sender_name}${group_id ? ' (Group)' : ''}`, {
+                    const n = new Notification(${sender_name}${group_id ? ' (Group)' : ''}, {
                         body: text || 'New message',
                         icon: '/logo.png',
                         tag: targetId,
@@ -177,9 +177,15 @@ import React, {
 import { io } from 'socket.io-client';
 import { toast } from 'react-hot-toast';
 import api from '../api/axios';
-import { useAuth } from '../auth/useAuth';
+import { useAuth } from '../auth/AuthContext';
 
-export const SocketContext = createContext();
+const SocketContext = createContext();
+
+export const useSocket = () => {
+  const ctx = useContext(SocketContext);
+  if (!ctx) throw new Error('useSocket must be used inside SocketProvider');
+  return ctx;
+};
 
 export const SocketProvider = ({ children }) => {
   const { currentUser, loading: authLoading } = useAuth();

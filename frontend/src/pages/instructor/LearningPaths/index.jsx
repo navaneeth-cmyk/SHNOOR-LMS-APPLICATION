@@ -20,6 +20,7 @@ const LearningPaths = () => {
     const [newPathName, setNewPathName] = useState("");
     const [newPathDesc, setNewPathDesc] = useState("");
     const [creatingPath, setCreatingPath] = useState(false);
+    const [error, setError] = useState(null);
 
     // Add course to path form
     const [selectedPathId, setSelectedPathId] = useState(null);
@@ -79,6 +80,7 @@ const LearningPaths = () => {
     const handleCreatePath = async () => {
         if (!newPathName.trim()) return;
         setCreatingPath(true);
+        setError(null);
         try {
             const token = await getToken();
             await api.post(
@@ -92,7 +94,11 @@ const LearningPaths = () => {
         } catch (err) {
             console.error("Create path error:", err);
             const message = err?.response?.data?.message || "Failed to create learning path";
-            alert(message);
+            if (err?.response?.status === 409) {
+                setError("already the name exists create another");
+            } else {
+                setError(message);
+            }
         } finally {
             setCreatingPath(false);
         }
@@ -187,7 +193,10 @@ const LearningPaths = () => {
                         <input
                             placeholder="Learning path name (e.g. AI & Machine Learning)"
                             value={newPathName}
-                            onChange={(e) => setNewPathName(e.target.value)}
+                            onChange={(e) => {
+                                setNewPathName(e.target.value);
+                                setError(null);
+                            }}
                             className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-md focus:border-indigo-500 focus:ring-0 outline-none text-sm font-medium"
                         />
                         <input
@@ -205,6 +214,11 @@ const LearningPaths = () => {
                             {creatingPath ? "Creating..." : "Create Path"}
                         </button>
                     </div>
+                    {error && (
+                        <div className="mt-3 text-red-600 font-semibold p-3 bg-red-50 rounded text-sm">
+                            {error}
+                        </div>
+                    )}
                 </div>
 
                 {/* Learning Paths List */}

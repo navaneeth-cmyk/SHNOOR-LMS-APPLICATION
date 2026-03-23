@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
-import { useSocket } from '@context/useSocket';
-import { useAuth } from '@auth/useAuth';
+import { useSocket } from '../../context/SocketContext';
+import { useAuth } from '../../auth/AuthContext';
 import ChatList from '../../components/chat/ChatList';
 import ChatWindow from '../../components/chat/ChatWindow';
 import { Search, X } from 'lucide-react';
@@ -44,12 +44,15 @@ const InstructorChat = () => {
                 console.log('📥 Available students:', studentsRes.data);
                 const allStudents = studentsRes.data || [];
 
+                // FIX: was broken string concatenation — use proper template literal
                 console.log(`📥 Found ${allStudents.length} students`);
+
                 const mergedChats = [...existingChats];
                 allStudents.forEach(student => {
                     const alreadyExists = existingChats.some(c => c.recipientId === student.user_id);
                     if (!alreadyExists) {
                         mergedChats.push({
+                            // FIX: was broken string concatenation — use proper template literal
                             id: `new_${student.user_id}`,
                             name: student.full_name,
                             recipientId: student.user_id,
@@ -94,6 +97,7 @@ const InstructorChat = () => {
                     const alreadyExists = existingChats.some(c => c.recipientId === student.user_id);
                     if (!alreadyExists) {
                         mergedChats.push({
+                            // FIX: was broken string concatenation — use proper template literal
                             id: `new_${student.user_id}`,
                             name: student.full_name,
                             recipientId: student.user_id,
@@ -157,6 +161,7 @@ const InstructorChat = () => {
 
         setLoadingMessages(true);
         try {
+            // FIX: was broken string concatenation — use proper template literal
             const res = await api.get(`/api/chats/messages/${chatId}`);
             setMessages(res.data.map(m => ({
                 ...m,
@@ -170,6 +175,9 @@ const InstructorChat = () => {
 
     // ✅ Send message
     const handleSendMessage = async (text, file) => {
+        // FIX: added guard — bail out if no active chat or socket
+        if (!socket || !activeChat) return;
+
         let attachmentFileId = null;
         let attachmentName = null;
         let attachmentType = null;
@@ -208,7 +216,8 @@ const InstructorChat = () => {
             text,
             senderId: dbUser.id,
             senderUid: dbUser.firebase_uid,
-            senderName: dbUser.fullName,
+            // FIX: was dbUser.fullName (camelCase) but the actual field is full_name (snake_case)
+            senderName: dbUser.full_name,
             recipientId: activeChat.recipientId,
             attachment_file_id: attachmentFileId,
             attachment_name: attachmentName,
@@ -270,11 +279,11 @@ const InstructorChat = () => {
 
     return (
         <div className="instructor-chat-page p-4">
-            {/* ── Header: File 2 title style + File 1 search bar ── */}
+            {/* ── Header ── */}
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold">Instructor Chat</h2>
 
-                {/* Search Bar (from File 1) */}
+                {/* Search Bar */}
                 <div className="relative w-64">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -356,6 +365,7 @@ const InstructorChat = () => {
                     messages={messages}
                     onSendMessage={handleSendMessage}
                     loadingMessages={loadingMessages}
+                    onClose={() => setActiveChat(null)}
                 />
             </div>
         </div>

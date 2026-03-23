@@ -5,8 +5,7 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
-import { AuthProvider, AuthContext } from "./auth/AuthContext";
-import { useAuth } from "./auth/useAuth";
+import { AuthProvider } from "./auth/AuthContext";
 import ProtectedRoute from "./auth/ProtectedRoute";
 
 import Login from "./pages/auth/Login";
@@ -42,8 +41,6 @@ import MockTest from "./pages/student/MockTest";
 import MyCertificates from "./pages/student/MyCertificates";
 import StudentCourses from "./pages/student/StudentCourses";
 import StudentPerformance from "./pages/instructor/StudentPerformance";
-import InstructorGroups from "./pages/instructor/Groups";
-import InstructorGroupChat from "./pages/instructor/GroupChat";
 import CourseDetail from "./pages/student/CourseDetail/index";
 import ManageUsers from "./pages/admin/ManageUsers";
 import Suspended from "./pages/auth/Suspended";
@@ -93,7 +90,6 @@ function App() {
             <Route path="/cookie-policy" element={<CookiePolicy />} />
             <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/verify/:certId" element={<VerifyCertificate />} />
 
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -154,8 +150,6 @@ function App() {
               <Route path="exams" element={<ExamBuilder />} />
               <Route path="learning-paths" element={<LearningPaths />} />
               <Route path="performance" element={<StudentPerformance />} />
-              <Route path="groups" element={<InstructorGroups />} />
-              <Route path="groups/:groupId" element={<InstructorGroupChat />} />
               <Route path="settings" element={<ProfileSettings />} />
               <Route path="chat" element={<InstructorChat />} />
             </Route>

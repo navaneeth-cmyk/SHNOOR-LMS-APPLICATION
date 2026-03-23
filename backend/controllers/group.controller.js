@@ -766,26 +766,48 @@ export const getInstructorGroups = async (req, res) => {
   }
 };
 
-export const getInstructorGroup = async (req, res) => {
+export const getGroupDetailForMember = async (req, res) => {
   const { groupId } = req.params;
 
   try {
-    const instructorId = req.user?.id;
-    if (!instructorId) {
+    const userId = req.user?.id;
+    if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    // Check membership in group_users table
     const membership = await pool.query(
       `SELECT 1 FROM group_users WHERE group_id = $1 AND user_id = $2`,
-      [groupId, instructorId]
+      [groupId, userId]
     );
 
+    // If not manually added, check if student is auto-included via Cohort rules
     if (membership.rows.length === 0) {
-      return res.status(403).json({ message: "Access denied" });
+      const userRes = await pool.query("SELECT college, created_at, role FROM users WHERE user_id = $1", [userId]);
+      const user = userRes.rows[0];
+      
+      if (user && user.role === 'student') {
+        const groupRes = await pool.query("SELECT group_name, start_date, end_date, created_by FROM groups WHERE group_id = $1", [groupId]);
+        const group = groupRes.rows[0];
+        
+        if (group) {
+          const isTimestampMatch = group.start_date && group.end_date && user.created_at >= group.start_date && user.created_at <= group.end_date;
+          const isCollegeMatch = !group.start_date && !group.end_date && !group.created_by && user.college && group.group_name && 
+                                 user.college.toUpperCase() === group.group_name.toUpperCase();
+          
+          if (!isTimestampMatch && !isCollegeMatch) {
+             return res.status(403).json({ message: "Access denied - You are not a member of this group" });
+          }
+        } else {
+           return res.status(404).json({ message: "Group not found" });
+        }
+      } else {
+         return res.status(403).json({ message: "Access denied - Manual membership required" });
+      }
     }
 
     const groupResult = await pool.query(
-      `SELECT group_id, group_name, start_date, end_date, created_by, created_at
+      `SELECT group_id, group_name AS name, start_date, end_date, created_by, created_at
        FROM groups WHERE group_id = $1`,
       [groupId]
     );
@@ -805,7 +827,61 @@ export const getInstructorGroup = async (req, res) => {
 
     return res.status(200).json({ ...group, group_type });
   } catch (error) {
-    console.error("getInstructorGroup error:", error);
+    console.error("getGroupDetailForMember error:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getInstructorGroup = getGroupDetailForMember;
+export const getStudentGroup = getGroupDetailForMember;
+
+export const getStudentGroups = async (req, res) => {
+  try {
+    const studentId = req.user?.id;
+    if (!studentId) return res.status(401).json({ message: "Unauthorized" });
+
+    // Lookup user's college and registration date
+    const userRes = await pool.query("SELECT college, created_at FROM users WHERE user_id = $1", [studentId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ message: "User not found" });
+    const { college, created_at } = userRes.rows[0];
+
+    // Groups from 'groups' table where student is integrated
+    const query = `
+      SELECT g.group_id, g.group_name, g.start_date, g.end_date, g.created_by, g.created_at
+      FROM groups g
+      WHERE 
+        -- 1. Manual membership (direct assignment)
+        EXISTS (SELECT 1 FROM group_users gu WHERE gu.group_id = g.group_id AND gu.user_id = $1)
+        OR
+        -- 2. Timestamp cohort (by registration date)
+        (g.created_by IS NULL AND g.start_date IS NOT NULL AND g.end_date IS NOT NULL 
+         AND $2 >= g.start_date AND $2 <= g.end_date)
+        OR
+        -- 3. College cohort (by college name match)
+        (g.created_by IS NULL AND g.start_date IS NULL AND g.end_date IS NULL 
+         AND $3::TEXT IS NOT NULL AND REGEXP_REPLACE(UPPER(TRIM($3::TEXT)), '[,.\\-_() ]+', ' ', 'g') 
+             = REGEXP_REPLACE(UPPER(TRIM(g.group_name)), '[,.\\-_() ]+', ' ', 'g'))
+      ORDER BY g.created_at DESC
+    `;
+
+    const result = await pool.query(query, [studentId, created_at, college]);
+    
+    // Add type labels for frontend
+    const groups = result.rows.map(g => {
+      let group_type = 'college';
+      if (g.created_by) group_type = 'manual';
+      else if (g.start_date && g.end_date) group_type = 'timestamp';
+      return { 
+        ...g, 
+        name: g.group_name, // Map for consistent frontend usage
+        type: 'admin-section', // Tag source as the main groups section
+        group_type 
+      };
+    });
+
+    res.json(groups);
+  } catch (err) {
+    console.error("getStudentGroups error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

@@ -17,7 +17,8 @@ import {
   getAllGroups,
   createGroupByCollege,
   getStudentsByCollege,
-  getColleges
+  getColleges,
+  deleteGroup
 } from '../controllers/admingroup.controller.js';
 
 const router = express.Router();
@@ -27,6 +28,7 @@ router.use((req, res, next) => {
 });
 // Admin-only routes
 router.post('/', firebaseAuth,attachUser,roleGuard("admin"), createGroup);
+router.delete('/:groupId', firebaseAuth,attachUser,roleGuard("admin"), deleteGroup);
 router.get('/admin/my-groups', firebaseAuth,attachUser,roleGuard("admin"), getMyGroups);
 router.post('/:groupId/members', firebaseAuth,attachUser,roleGuard("admin"), addMemberToGroup);
 router.delete('/:groupId/members/:userId', firebaseAuth,attachUser,roleGuard("admin"), removeMemberFromGroup);

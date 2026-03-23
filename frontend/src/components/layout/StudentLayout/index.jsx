@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@auth/useAuth";
+import { useAuth } from "../../../auth/AuthContext";
 import api from "../../../api/axios";
-import { useSocket } from "@context/useSocket";
+import { useSocket } from "../../../context/SocketContext";
 import {
   initializeSocket,
   onNotification,
@@ -19,7 +19,7 @@ const StudentLayout = () => {
   const [studentName, setStudentName] = useState("");
   const [xp, setXp] = useState(0);
   const [rank, setRank] = useState("Novice");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Chat Unread Count
   const { unreadCounts } = useSocket();
@@ -234,13 +234,6 @@ const StudentLayout = () => {
   const handleDismissToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
-
-  // Track screen size
-  useEffect(() => {
-    const handleResize = () => {};
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const handleLogout = async () => {
     await logout();
