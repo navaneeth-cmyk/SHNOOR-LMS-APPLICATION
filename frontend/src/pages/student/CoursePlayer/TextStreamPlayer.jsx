@@ -14,16 +14,21 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
           // Normalize any embedded gamma.app links found inside the HTML file
           let fixedHtml = htmlText;
           
-          // Replace gamma.app URLs in src attributes with embed format
-          fixedHtml = fixedHtml.replace(/src\s*=\s*["']([^"']*gamma\.app\/(?:docs|public|present|embed)\/[^"']*)["']/gi, (match, url) => {
-            const normalizedUrl = url.replace(/gamma\.app\/(docs|public|present)\//i, 'gamma.app/embed/');
-            return `src="${normalizedUrl}"`;
+          // Replace problematic iframes with clickable links
+          fixedHtml = fixedHtml.replace(/<iframe[^>]*src\s*=\s*["']([^"']*(gamma\.app|pdf)[^"']*)["'][^>]*>/gi, (match, url) => {
+            return `<a href="${url}" target="_blank" style="display: inline-block; padding: 12px 20px; margin: 10px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">Open in New Tab</a>`;
           });
           
-          // Replace gamma.app URLs in href attributes with embed format
+          // Replace gamma.app URLs in src attributes with direct links only
+          fixedHtml = fixedHtml.replace(/src\s*=\s*["']([^"']*gamma\.app\/(?:docs|public|present|embed)\/[^"']*)["']/gi, (match, url) => {
+            // Replace with a clickable link instead of iframe
+            return `data-external-url="${url}"`;
+          });
+          
+          // Replace gamma.app URLs in href attributes with embed format where possible
           fixedHtml = fixedHtml.replace(/href\s*=\s*["']([^"']*gamma\.app\/(?:docs|public|present|embed)\/[^"']*)["']/gi, (match, url) => {
             const normalizedUrl = url.replace(/gamma\.app\/(docs|public|present)\//i, 'gamma.app/embed/');
-            return `href="${normalizedUrl}"`;
+            return `href="${normalizedUrl}" target="_blank"`;
           });
           
           // Also handle protocol-relative and absolute URLs
