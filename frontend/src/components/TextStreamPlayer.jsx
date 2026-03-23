@@ -90,7 +90,7 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
                 let triedDirectTextUrl = false;
 
                 // Skip text fetch for embeddable content (HTML, PDF, etc.) - let iframe handle it
-                if (url && !isEmbeddable) {
+                if (url && !isEmbeddable && isHtml) {
                     triedDirectTextUrl = true;
                     try {
                         const textRes = await api.get(url, {
