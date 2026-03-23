@@ -1,7 +1,7 @@
 {/*import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 import api from '../api/axios';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../auth/useAuth';
 
 const SocketContext = createContext();
 
@@ -177,7 +177,7 @@ import React, {
 import { io } from 'socket.io-client';
 import { toast } from 'react-hot-toast';
 import api from '../api/axios';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../auth/useAuth';
 
 const SocketContext = createContext();
 
