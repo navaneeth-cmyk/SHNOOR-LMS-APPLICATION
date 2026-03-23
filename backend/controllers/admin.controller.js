@@ -36,7 +36,7 @@ export const getDashboardStats = async (req, res) => {
         `SELECT COUNT(*) FROM users WHERE role IN ('instructor', 'company')`
       );
       const pendingCoursesResult = await pool.query(
-        `SELECT COUNT(*) FROM courses WHERE status = 'review'`
+        `SELECT COUNT(*) FROM courses WHERE status IN ('review', 'pending')`
       );
       
       const certificatesRes = await pool.query(
@@ -161,12 +161,12 @@ export const getDashboardStats = async (req, res) => {
 
     // Current period - Pending courses
     const pendingCoursesResult = await pool.query(
-      `SELECT COUNT(*) FROM courses WHERE status = 'review' AND created_at::date BETWEEN $1 AND $2`,
+      `SELECT COUNT(*) FROM courses WHERE status IN ('review', 'pending') AND created_at::date BETWEEN $1 AND $2`,
       [startDate, endDate]
     );
     // Previous period - Pending courses
     const prevPendingCoursesResult = await pool.query(
-      `SELECT COUNT(*) FROM courses WHERE status = 'review' AND created_at::date BETWEEN $1 AND $2`,
+      `SELECT COUNT(*) FROM courses WHERE status IN ('review', 'pending') AND created_at::date BETWEEN $1 AND $2`,
       [prevStartDate, prevEndDate]
     );
 

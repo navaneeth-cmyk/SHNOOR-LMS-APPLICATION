@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../auth/useAuth';
@@ -124,18 +125,45 @@ const InstructorChat = () => {
         if (!socket) return;
 
         const handleReceive = (msg) => {
+            const isMyMessage = msg.sender_id === dbUser?.id;
+            
             if (activeChat && msg.chat_id === activeChat.id) {
                 setMessages(prev => [...prev, {
                     ...msg,
-                    isMyMessage: msg.sender_id === dbUser?.id
+                    isMyMessage
                 }]);
                 api.put('/api/chats/read', { chatId: msg.chat_id });
+                if (!isMyMessage) {
+                    toast.success(`New message from ${msg.sender_name || 'User'}`, {
+                        duration: 2,
+                        position: 'top-right'
+                    });
+                }
+            } else if (!isMyMessage) {
+                // Message from inactive chat - show prominent notification
+                const chatName = msg.sender_name || 'User';
+                toast.custom((t) => (
+                    <div className="bg-white border-l-4 border-blue-500 shadow-lg rounded-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
+                        onClick={() => {
+                            const targetChat = chats.find(c => c.id === msg.chat_id);
+                            if (targetChat) {
+                                handleSelectChat(targetChat);
+                                toast.dismiss(t.id);
+                            }
+                        }}>
+                        <p className="font-semibold text-gray-900">{chatName}</p>
+                        <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
+                    </div>
+                ), {
+                    duration: 5,
+                    position: 'top-right'
+                });
             }
         };
 
         socket.on('receive_message', handleReceive);
         return () => socket.off('receive_message', handleReceive);
-    }, [socket, activeChat, dbUser]);
+    }, [socket, activeChat, dbUser, chats]);
 
     // ✅ Select chat
     const handleSelectChat = async (chat) => {

@@ -34,7 +34,25 @@
 .chat-contacts-list {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 10px;
+}
+
+.chat-contacts-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-contacts-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.chat-contacts-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.chat-contacts-list::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .chat-contact-item {
@@ -179,11 +197,29 @@
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 12px;
     background: #f3f4f6;
+}
+
+.chat-messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .message {

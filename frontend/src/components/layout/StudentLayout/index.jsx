@@ -97,18 +97,32 @@ const StudentLayout = () => {
     const fetchProfile = async () => {
       try {
         const res = await api.get("/api/users/me");
-
-        setStudentName(res.data.displayName);
-        setXp(res.data.xp || 0);
-
-        const xpValue = res.data.xp || 0;
-        setRank(
-          xpValue >= 500
-            ? "Expert"
-            : xpValue >= 200
-              ? "Intermediate"
-              : "Novice",
-        );
+        setStudentName(res.data.displayName || "Student");
+        
+        // Fetch XP and Rank from dashboard API for consistency
+        try {
+          const dashRes = await api.get("/api/student/dashboard");
+          setXp(dashRes.data.xp || 0);
+          const xpValue = dashRes.data.xp || 0;
+          setRank(
+            xpValue >= 500
+              ? "Expert"
+              : xpValue >= 200
+                ? "Intermediate"
+                : "Novice",
+          );
+        } catch (_) {
+          // Fallback: use /users/me if dashboard endpoint fails
+          setXp(res.data.xp || 0);
+          const xpValue = res.data.xp || 0;
+          setRank(
+            xpValue >= 500
+              ? "Expert"
+              : xpValue >= 200
+                ? "Intermediate"
+                : "Novice",
+          );
+        }
       } catch (err) {
         console.error("Failed to fetch student profile:", err);
       }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, X, Loader2, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useSocket } from '../../context/SocketContext';
 import ChatList from '../../components/chat/ChatList';
 import ChatWindow from '../../components/chat/ChatWindow';
@@ -45,8 +46,13 @@ const ChatWithStudents = () => {
       setLoadingChats(true);
       setError(null);
 
-      const groupsRes = await api.get('/api/admingroups');
-      const adminGroups = groupsRes.data.map(g => ({
+      // Fetch both admin chat groups and admin section groups
+      const [adminGroupsRes, adminSectionGroupsRes] = await Promise.all([
+        api.get('/api/admingroups'),
+        api.get('/api/admin/groups').catch(() => ({ data: [] }))
+      ]);
+
+      const adminGroups = (Array.isArray(adminGroupsRes.data) ? adminGroupsRes.data : []).map(g => ({
         id: g.group_id,
         type: 'group',
         name: g.name,
@@ -54,10 +60,29 @@ const ChatWithStudents = () => {
         lastMessage: 'Group chat',
         unread: 0,
         memberCount: g.member_count || 0,
-        groupType: 'admin',
+        groupType: 'admin-chat',
       }));
 
-      setChats(adminGroups);
+      const sectionGroups = (Array.isArray(adminSectionGroupsRes.data) ? adminSectionGroupsRes.data : []).map(g => ({
+        id: g.group_id || g.id,
+        type: 'group',
+        name: g.group_name || g.name,
+        recipientName: g.group_name || g.name,
+        lastMessage: 'Group chat',
+        unread: 0,
+        memberCount: g.user_count || g.member_count || 0,
+        groupType: 'admin-section',
+      }));
+
+      // Merge and deduplicate by group id
+      const mergedMap = new Map();
+      [...adminGroups, ...sectionGroups].forEach(g => {
+        if (!mergedMap.has(g.id)) {
+          mergedMap.set(g.id, g);
+        }
+      });
+
+      setChats(Array.from(mergedMap.values()));
     } catch (err) {
       console.error('Failed to load admin groups:', err);
       setError('Failed to load groups');
@@ -77,16 +102,23 @@ const ChatWithStudents = () => {
 
       for (const chat of list) {
         try {
-          // FIX: was broken string concatenation — use proper template literal
-          const res = await api.get(`/api/admingroups/${chat.id}/messages`);
-          const messagesWithChat = res.data.map(m => ({
+          // Determine correct endpoint based on group type
+          let endpoint;
+          if (chat.groupType === 'admin-section') {
+            endpoint = `/api/admin/groups/${chat.id}/messages`;
+          } else {
+            endpoint = `/api/admingroups/${chat.id}/messages`;
+          }
+
+          const res = await api.get(endpoint);
+          const messagesWithChat = (Array.isArray(res.data) ? res.data : []).map(m => ({
             ...m,
             chat_id: chat.id,
             chat_name: chat.name,
+            groupType: chat.groupType,
           }));
           groupMessages.push(...messagesWithChat);
         } catch (err) {
-          // FIX: was broken string concatenation — use proper template literal
           console.error(`Failed to load messages for group ${chat.id}:`, err);
         }
       }
@@ -153,29 +185,84 @@ const ChatWithStudents = () => {
   useEffect(() => {
     if (!socket) return;
     const onNewMessage = (msg) => {
+      const isMyMessage = msg.sender_id === dbUser?.id;
+      
       if (msg.chat_id === activeChat?.id) {
-        setMessages(prev => [...prev, { ...msg, isMyMessage: msg.sender_id === dbUser?.id }]);
+        // Message is for the active chat - add to messages and show subtle notification
+        setMessages(prev => [...prev, { ...msg, isMyMessage }]);
+        if (!isMyMessage) {
+          toast.success(`New message from ${msg.sender_name || 'User'}`, {
+            duration: 2,
+            position: 'top-right'
+          });
+        }
+      } else if (!isMyMessage) {
+        // Message from another chat - show prominent notification with action
+        toast.custom((t) => (
+          <div className="bg-white border-l-4 border-blue-500 shadow-lg rounded-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
+            onClick={() => {
+              const targetChat = chats.find(c => c.id === msg.chat_id);
+              if (targetChat) {
+                handleSelectChat(targetChat);
+                toast.dismiss(t.id);
+              }
+            }}>
+            <p className="font-semibold text-gray-900">{msg.sender_name || 'User'}</p>
+            <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
+          </div>
+        ), {
+          duration: 5,
+          position: 'top-right'
+        });
       }
     };
     socket.on('new_message', onNewMessage);
     return () => socket.off('new_message', onNewMessage);
-  }, [socket, activeChat, dbUser]);
+  }, [socket, activeChat, dbUser, chats]);
 
   // ── Socket: group messages ──────────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
     const handleGroupMessage = (msg) => {
+      const isMyMessage = msg.sender_id === dbUser?.id;
+      
       if (msg.group_id === activeChat?.id) {
+        // Message is for the active group - add to messages and show subtle notification
         setMessages(prev => [...prev, {
           ...msg,
-          isMyMessage: msg.sender_id === dbUser?.id,
+          isMyMessage,
           sender_name: msg.sender_name || 'Unknown',
         }]);
+        if (!isMyMessage) {
+          toast.success(`New message in ${msg.group_name || 'group'}`, {
+            duration: 2,
+            position: 'top-right'
+          });
+        }
+      } else if (!isMyMessage) {
+        // Message from another group - show prominent notification with action
+        toast.custom((t) => (
+          <div className="bg-white border-l-4 border-purple-500 shadow-lg rounded-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
+            onClick={() => {
+              const targetChat = chats.find(c => c.id === msg.group_id);
+              if (targetChat) {
+                handleSelectChat(targetChat);
+                toast.dismiss(t.id);
+              }
+            }}>
+            <p className="font-semibold text-gray-900">{msg.group_name || 'Group'}</p>
+            <p className="text-gray-700 text-sm font-medium">{msg.sender_name}</p>
+            <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
+          </div>
+        ), {
+          duration: 5,
+          position: 'top-right'
+        });
       }
     };
     socket.on('group_message', handleGroupMessage);
     return () => socket.off('group_message', handleGroupMessage);
-  }, [socket, activeChat, dbUser]);
+  }, [socket, activeChat, dbUser, chats]);
 
   // ── Select chat ─────────────────────────────────────────────────────────────
   const handleSelectChat = async (chat) => {
@@ -196,8 +283,12 @@ const ChatWithStudents = () => {
         if (socket) {
           socket.emit('join_group', chat.id);
         }
-        // FIX: was broken string concatenation — use proper template literal
-        res = await api.get(`/api/admingroups/${chat.id}/messages`);
+        // Fetch from correct endpoint based on group type
+        if (chat.groupType === 'admin-section') {
+          res = await api.get(`/api/admin/groups/${chat.id}/messages`);
+        } else {
+          res = await api.get(`/api/admingroups/${chat.id}/messages`);
+        }
       } else {
         // FIX: was broken string concatenation — use proper template literal
         res = await api.get(`/api/chats/messages/${chat.id}`);
