@@ -27,7 +27,6 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
         setError(null);
 
         // Fetch content from backend using the stream endpoint
-        // This endpoint returns the text chunks for the module
         const response = await api.get(`/api/modules/${moduleId}/stream`);
         
         if (response.data?.chunks && Array.isArray(response.data.chunks)) {
@@ -36,151 +35,149 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
             .map(chunk => chunk.content || chunk)
             .join("");
           
-          // Detect content type
-          let type = "text";
-          const isHtml = /<[a-z][\s\S]*>/i.test(content);
+          // Check if content is already complete HTML
+          const isCompleteHtml = /^\s*<!DOCTYPE|^\s*<html/i.test(content.trim());
           
-          // Detect markdown (basic check)
-          const isMarkdown = content.includes("# ") || 
-                           content.includes("## ") || 
-                           content.includes("- ");
-          
-          if (isHtml) {
-            type = "html";
-          } else if (isMarkdown) {
-            type = "markdown";
-          }
-          
-          // For HTML, wrap in a proper HTML document
-          let wrappedContent = "";
-          if (isHtml) {
-            wrappedContent = `
-              <!DOCTYPE html>
-              <html lang="en">
-              <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Content</title>
-                <style>
-                  * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                  }
-                  body {
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    background: #fff;
-                    padding: 20px;
-                  }
-                  img {
-                    max-width: 100%;
-                    height: auto;
-                  }
-                  a {
-                    color: #4f46e5;
-                    text-decoration: none;
-                  }
-                  a:hover {
-                    text-decoration: underline;
-                  }
-                  code {
-                    background: #f3f4f6;
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                    font-family: "Courier New", monospace;
-                    font-size: 0.9em;
-                  }
-                  pre {
-                    background: #f3f4f6;
-                    padding: 12px;
-                    border-radius: 4px;
-                    overflow-x: auto;
-                    margin: 12px 0;
-                  }
-                  h1, h2, h3, h4, h5, h6 {
-                    margin-top: 16px;
-                    margin-bottom: 8px;
-                    color: #1f2937;
-                  }
-                  p {
-                    margin-bottom: 12px;
-                  }
-                  ul, ol {
-                    margin-left: 20px;
-                    margin-bottom: 12px;
-                  }
-                  li {
-                    margin-bottom: 4px;
-                  }
-                  blockquote {
-                    border-left: 4px solid #4f46e5;
-                    padding-left: 12px;
-                    margin: 12px 0;
-                    color: #666;
-                  }
-                  table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin: 12px 0;
-                  }
-                  th, td {
-                    border: 1px solid #e5e7eb;
-                    padding: 8px;
-                    text-align: left;
-                  }
-                  th {
-                    background: #f3f4f6;
-                    font-weight: 600;
-                  }
-                </style>
-              </head>
-              <body>
-                ${content}
-              </body>
-              </html>
-            `;
+          if (isCompleteHtml) {
+            // Already complete HTML - use as-is
+            setHtmlContent(content);
           } else {
-            // For text/markdown, wrap in pre tag for display
-            wrappedContent = `
-              <!DOCTYPE html>
-              <html lang="en">
-              <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Content</title>
-                <style>
-                  * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                  }
-                  body {
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    background: #fff;
-                    padding: 20px;
-                  }
-                  pre {
-                    white-space: pre-wrap;
-                    word-wrap: break-word;
-                    font-family: "Courier New", monospace;
-                    background: #f3f4f6;
-                    padding: 12px;
-                    border-radius: 4px;
-                  }
-                </style>
-              </head>
-              <body>
-                <pre>${content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-              </body>
-              </html>
-            `;
+            // Detect content type for partial content
+            const isHtml = /<[a-z][\s\S]*>/i.test(content);
+            const isMarkdown = content.includes("# ") || 
+                             content.includes("## ") || 
+                             content.includes("- ");
+            
+            // Wrap in HTML document
+            let wrappedContent = "";
+            if (isHtml) {
+              wrappedContent = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <title>Content</title>
+                  <style>
+                    * {
+                      margin: 0;
+                      padding: 0;
+                      box-sizing: border-box;
+                    }
+                    body {
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                      line-height: 1.6;
+                      color: #333;
+                      background: #fff;
+                      padding: 20px;
+                    }
+                    img {
+                      max-width: 100%;
+                      height: auto;
+                    }
+                    a {
+                      color: #4f46e5;
+                      text-decoration: none;
+                    }
+                    a:hover {
+                      text-decoration: underline;
+                    }
+                    code {
+                      background: #f3f4f6;
+                      padding: 2px 6px;
+                      border-radius: 3px;
+                      font-family: "Courier New", monospace;
+                      font-size: 0.9em;
+                    }
+                    pre {
+                      background: #f3f4f6;
+                      padding: 12px;
+                      border-radius: 4px;
+                      overflow-x: auto;
+                      margin: 12px 0;
+                    }
+                    h1, h2, h3, h4, h5, h6 {
+                      margin-top: 16px;
+                      margin-bottom: 8px;
+                      color: #1f2937;
+                    }
+                    p {
+                      margin-bottom: 12px;
+                    }
+                    ul, ol {
+                      margin-left: 20px;
+                      margin-bottom: 12px;
+                    }
+                    li {
+                      margin-bottom: 4px;
+                    }
+                    blockquote {
+                      border-left: 4px solid #4f46e5;
+                      padding-left: 12px;
+                      margin: 12px 0;
+                      color: #666;
+                    }
+                    table {
+                      width: 100%;
+                      border-collapse: collapse;
+                      margin: 12px 0;
+                    }
+                    th, td {
+                      border: 1px solid #e5e7eb;
+                      padding: 8px;
+                      text-align: left;
+                    }
+                    th {
+                      background: #f3f4f6;
+                      font-weight: 600;
+                    }
+                  </style>
+                </head>
+                <body>
+                  ${content}
+                </body>
+                </html>
+              `;
+            } else {
+              // For text/markdown
+              wrappedContent = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <title>Content</title>
+                  <style>
+                    * {
+                      margin: 0;
+                      padding: 0;
+                      box-sizing: border-box;
+                    }
+                    body {
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                      line-height: 1.6;
+                      color: #333;
+                      background: #fff;
+                      padding: 20px;
+                    }
+                    pre {
+                      white-space: pre-wrap;
+                      word-wrap: break-word;
+                      font-family: "Courier New", monospace;
+                      background: #f3f4f6;
+                      padding: 12px;
+                      border-radius: 4px;
+                    }
+                  </style>
+                </head>
+                <body>
+                  <pre>${content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+                </body>
+                </html>
+              `;
+            }
+            setHtmlContent(wrappedContent);
           }
-          
-          setHtmlContent(wrappedContent);
         }
         
         setLoading(false);
@@ -206,8 +203,8 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     }
   }, [moduleId, onComplete]);
 
-  // Create blob URL for iframe
-  const iframeUrl = htmlContent ? URL.createObjectURL(new Blob([htmlContent], { type: "text/html" })) : "";
+  // Create blob URL for iframe - better for external embeds like Gamma
+  const iframeUrl = htmlContent ? URL.createObjectURL(new Blob([htmlContent], { type: "text/html;charset=utf-8" })) : "";
 
   // Cleanup blob URL
   useEffect(() => {
@@ -245,12 +242,12 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     <div className="w-full h-full relative bg-white">
       <iframe
         ref={iframeRef}
-        srcDoc={htmlContent}
+        src={iframeUrl}
         title="Text Stream Content"
         className="w-full h-full border-0"
-        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts allow-forms allow-top-navigation allow-pointer-lock"
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts allow-forms allow-top-navigation allow-pointer-lock allow-presentation"
         scrolling="auto"
-        allow="fullscreen"
+        allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       />
     </div>
   );
