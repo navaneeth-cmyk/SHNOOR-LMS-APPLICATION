@@ -19,11 +19,18 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
       fetch(url)
         .then((res) => res.text())
         .then((htmlText) => {
+          // Look for gamma.app URLs in iframes
           const gammaMatch = htmlText.match(
-            /src\s*=\s*["'](https?:\/\/(?:www\.)?gamma\.app[^"']*)["']/i
+            /(?:src|href)\s*=\s*["'](https?:\/\/[^"']*gamma\.app[^"']*)["']/i
           );
           if (gammaMatch) {
             setGammaUrl(gammaMatch[1]);
+            // Remove gamma iframes from HTML
+            let cleanedHtml = htmlText.replace(
+              /<iframe[^>]*(?:src|href)\s*=\s*["'][^"']*gamma\.app[^"']*["'][^>]*>.*?<\/iframe>/gi,
+              ""
+            );
+            setFetchedHtml(cleanedHtml);
             return;
           }
           setFetchedHtml(htmlText);
