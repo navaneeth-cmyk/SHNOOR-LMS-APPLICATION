@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../../auth/AuthContext";
+import { useAuth } from "../../../auth/useAuth";
 import api from "../../../api/axios";
 import { useSocket } from "../../../context/SocketContext";
 import {

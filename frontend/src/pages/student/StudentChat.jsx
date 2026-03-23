@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import api from "../../api/axios";
 import { useSocket } from "../../context/SocketContext";
-import { useAuth } from "../../auth/AuthContext";
+import { useAuth } from "../../auth/useAuth";
 import ChatList from "../../components/chat/ChatList";
 import ChatWindow from "../../components/chat/ChatWindow";
 import { Users, Search, X } from "lucide-react";
