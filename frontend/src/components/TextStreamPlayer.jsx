@@ -248,7 +248,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
         src={iframeUrl}
         title="Text Stream Content"
         className="w-full h-full border-0"
-        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts allow-forms allow-top-navigation"
         scrolling="auto"
       />
     </div>
