@@ -48,8 +48,14 @@ const ChatWithStudents = () => {
 
       // Fetch both admin chat groups and admin section groups
       const [adminGroupsRes, adminSectionGroupsRes] = await Promise.all([
-        api.get('/api/admingroups'),
-        api.get('/api/admin/groups').catch(() => ({ data: [] }))
+        api.get('/api/admingroups').catch(err => {
+          console.warn('Admin chat groups fetch failed:', err.response?.status);
+          return { data: [] };
+        }),
+        api.get('/api/admin/groups').catch(err => {
+          console.warn('Admin section groups fetch failed:', err.response?.status);
+          return { data: [] };
+        })
       ]);
 
       const adminGroups = (Array.isArray(adminGroupsRes.data) ? adminGroupsRes.data : []).map(g => ({
@@ -82,7 +88,15 @@ const ChatWithStudents = () => {
         }
       });
 
-      setChats(Array.from(mergedMap.values()));
+      const finalChats = Array.from(mergedMap.values());
+      console.log('[ChatWithStudents] Fetched groups:', {
+        adminChat: adminGroups.length,
+        adminSection: sectionGroups.length,
+        total: finalChats.length,
+        groups: finalChats.map(g => ({ id: g.id, name: g.name, type: g.groupType }))
+      });
+
+      setChats(finalChats);
     } catch (err) {
       console.error('Failed to load admin groups:', err);
       setError('Failed to load groups');
@@ -105,7 +119,7 @@ const ChatWithStudents = () => {
           // Determine correct endpoint based on group type
           let endpoint;
           if (chat.groupType === 'admin-section') {
-            endpoint = `/api/admin/groups/${chat.id}/messages`;
+            endpoint = `/api/chats/groups/${chat.id}/messages`;
           } else {
             endpoint = `/api/admingroups/${chat.id}/messages`;
           }
@@ -266,6 +280,7 @@ const ChatWithStudents = () => {
 
   // ── Select chat ─────────────────────────────────────────────────────────────
   const handleSelectChat = async (chat) => {
+    console.log('[ChatWithStudents] Selected chat:', { id: chat.id, name: chat.name, type: chat.type, groupType: chat.groupType });
     setActiveChat(chat);
     handleSetActiveChat(chat.id);
     markChatRead(chat.id);
@@ -284,9 +299,12 @@ const ChatWithStudents = () => {
           socket.emit('join_group', chat.id);
         }
         // Fetch from correct endpoint based on group type
+        console.log('[ChatWithStudents] Fetching group messages - groupType:', chat.groupType);
         if (chat.groupType === 'admin-section') {
-          res = await api.get(`/api/admin/groups/${chat.id}/messages`);
+          console.log('[ChatWithStudents] Using /api/chats/groups endpoint');
+          res = await api.get(`/api/chats/groups/${chat.id}/messages`);
         } else {
+          console.log('[ChatWithStudents] Using /api/admingroups endpoint');
           res = await api.get(`/api/admingroups/${chat.id}/messages`);
         }
       } else {
@@ -294,6 +312,7 @@ const ChatWithStudents = () => {
         res = await api.get(`/api/chats/messages/${chat.id}`);
       }
 
+      console.log('[ChatWithStudents] Messages loaded:', res.data.length);
       setMessages(
         res.data.map(m => ({
           ...m,
@@ -302,7 +321,7 @@ const ChatWithStudents = () => {
         }))
       );
     } catch (err) {
-      console.error('[Messages] Failed to load:', err);
+      console.error('[Messages] Failed to load:', err.response?.status, err.response?.data || err.message);
       setError('Could not load messages');
     } finally {
       setLoadingMessages(false);

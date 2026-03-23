@@ -170,7 +170,7 @@ const MyGroups = () => {
 
             <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
               <Link
-                to={`/student/groups/${group.group_id}`}
+                to={`/student/groups/${group.group_id}?source=${group.source}`}
                 className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
               >
                 <MessageSquare size={16} />

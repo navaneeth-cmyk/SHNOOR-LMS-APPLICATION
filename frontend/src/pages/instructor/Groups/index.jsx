@@ -21,12 +21,18 @@ const InstructorGroups = () => {
         setLoading(true);
         setError(null);
 
-        const [adminChatGroupsRes, adminSectionGroupsRes] = await Promise.all([
+        // Use allSettled to prevent one endpoint crashing the entire view
+        const results = await Promise.allSettled([
           api.get('/api/admingroups/my-groups'),
           api.get('/api/admin/groups/instructor/my-groups'),
         ]);
 
-        const adminChatGroups = (Array.isArray(adminChatGroupsRes.data) ? adminChatGroupsRes.data : []).map((group) => ({
+        const [adminChatGroupsRes, adminSectionGroupsRes] = results;
+
+        if (adminChatGroupsRes.status === 'rejected') console.warn('Admin chat groups fetch failed:', adminChatGroupsRes.reason?.response?.status);
+        if (adminSectionGroupsRes.status === 'rejected') console.warn('Admin section groups fetch failed:', adminSectionGroupsRes.reason?.response?.status);
+
+        const adminChatGroups = (adminChatGroupsRes.status === 'fulfilled' && Array.isArray(adminChatGroupsRes.value.data) ? adminChatGroupsRes.value.data : []).map((group) => ({
           group_id: group.group_id,
           name: group.name,
           description: group.description,
@@ -35,7 +41,7 @@ const InstructorGroups = () => {
           source: 'admin-chat',
         }));
 
-        const adminSectionGroups = (Array.isArray(adminSectionGroupsRes.data) ? adminSectionGroupsRes.data : []).map((group) => ({
+        const adminSectionGroups = (adminSectionGroupsRes.status === 'fulfilled' && Array.isArray(adminSectionGroupsRes.value.data) ? adminSectionGroupsRes.value.data : []).map((group) => ({
           group_id: group.group_id,
           name: group.group_name,
           description: null,
@@ -47,6 +53,13 @@ const InstructorGroups = () => {
         const merged = [...adminChatGroups, ...adminSectionGroups].sort(
           (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
         );
+
+        console.log('[InstructorGroups] Fetched groups:', {
+          adminChat: adminChatGroups.length,
+          adminSection: adminSectionGroups.length,
+          total: merged.length,
+          groups: merged.map(g => ({ id: g.group_id, name: g.name, source: g.source }))
+        });
 
         setGroups(merged);
       } catch (err) {
