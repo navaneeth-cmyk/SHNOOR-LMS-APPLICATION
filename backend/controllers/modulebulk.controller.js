@@ -215,7 +215,8 @@ export const bulkUploadModules = async (req, res) => {
                 if (textContent && !isHtmlFile) {
                     // Strip HTML if pseudo-HTML (though we checked isHtmlFile, this is for safety)
                     if (m.uploadedFile?.originalname.endsWith('.html')) {
-                        textContent = textContent.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+                        // ✅ DO NOT strip HTML tags - preserve them for iframe display
+                        // textContent = textContent.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
                     }
 
                     if (textContent) {

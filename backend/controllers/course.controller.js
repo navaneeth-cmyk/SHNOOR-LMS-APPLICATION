@@ -75,9 +75,10 @@ const extractTextStreamContent = async ({ notes, contentUrl }) => {
     }
   }
 
-  if (text && /\.html?($|\?)/i.test(String(contentUrl || ""))) {
-    text = text.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
-  }
+  // ✅ DO NOT strip HTML tags - preserve them for iframe display
+  // if (text && /\.html?($|\?)/i.test(String(contentUrl || ""))) {
+  //   text = text.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
+  // }
 
   return text;
 };

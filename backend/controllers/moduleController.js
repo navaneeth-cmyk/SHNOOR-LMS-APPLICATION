@@ -118,14 +118,15 @@ export const addModules = async (req, res) => {
           }
         }
 
-        const isHtmlContent = (textResData) => /<[a-z][\s\S]*>/i.test(textResData || "");
-        const shouldStripTags = 
-          /\.html?($|\?)/i.test(finalContentUrl || "") || 
-          isHtmlContent(textToChunk);
-
-        if (textToChunk && shouldStripTags && !finalContentUrl?.includes("i=open")) {
-          textToChunk = textToChunk.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
-        }
+        // ✅ DO NOT strip HTML tags - preserve them for iframe display
+        // const isHtmlContent = (textResData) => /<[a-z][\s\S]*>/i.test(textResData || "");
+        // const shouldStripTags = 
+        //   /\.html?($|\?)/i.test(finalContentUrl || "") || 
+        //   isHtmlContent(textToChunk);
+        //
+        // if (textToChunk && shouldStripTags && !finalContentUrl?.includes("i=open")) {
+        //   textToChunk = textToChunk.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim());
+        // }
 
         if (textToChunk) {
           const chunks = textToChunk.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");

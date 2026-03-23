@@ -344,6 +344,48 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
     const { index, total } = streamData;
     const isCompleted = streamData.completed;
 
+    // ✅ Detect if content is HTML and render in iframe
+    const fullContent = chunksToShow.map(c => c.content || c).join("");
+    const isStreamHtml = /<[a-z][\s\S]*>/i.test(fullContent) && fullContent.includes("<iframe");
+
+    if (isStreamHtml) {
+        // Render HTML content in iframe
+        const htmlDoc = /<html|<!DOCTYPE/i.test(fullContent.trim())
+            ? fullContent
+            : `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content</title>
+    <style>
+        body { margin: 0; padding: 20px; background: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        iframe { width: 100%; max-width: 100%; border: none; }
+    </style>
+</head>
+<body>
+    ${fullContent}
+</body>
+</html>`;
+
+        const iframeUrl = URL.createObjectURL(new Blob([htmlDoc], { type: "text/html;charset=utf-8" }));
+        return (
+            <div className="w-full h-full relative bg-white rounded-xl overflow-hidden shadow-2xl">
+                <iframe
+                    src={iframeUrl}
+                    className="w-full h-full border-0"
+                    sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts allow-forms allow-top-navigation allow-pointer-lock allow-presentation"
+                    scrolling="auto"
+                    allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    title="HTML Content"
+                    onLoad={() => {
+                        setTimeout(() => URL.revokeObjectURL(iframeUrl), 1000);
+                    }}
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="h-full flex flex-col bg-slate-900 text-slate-200 relative">
             {!isCompleted && (
