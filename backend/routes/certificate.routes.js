@@ -250,6 +250,7 @@ router.post("/add", async (req, res) => {
         not_passed: "Score below pass percentage. Certificate not eligible.",
         not_exam_type: "Certificates are issued only for exams, not contests",
         already_issued: "Certificate already issued for this exam",
+        certificate_id_conflict: "Please retry certificate generation",
         pdf_failed: "PDF generation failed",
         pdf_upload_failed: "Certificate storage upload failed"
       };

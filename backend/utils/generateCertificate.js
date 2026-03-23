@@ -7,6 +7,7 @@ import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const imageSourceCache = new Map();
 
 const firstExistingPath = (paths = []) => {
   for (const candidate of paths) {
@@ -24,13 +25,19 @@ const loadImageSource = async (value) => {
   const text = String(value).trim();
   if (!text) return null;
 
+  if (imageSourceCache.has(text)) {
+    return imageSourceCache.get(text);
+  }
+
   if (text.startsWith("data:image")) {
     if (text.startsWith("data:image/svg")) {
       return null;
     }
     const parts = text.split(",");
     if (parts.length === 2) {
-      return Buffer.from(parts[1], "base64");
+      const parsed = Buffer.from(parts[1], "base64");
+      imageSourceCache.set(text, parsed);
+      return parsed;
     }
     return null;
   }
@@ -44,7 +51,9 @@ const loadImageSource = async (value) => {
         responseType: "arraybuffer",
         timeout: 7000,
       });
-      return Buffer.from(response.data);
+      const fetched = Buffer.from(response.data);
+      imageSourceCache.set(text, fetched);
+      return fetched;
     } catch (_) {
       return null;
     }
@@ -62,7 +71,9 @@ const loadImageSource = async (value) => {
     if (/\.svg$/i.test(localPath)) {
       return null;
     }
-    return fs.readFileSync(localPath);
+    const fileBuffer = fs.readFileSync(localPath);
+    imageSourceCache.set(text, fileBuffer);
+    return fileBuffer;
   } catch (_) {
     return null;
   }
@@ -135,38 +146,38 @@ const generatePDF = async (
     doc.pipe(outputStream);
   }
 
-  const logoSource = await loadImageSource(
-    finalOptions.logoUrl
-    || process.env.CERTIFICATE_LOGO_PATH
-    || path.resolve(process.cwd(), "frontend/src/assets/just_logo.jpeg")
-    || path.resolve(__dirname, "../../frontend/src/assets/just_logo.jpeg")
-  );
+  const [logoSource, signatureSource, footerLogoSource, templateSource] = await Promise.all([
+    loadImageSource(
+      finalOptions.logoUrl
+      || process.env.CERTIFICATE_LOGO_PATH
+      || path.resolve(process.cwd(), "frontend/src/assets/just_logo.jpeg")
+      || path.resolve(__dirname, "../../frontend/src/assets/just_logo.jpeg")
+    ),
+    loadImageSource(
+      finalOptions.signatureUrl
+      || process.env.CERTIFICATE_SIGNATURE_PATH
+      || path.resolve(process.cwd(), "frontend/public/signatures/sign.png")
+      || path.resolve(__dirname, "../../frontend/public/signatures/sign.png")
+    ),
+    loadImageSource(
+      process.env.CERTIFICATE_FOOTER_LOGO_PATH
+      || path.resolve(process.cwd(), "frontend/public/nasscom.jpg")
+      || path.resolve(__dirname, "../../frontend/public/nasscom.jpg")
+    ),
+    loadImageSource(finalOptions.templateUrl || null),
+  ]);
 
-  const signatureSource = await loadImageSource(
-    finalOptions.signatureUrl
-    || process.env.CERTIFICATE_SIGNATURE_PATH
-    || path.resolve(process.cwd(), "frontend/public/signatures/sign.png")
-    || path.resolve(__dirname, "../../frontend/public/signatures/sign.png")
-  );
-
-  const footerLogoSource = await loadImageSource(
-    process.env.CERTIFICATE_FOOTER_LOGO_PATH
-    || path.resolve(process.cwd(), "frontend/public/nasscom.jpg")
-    || path.resolve(__dirname, "../../frontend/public/nasscom.jpg")
-  );
-
-  const templateSource = await loadImageSource(finalOptions.templateUrl || null);
-
-  let qrDataUrl = null;
+  let qrImage = null;
   if (verifyUrl) {
     try {
-      qrDataUrl = await QRCode.toDataURL(verifyUrl, {
-        width: 170,
-        margin: 1,
-        errorCorrectionLevel: "M"
+      qrImage = await QRCode.toBuffer(verifyUrl, {
+        type: "png",
+        width: 48,
+        margin: 0,
+        errorCorrectionLevel: "L"
       });
     } catch (_) {
-      qrDataUrl = null;
+      qrImage = null;
     }
   }
 
@@ -218,9 +229,9 @@ const generatePDF = async (
     } catch (_) { }
   }
 
-  if (qrDataUrl) {
+  if (qrImage) {
     try {
-      doc.image(qrDataUrl, frameX + frameW - 54, frameY + 18, { width: 36, height: 36 });
+      doc.image(qrImage, frameX + frameW - 54, frameY + 18, { width: 36, height: 36 });
     } catch (_) { }
   }
 

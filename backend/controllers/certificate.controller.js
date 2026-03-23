@@ -2,7 +2,6 @@ import pool from "../db/postgres.js";
 import generatePDF from "../utils/generateCertificate.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import { randomUUID } from "crypto";
 import {
   uploadCertificatePdfFileToSupabase,
   removeLocalFileSafe,
@@ -66,6 +65,22 @@ const resolveExamByName = async (examName) => {
   }
 
   return null;
+};
+
+const generateDateBasedCertificateId = async () => {
+  const sequenceRes = await pool.query(
+    `
+    SELECT
+      TO_CHAR(CURRENT_DATE, 'DDMMYYYY') AS date_part,
+      COUNT(*)::int + 1 AS next_count
+    FROM certificates
+    WHERE issued_at::date = CURRENT_DATE
+    `
+  );
+
+  const datePart = sequenceRes.rows[0]?.date_part;
+  const nextCount = Number(sequenceRes.rows[0]?.next_count || 1);
+  return `${datePart}${String(nextCount).padStart(2, "0")}`;
 };
 
 
@@ -187,8 +202,58 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
     certificateSettings = null;
   }
 
-  const certificateId = `CERT-${randomUUID()}`;
-  const verifyBase = process.env.CERTIFICATE_VERIFY_BASE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
+  const verifyBase =
+    process.env.CERTIFICATE_VERIFY_BASE_URL ||
+    process.env.FRONTEND_URL ||
+    "http://localhost:5173";
+
+  let insertRes = null;
+  let certificateId = null;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    certificateId = await generateDateBasedCertificateId();
+
+    try {
+      insertRes = await pool.query(
+        `
+        INSERT INTO certificates
+          (user_id, exam_id, exam_name, score, certificate_id, issued_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING *
+        `,
+        [userId, examId, exam.title, numericScore, certificateId]
+      );
+      break;
+    } catch (insertError) {
+      const constraintName = String(insertError?.constraint || "");
+      if (insertError?.code === "23505" && constraintName.includes("user_id") && constraintName.includes("exam_id")) {
+        const certRes = await pool.query(
+          `SELECT * FROM certificates WHERE user_id = $1 AND exam_id = $2 LIMIT 1`,
+          [userId, examId]
+        );
+
+        if (certRes.rows.length > 0) {
+          return {
+            issued: true,
+            certificate: certRes.rows[0],
+            filePath: certRes.rows[0].certificate_id || null,
+            alreadyExisted: true
+          };
+        }
+      }
+
+      if (insertError?.code === "23505" && constraintName.includes("certificate_id")) {
+        continue;
+      }
+
+      throw insertError;
+    }
+  }
+
+  if (!insertRes?.rows?.length || !certificateId) {
+    return { issued: false, reason: "certificate_id_conflict" };
+  }
+
   const verifyUrl = `${String(verifyBase).replace(/\/$/, "")}/verify/${certificateId}`;
 
   const pdfResult = await generatePDF(
@@ -210,6 +275,7 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
   );
 
   if (!pdfResult?.generated) {
+    await pool.query(`DELETE FROM certificates WHERE id = $1`, [insertRes.rows[0].id]).catch(() => {});
     return { issued: false, reason: "pdf_failed" };
   }
 
@@ -219,19 +285,10 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
       await removeLocalFileSafe(pdfResult.filePath);
     }
   } catch (uploadError) {
+    await pool.query(`DELETE FROM certificates WHERE id = $1`, [insertRes.rows[0].id]).catch(() => {});
     console.error("Certificate Supabase upload failed:", uploadError.message);
     return { issued: false, reason: "pdf_upload_failed" };
   }
-
-  const insertRes = await pool.query(
-    `
-    INSERT INTO certificates
-      (user_id, exam_id, exam_name, score, certificate_id, issued_at)
-    VALUES ($1, $2, $3, $4, $5, NOW())
-    RETURNING *
-    `,
-    [userId, examId, exam.title, numericScore, certificateId]
-  );
 
   return {
     issued: true,
@@ -291,6 +348,7 @@ const generateQuizCertificate = async (req, res) => {
         not_passed: "Score below pass percentage. Certificate not eligible.",
         not_exam_type: "Certificates are issued only for exams, not contests",
         already_issued: "Certificate already issued for this exam",
+        certificate_id_conflict: "Please retry certificate generation",
         pdf_failed: "PDF generation failed",
         pdf_upload_failed: "Certificate storage upload failed"
       };

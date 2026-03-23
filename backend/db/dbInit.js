@@ -464,6 +464,15 @@ export const initializeDatabase = async () => {
                 UNIQUE(user_id, exam_id)
             );
         `);
+        await pool.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_certificate_id_unique
+            ON certificates(certificate_id)
+            WHERE certificate_id IS NOT NULL;
+        `).catch(() => {});
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_certificates_issued_at
+            ON certificates(issued_at);
+        `).catch(() => {});
 
         console.log("✅ Database tables verified and initialized successfully!");
     } catch (err) {

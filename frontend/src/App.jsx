@@ -93,6 +93,7 @@ function App() {
             <Route path="/cookie-policy" element={<CookiePolicy />} />
             <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/verify/:certId" element={<VerifyCertificate />} />
 
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
