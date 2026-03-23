@@ -9,11 +9,12 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     setGammaUrl(null);
     setFetchedHtml(null);
 
+    // Only fetch to detect gamma.app, otherwise use direct URL
     if (
       url &&
       typeof url === "string" &&
       url.toLowerCase().endsWith(".html") &&
-      url.includes(window.location.hostname)
+      url.includes("supabase.co")
     ) {
       setLoadingHtml(true);
       fetch(url)
@@ -25,17 +26,15 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
           );
           if (gammaMatch) {
             setGammaUrl(gammaMatch[1]);
-            // Remove gamma iframes from HTML
-            let cleanedHtml = htmlText.replace(
-              /<iframe[^>]*(?:src|href)\s*=\s*["'][^"']*gamma\.app[^"']*["'][^>]*>.*?<\/iframe>/gi,
-              ""
-            );
-            setFetchedHtml(cleanedHtml);
             return;
           }
-          setFetchedHtml(htmlText);
+          // If no gamma URL found, don't use srcDoc - just use direct URL
+          setFetchedHtml(null);
         })
-        .catch((err) => console.error("Failed to fetch HTML:", err))
+        .catch((err) => {
+          console.error("Failed to fetch HTML:", err);
+          setFetchedHtml(null);
+        })
         .finally(() => setLoadingHtml(false));
     }
   }, [url]);
@@ -90,6 +89,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
           className="w-full h-full border-0 bg-white"
           title="Reading Material"
           allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen; clipboard-read"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         />
       </div>
     );
@@ -137,14 +137,14 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     );
   }
 
-  // All other URLs
+  // All other URLs (including HTML files without gamma)
   return (
     <div className="relative w-full h-full bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-200">
       <iframe
         src={url}
         className="w-full h-full border-0 bg-white"
         title="Reading Material"
-        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen; clipboard-read"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
       />
     </div>
