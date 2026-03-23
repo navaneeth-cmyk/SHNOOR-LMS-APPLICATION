@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../../../api/axios';
-import { getEmbedUrl } from '../../../utils/urlHelper';
+import api from '../api/axios';
+import { getEmbedUrl } from '../utils/urlHelper';
 import { Clock, ArrowRight, CheckCircle, Loader2, Play, Pause, FileText } from 'lucide-react';
 
 const TextStreamPlayer = ({ moduleId, url, authToken }) => {
