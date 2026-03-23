@@ -33,31 +33,11 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
     const isPlainTextUrl = !!url && !isEmbeddable && /\.txt($|\?)/i.test(url);
     const WORD_STREAM_DELAY_MS = 650;
 
-    // Iframe view for HTML/Embed content (including forced i=open)
-    if (isEmbeddable) {
-        const embedUrl = isPdf ? buildPdfViewerUrl(url, authToken) : getEmbedUrl(url);
-        return (
-            <div className="w-full h-full relative bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl">
-                <iframe
-                    src={embedUrl}
-                    className="w-full h-full border-0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    title="Embedded Content"
-                />
-                <div className="absolute bottom-4 right-4 bg-slate-900/80 p-2 rounded text-[10px] text-slate-400 z-10 opacity-70 hover:opacity-100 transition-opacity">
-                    <span className="mr-2">Not loading?</span>
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-white underline">
-                        Open in new tab
-                    </a>
-                </div>
-            </div>
-        );
-    }
-
+    // ✅ ALL hooks must come before any conditional returns
 
     // Timer Countdown
     useEffect(() => {
+        if (isEmbeddable) return; // skip for embeddable content
         if (!streamData || streamData.completed || advancing || !isPlaying) return;
 
         if (timeLeft > 0) {
@@ -65,14 +45,13 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
                 setTimeLeft((prev) => {
                     if (prev <= 1) {
                         clearInterval(timerRef.current);
-                        handleNext(); // Trigger next chunk
+                        handleNext();
                         return 0;
                     }
                     return prev - 1;
                 });
             }, 1000);
         } else if (timeLeft === 0 && !advancing) {
-            // Already at 0 (e.g. loaded that way), trigger next
             handleNext();
         }
 
@@ -81,6 +60,11 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
 
     // Fetch initial stream state
     useEffect(() => {
+        if (isEmbeddable) {
+            setLoading(false); // nothing to fetch for embeddable
+            return;
+        }
+
         let mounted = true;
         const fetchStream = async () => {
             try {
@@ -89,8 +73,8 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
                 setStreamData(null);
                 let triedDirectTextUrl = false;
 
-                // Skip text fetch for embeddable content (HTML, PDF, etc.) - let iframe handle it
-                if (url && !isEmbeddable && isHtml) {
+                // Only fetch as plain text for non-HTML, non-PDF URLs
+                if (url && !isHtml && !isPdf) {
                     triedDirectTextUrl = true;
                     try {
                         const textRes = await api.get(url, {
@@ -99,16 +83,17 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
                         });
                         const contentType = String(textRes.headers?.["content-type"] || "").toLowerCase();
                         const isPdfResponse = contentType.includes("application/pdf");
+                        const isHtmlResponse = contentType.includes("text/html");
                         const textData = typeof textRes.data === "string" ? textRes.data : "";
                         const canRenderAsText =
                             isPlainTextUrl ||
                             contentType.includes("text/plain") ||
                             contentType.includes("text/markdown") ||
-                            contentType.includes("text/") ||
                             contentType.includes("application/octet-stream") ||
                             contentType === "";
 
-                        if (!isPdfResponse && canRenderAsText && textData.length > 0) {
+                        // ✅ Never treat HTML responses as plain text
+                        if (!isPdfResponse && !isHtmlResponse && canRenderAsText && textData.length > 0) {
                             if (mounted) {
                                 setPlainTextContent(textData);
                                 setLoading(false);
@@ -119,7 +104,6 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
                         console.warn("Plain text fetch failed:", textErr);
                     }
 
-                    // URL-based text modules should not fallback to stream endpoint.
                     if (triedDirectTextUrl) {
                         if (mounted) setLoading(false);
                         return;
@@ -130,7 +114,6 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
                 if (!mounted) return;
 
                 setStreamData(res.data);
-                // If not completed and has duration, start timer
                 if (!res.data.completed && (res.data.currentChunk || res.data.chunk)) {
                     setTimeLeft((res.data.currentChunk || res.data.chunk).duration_seconds || 60);
                 } else {
@@ -147,7 +130,7 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
         return () => { mounted = false; clearInterval(timerRef.current); };
     }, [moduleId, url, isPlainTextUrl]);
 
-    // Word-by-word stream effect for full plain-text modules
+    // Word-by-word stream effect for plain-text modules
     useEffect(() => {
         if (!plainTextContent) {
             setStreamedWordCount(0);
@@ -177,7 +160,30 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
         plainTextContainerRef.current.scrollTop = plainTextContainerRef.current.scrollHeight;
     }, [streamedWordCount]);
 
-    // Wrap handleNext to be usable in effect
+    // ✅ Conditional returns AFTER all hooks
+
+    // Iframe view for HTML/PDF/Gamma/embed content
+    if (isEmbeddable) {
+        const embedUrl = isPdf ? buildPdfViewerUrl(url, authToken) : getEmbedUrl(url);
+        return (
+            <div className="w-full h-full relative bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl">
+                <iframe
+                    src={embedUrl}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    title="Embedded Content"
+                />
+                <div className="absolute bottom-4 right-4 bg-slate-900/80 p-2 rounded text-[10px] text-slate-400 z-10 opacity-70 hover:opacity-100 transition-opacity">
+                    <span className="mr-2">Not loading?</span>
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-white underline">
+                        Open in new tab
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
     const handleNext = async () => {
         if (advancing) return;
 
@@ -187,9 +193,8 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
 
             if (res.data.completed) {
                 setStreamData(prev => ({ ...prev, completed: true }));
-                setIsPlaying(false); // Stop playing when done
+                setIsPlaying(false);
             } else {
-                // Fetch new chunk details
                 const nextRes = await api.get(`/api/modules/${moduleId}/stream`);
                 setStreamData(nextRes.data);
                 if (nextRes.data.currentChunk || nextRes.data.chunk) {
@@ -238,8 +243,6 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
     }
 
     if (!streamData) {
-        // Fallback: If stream failed to load (e.g. 404 because no chunks were created) 
-        // AND it is an HTML/PDF file, show an improved failure UI
         if (url && (url.match(/\.html$/i) || url.match(/\.pdf$/i))) {
             return (
                 <div className="w-full h-full relative bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl">
@@ -282,14 +285,12 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
         );
     }
 
-    // Unified View (Streaming builds up the list)
     const chunksToShow = streamData.chunks || (streamData.chunk ? [streamData.chunk] : []);
     const { index, total } = streamData;
     const isCompleted = streamData.completed;
 
     return (
         <div className="h-full flex flex-col bg-slate-900 text-slate-200 relative">
-            {/* Progress Bar Top */}
             {!isCompleted && (
                 <div className="h-1 bg-slate-800 w-full flex-shrink-0">
                     <div
@@ -301,7 +302,6 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar pb-8">
                 <div className="max-w-3xl mx-auto w-full">
-                    {/* Continuous Text View */}
                     <div className="bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-2xl animate-in fade-in duration-500 mb-8">
                         <p className="prose prose-invert max-w-none text-lg leading-relaxed whitespace-pre-wrap font-serif">
                             {chunksToShow.map((chunk, idx) => (
@@ -309,7 +309,6 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
                                     {chunk.content}
                                 </span>
                             ))}
-                            {/* Typing Indicator if playing */}
                             {isPlaying && !isCompleted && (
                                 <span className="inline-block w-2 h-4 bg-indigo-400 ml-1 animate-pulse" />
                             )}
@@ -325,10 +324,8 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
                 </div>
             </div>
 
-            {/* Sticky Player Controls */}
             {!isCompleted && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-6 bg-slate-800/90 backdrop-blur-md px-8 py-4 rounded-full border border-slate-700 shadow-2xl z-50 transition-all hover:scale-105">
-                    {/* Play/Pause Control */}
                     <button
                         onClick={() => setIsPlaying(!isPlaying)}
                         className="w-12 h-12 flex items-center justify-center rounded-full bg-indigo-500 hover:bg-indigo-400 text-white transition-colors shadow-lg shadow-indigo-500/20"
@@ -338,7 +335,6 @@ const TextStreamPlayer = ({ moduleId, url, authToken }) => {
 
                     <div className="h-8 w-px bg-slate-700"></div>
 
-                    {/* Timer Status */}
                     <div className="flex flex-col">
                         <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
                             {isPlaying ? "Streaming" : "Paused"}
