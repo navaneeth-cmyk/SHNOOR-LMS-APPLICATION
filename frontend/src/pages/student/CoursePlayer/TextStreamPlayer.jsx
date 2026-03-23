@@ -60,9 +60,10 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
   }
 
   let finalUrl = url;
+  const isGammaUrl = finalUrl.includes("gamma.app");
   
   // Normalize Gamma URLs to their embed format so they don't get blocked by X-Frame-Options
-  if (finalUrl.includes("gamma.app") && !finalUrl.includes("/embed/")) {
+  if (isGammaUrl && !finalUrl.includes("/embed/")) {
     finalUrl = finalUrl.replace(/gamma\.app\/[a-zA-Z0-9_-]+\//i, "gamma.app/embed/");
   }
 
@@ -75,7 +76,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
           className="w-full h-full border-0 bg-white"
           title="Reading Material"
           allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
         />
       </div>
     );
@@ -92,7 +93,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     
     // Ensure the pasted iframe fills the container
     if (embedHtml.toLowerCase().includes("<iframe")) {
-        embedHtml = embedHtml.replace(/<iframe/i, `<iframe style="width: 100%; height: 100%; border: none;" allow="fullscreen" sandbox="allow-scripts allow-same-origin allow-popups allow-forms" `);
+        embedHtml = embedHtml.replace(/<iframe/i, `<iframe style="width: 100%; height: 100%; border: none;" allow="fullscreen" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-top-navigation" `);
     }
     
     return (
@@ -110,7 +111,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
         className="w-full h-full border-0 bg-white"
         title="Reading Material"
         allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        sandbox={isGammaUrl ? "allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-top-navigation" : "allow-scripts allow-same-origin allow-popups allow-forms"}
       />
     </div>
   );
