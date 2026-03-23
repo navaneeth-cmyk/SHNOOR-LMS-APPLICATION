@@ -8,13 +8,23 @@ import {
   BookOpen,
   Info,
 } from "lucide-react";
-import TextStreamPlayer from "../../../components/TextStreamPlayer";
+import TextStreamPlayer from "./TextStreamPlayer";
 import ReactPlayer from "react-player";
 import { getEmbedUrl } from "../../../utils/urlHelper";
 
 const isGoogleDriveUrl = (url) => url && url.includes("drive.google.com");
 const isLocalOrMp4Url = (url) => url && (url.includes("localhost") || url.includes("127.0.0.1") || url.match(/\.(mp4|webm|ogg)$/i) || url.startsWith("/uploads/"));
 const isYouTubeUrl = (url) => Boolean(url && /(?:youtube\.com|youtu\.be)/i.test(url));
+const isGammaUrl = (url) => Boolean(url && url.includes("gamma.app"));
+
+const normalizeGammaUrl = (url) => {
+  if (!url) return "";
+  if (!url.includes("/embed/")) {
+    return url.replace(/gamma\.app\/[a-zA-Z0-9_-]+\//i, "gamma.app/embed/");
+  }
+  return url;
+};
+
 const normalizeExternalUrl = (url) => {
   if (!url || typeof url !== "string") return "";
   const trimmed = url.trim();
@@ -29,6 +39,17 @@ const buildPdfViewerUrl = (url, authToken) => {
   const withToken = authToken
     ? `${url}${url.includes("?") ? "&" : "?"}token=${authToken}`
     : url;
+    
+  // Google Docs Viewer cannot fetch local files. Let the browser render them natively.
+  if (url.includes("localhost") || url.includes("127.0.0.1") || url.startsWith("/")) {
+    return withToken;
+  }
+  
+  // If a Gamma URL snuck into PDF type, normalize it and bypass Google Docs viewer
+  if (isGammaUrl(url)) {
+    return normalizeGammaUrl(url);
+  }
+  
   return `https://docs.google.com/viewer?url=${encodeURIComponent(withToken)}&embedded=true`;
 };
 
@@ -350,6 +371,13 @@ const CoursePlayerView = ({
                     title={currentModule.title || "Google Drive Video"}
                     allow="fullscreen"
                   />
+                ) : isGammaUrl(normalizedModuleUrl) ? (
+                  <iframe
+                    src={normalizeGammaUrl(normalizedModuleUrl)}
+                    className="w-full h-full border-0 bg-black"
+                    title={currentModule.title || "Gamma Presentation"}
+                    allow="fullscreen"
+                  />
                 ) : isYouTubeUrl(normalizedModuleUrl) ? (
                   <iframe
                     src={getEmbedUrl(normalizedModuleUrl)}
@@ -411,6 +439,18 @@ const CoursePlayerView = ({
 
 
 
+            ) : currentModule?.type === "text_stream" || 
+                currentModule?.type === "html" || 
+                (currentModule?.url && currentModule.url.trim().toLowerCase().startsWith("<iframe")) ||
+                currentModule?.url?.toLowerCase().endsWith(".html") ? (
+              <div className="absolute inset-0 w-full h-full overflow-y-auto">
+                <TextStreamPlayer
+                  moduleId={currentModule.id}
+                  url={currentModule.url}
+                  onComplete={handleMarkComplete}
+                />
+              </div>
+
             ) : currentModule?.type === "pdf" ||
               currentModule?.url?.toLowerCase().includes(".pdf") ||
               currentModule?.url?.toLowerCase().endsWith("/pdf") ? (
@@ -423,20 +463,7 @@ const CoursePlayerView = ({
                 allow="fullscreen"
               />
 
-            ) : currentModule?.type === "html" ||
-              currentModule?.url?.toLowerCase().endsWith(".html") ? (
-
-              /* HTML */
-              <iframe
-                src={currentModule.url}
-                className="absolute inset-0 w-full h-full border-0"
-                title={currentModule.title || "HTML Content"}
-                allow="fullscreen"
-              />
-
             ) : (
-
-              /* FALLBACK */
               <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-300 p-8">
                 <FileText size={64} className="text-slate-500 mb-6" />
                 <h3 className="text-2xl font-bold text-white mb-2">

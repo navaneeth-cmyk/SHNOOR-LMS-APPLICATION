@@ -78,28 +78,28 @@ export const handleUpload = async (req, res) => {
         return res.status(400).json({ message: "No file uploaded" });
     }
 
-    let fileUrl = null;
     try {
-        const uploaded = await uploadLocalFileToSupabase(req.file.path, {
-            originalName: req.file.originalname,
-            mimeType: req.file.mimetype,
-            folder: `modules/${resolveModuleStorageFolder({
-                mimeType: req.file.mimetype,
-                originalName: req.file.originalname,
-            })}`,
+        const ext = path.extname(req.file.originalname).toLowerCase();
+        let subFolder;
+        if (req.file.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
+            subFolder = "videos";
+        } else if (req.file.mimetype === "application/pdf" || ext === ".pdf") {
+            subFolder = "pdfs";
+        } else {
+            subFolder = "docs";
+        }
+        
+        const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+        const fileUrl = `${backendUrl}/uploads/${subFolder}/${req.file.filename}`;
+
+        res.status(200).json({
+            message: "File uploaded successfully",
+            url: fileUrl,
+            filename: req.file.originalname,
+            mimetype: req.file.mimetype,
         });
-        fileUrl = uploaded.url;
     } catch (error) {
         await removeLocalFileSafe(req.file.path);
         return res.status(500).json({ message: error.message || "File upload failed" });
     }
-
-    await removeLocalFileSafe(req.file.path);
-
-    res.status(200).json({
-        message: "File uploaded successfully",
-        url: fileUrl,
-        filename: req.file.originalname,
-        mimetype: req.file.mimetype,
-    });
 };

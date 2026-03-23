@@ -39,17 +39,15 @@ export const addModules = async (req, res) => {
       let uploadProvider = null;
 
       if (pdf) {
-        const uploadResult = await uploadLocalFileToSupabase(pdf.path, {
-          originalName: pdf.originalname,
-          mimeType: pdf.mimetype,
-          folder: `modules/${resolveModuleStorageFolder({
-            type: m.type,
-            mimeType: pdf.mimetype,
-            originalName: pdf.originalname,
-          })}`,
-        });
-        finalContentUrl = uploadResult.url;
-        uploadProvider = uploadResult.provider;
+        const ext = pdf.originalname.slice(pdf.originalname.lastIndexOf('.')).toLowerCase();
+        let subFolder = "docs";
+        if (pdf.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
+            subFolder = "videos";
+        } else if (pdf.mimetype === "application/pdf" || ext === ".pdf") {
+            subFolder = "pdfs";
+        }
+        const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+        finalContentUrl = `${backendUrl}/uploads/${subFolder}/${pdf.filename}`;
       }
 
       const result = await pool.query(
@@ -118,15 +116,14 @@ export const addModules = async (req, res) => {
           }
         }
 
-        // ✅ DO NOT strip HTML tags - preserve them for iframe display
-        // const isHtmlContent = (textResData) => /<[a-z][\s\S]*>/i.test(textResData || "");
-        // const shouldStripTags = 
-        //   /\.html?($|\?)/i.test(finalContentUrl || "") || 
-        //   isHtmlContent(textToChunk);
-        //
-        // if (textToChunk && shouldStripTags && !finalContentUrl?.includes("i=open")) {
-        //   textToChunk = textToChunk.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim());
-        // }
+        const isHtmlContent = (textResData) => /<[a-z][\s\S]*>/i.test(textResData || "");
+        const shouldStripTags = 
+          /\.html?($|\?)/i.test(finalContentUrl || "") || 
+          isHtmlContent(textToChunk);
+
+        if (textToChunk && shouldStripTags && !finalContentUrl?.includes("i=open")) {
+          textToChunk = textToChunk.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
+        }
 
         if (textToChunk) {
           const chunks = textToChunk.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
@@ -192,6 +189,7 @@ export const getModulesByCourse = async (req, res) => {
         CASE 
           WHEN type = 'pdf' OR pdf_filename IS NOT NULL OR content_url LIKE '%.pdf%' THEN '${baseUrl}/api/modules/' || module_id || '/view?type=pdf'
           WHEN type = 'html' OR content_url LIKE '%.html%' THEN '${baseUrl}/api/modules/' || module_id || '/view?type=html'
+          WHEN type = 'text_stream' AND content_url IS NOT NULL AND content_url NOT LIKE '<iframe%' THEN '${baseUrl}/api/modules/' || module_id || '/view?type=html'
           ELSE content_url 
         END AS content_url,
         duration_mins,

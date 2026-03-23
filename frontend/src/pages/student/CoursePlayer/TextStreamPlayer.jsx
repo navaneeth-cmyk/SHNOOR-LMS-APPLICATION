@@ -1,275 +1,101 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@auth/useAuth";
-import api from "../../../api/axios";
-import { useSocket } from "@context/useSocket";
-import {
-  initializeSocket,
-  onNotification,
-  disconnectSocket,
-} from "../../../services/socket";
-import StudentLayoutView from "./view";
-import StudentBot from "../../../components/StudentBot/StudentBot";
+import React, { useState, useEffect } from "react";
 
-const StudentLayout = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { currentUser, logout } = useAuth();
-  const isExamPage = location.pathname.includes("/student/exam/");
-  const [studentName, setStudentName] = useState("");
-  const [xp, setXp] = useState(0);
-  const [rank, setRank] = useState("Novice");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-
-  // Chat Unread Count
-  const { unreadCounts } = useSocket();
-  const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
-  const [notifications, setNotifications] = useState([]);
-  const [notifPermission, setNotifPermission] = useState(
-    "Notification" in window ? Notification.permission : "default",
-  );
-
-  // Push Subscription Logic
-  const subscribeUserToPush = async () => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      console.warn("Push messaging is not supported");
-      return;
-    }
-
-    try {
-      const registration = await navigator.serviceWorker.register("/sw.js");
-      console.log("Service Worker Registered");
-
-      // Helper to convert VAPID key
-      const urlBase64ToUint8Array = (base64String) => {
-        const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-        const base64 = (base64String + padding)
-          .replace(/-/g, "+")
-          .replace(/_/g, "/");
-
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-
-        for (let i = 0; i < rawData.length; ++i) {
-          outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
-      };
-
-      const publicVapidKey =
-        "BKwO75HycvnqB51-Jx6aCKHQ4yYIhnniMRAt83Ytgtrxvr7tjKF5sWW9i-79W31bEv9uY2MHX4PdL_NM6d8zm1E"; // TODO: Enviroment variable ideally, but hardcoding for speed/demo as per user context
-      const convertedVapidKey = urlBase64ToUint8Array(publicVapidKey);
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: convertedVapidKey,
-      });
-
-      console.log("Push Subscription Object:", subscription);
-
-      // Send to backend
-      await api.post("/api/notifications/subscribe", { subscription });
-      console.log("Attributes sent to server.");
-    } catch (err) {
-      console.error("Failed to subscribe to push:", err);
-    }
-  };
-
-  const requestNotifPermission = async () => {
-    if (!("Notification" in window)) return;
-    try {
-      const permission = await Notification.requestPermission();
-      setNotifPermission(permission);
-      if (permission === "granted") {
-        new Notification("✅ Notifications Enabled", {
-          body: "You will now receive global updates!",
-          icon: "/just_logo.svg",
-        });
-
-        subscribeUserToPush();
-      }
-    } catch (error) {
-      console.error("Permission request failed", error);
-    }
-  };
+const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
+  const [fetchedHtml, setFetchedHtml] = useState(null);
+  const [loadingHtml, setLoadingHtml] = useState(false);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await api.get("/api/users/me");
-
-        setStudentName(res.data.displayName);
-        setXp(res.data.xp || 0);
-
-        const xpValue = res.data.xp || 0;
-        setRank(
-          xpValue >= 500
-            ? "Expert"
-            : xpValue >= 200
-              ? "Intermediate"
-              : "Novice",
-        );
-      } catch (err) {
-        console.error("Failed to fetch student profile:", err);
-      }
-    };
-
-    if (currentUser) {
-      fetchProfile();
-      // Auto-subscribe if already granted (ensures SW is registered)
-      if (Notification.permission === "granted") {
-        subscribeUserToPush();
-      }
-
-      const socket = initializeSocket(currentUser.uid);
-
-      onNotification((notification) => {
-        console.log("🔔 Live notification received:", notification);
-        console.log("Current Permission State:", Notification.permission);
-
-        // Add to state immediately
-        setNotifications((prev) => {
-          // Avoid duplicates
-          if (prev.find((n) => n.id === notification.id)) {
-            return prev;
-          }
-          return [notification, ...prev];
-        });
-
-        // Add to Toasts (Transient)
-        setToasts((prev) => [...prev, notification]);
-
-        // Show OS notification
-        if (Notification.permission === "granted") {
-          console.log(
-            "Attempting to create OS notification...",
-            "Page Visibility:",
-            document.visibilityState,
-          );
-
-          // Some browsers block notifications if the tab is focused.
-          // We will try to send it anyway as per user request.
-          try {
-            // Create notification
-            const title =
-              notification.type === "STREAK_EXPIRED"
-                ? "⚠️ Streak Expired"
-                : "🎓 New Notification";
-            const icon = "/just_logo.svg";
-
-            // Use ServiceWorker registration if available (more reliable)
-            if ("serviceWorker" in navigator && navigator.serviceWorker.ready) {
-              navigator.serviceWorker.ready.then((registration) => {
-                registration.showNotification(title, {
-                  body: notification.message,
-                  icon: icon,
-                  tag: notification.id, // Prevent duplicates
-                });
-              });
-            } else {
-              // Fallback to standard API
-              const osNotif = new Notification(title, {
-                body: notification.message,
-                icon: icon,
-              });
-              osNotif.onclick = () => {
-                window.focus();
-                navigate(notification.link || "/student/dashboard");
-              };
-            }
-          } catch (e) {
-            console.error("OS Notification failed:", e);
-          }
-        } else {
-          console.warn(
-            "OS Notification skipped. Permission:",
-            Notification.permission,
-          );
-        }
-      });
-
-      return () => disconnectSocket();
+    // If the url is a local uploaded HTML file, fetch it and sanitize inner Gamma links
+    if (url && typeof url === 'string' && url.toLowerCase().endsWith(".html") && url.includes(window.location.hostname)) {
+      setLoadingHtml(true);
+      fetch(url)
+        .then(res => res.text())
+        .then(htmlText => {
+          // Normalize any embedded gamma.app links found inside the HTML file
+          let fixedHtml = htmlText.replace(/gamma\.app\/docs\//gi, "gamma.app/embed/");
+          fixedHtml = fixedHtml.replace(/gamma\.app\/public\//gi, "gamma.app/embed/");
+          fixedHtml = fixedHtml.replace(/gamma\.app\/present\//gi, "gamma.app/embed/");
+          setFetchedHtml(fixedHtml);
+        })
+        .catch(err => {
+          console.error("Failed to fetch HTML text stream:", err);
+          setFetchedHtml(null);
+        })
+        .finally(() => setLoadingHtml(false));
+    } else {
+      setFetchedHtml(null);
     }
-  }, [currentUser, navigate]);
+  }, [url]);
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const res = await api.get("/api/notifications");
-        const unread = res.data.filter((n) => !n.is_read);
+  if (!url) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full text-slate-400 bg-slate-900 border-2 border-dashed border-slate-700 p-8 rounded-xl">
+        <h3 className="text-xl font-bold mb-2">Text Stream Unavailable</h3>
+        <p>The URL for this reading material is missing or invalid.</p>
+      </div>
+    );
+  }
 
-        setNotifications((prev) => {
-          const prevIds = new Set(prev.map((n) => n.id));
-          const newItems = unread.filter((n) => !prevIds.has(n.id));
+  if (loadingHtml) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full text-slate-400 bg-slate-900 border-2 border-dashed border-slate-700 p-8 rounded-xl">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p>Loading document...</p>
+      </div>
+    );
+  }
 
-          // Only update if there are actual changes
-          if (newItems.length > 0 || unread.length < prev.length) {
-            return unread;
-          }
-          return prev;
-        });
-      } catch (err) {
-        console.error("Failed to fetch notifications:", err);
-      }
-    };
+  let finalUrl = url;
+  
+  // Normalize Gamma URLs to their embed format so they don't get blocked by X-Frame-Options
+  if (finalUrl.includes("gamma.app") && !finalUrl.includes("/embed/")) {
+    finalUrl = finalUrl.replace(/gamma\.app\/[a-zA-Z0-9_-]+\//i, "gamma.app/embed/");
+  }
 
-    if (currentUser) {
-      fetchNotifications();
-      // Poll every 10 seconds as fallback
-      const interval = setInterval(fetchNotifications, 10000);
-      return () => clearInterval(interval);
+  // Use the fetched and normalized HTML if we processed a local HTML file
+  if (fetchedHtml !== null) {
+    return (
+      <div className="relative w-full h-full bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-200">
+        <iframe
+          srcDoc={fetchedHtml}
+          className="w-full h-full border-0 bg-white"
+          title="Reading Material"
+          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        />
+      </div>
+    );
+  }
+
+  // Check if the input is actually an HTML snippet (e.g., iframe embed code) pasted by the instructor
+  const isEmbedCode = finalUrl.trim().toLowerCase().startsWith("<iframe") || finalUrl.trim().toLowerCase().startsWith("<div");
+
+  if (isEmbedCode) {
+    let embedHtml = finalUrl.trim();
+    // Ensure the pasted iframe fills the container
+    if (embedHtml.toLowerCase().includes("<iframe")) {
+        embedHtml = embedHtml.replace(/<iframe/i, `<iframe style="width: 100%; height: 100%; border: none;" allow="fullscreen" `);
     }
-  }, [currentUser]);
-
-  const handleDismissNotification = async (id) => {
-    try {
-      await api.put(`/api/notifications/${id}/read`);
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-    } catch (err) {
-      console.error("Dismiss notification error:", err);
-    }
-  };
-
-  const [toasts, setToasts] = useState([]);
-  const handleDismissToast = (id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // Track screen size
-  useEffect(() => {
-    const handleResize = () => {};
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/");
-  };
+    
+    return (
+      <div 
+        className="relative w-full h-full bg-white rounded-xl overflow-hidden shadow-2xl flex items-center justify-center [&>iframe]:w-full [&>iframe]:h-full"
+        dangerouslySetInnerHTML={{ __html: embedHtml }}
+      />
+    );
+  }
 
   return (
-    <>
-    <StudentLayoutView
-      studentName={studentName}
-      xp={xp}
-      setXp={setXp}
-      rank={rank}
-      isSidebarOpen={isSidebarOpen}
-      setIsSidebarOpen={setIsSidebarOpen}
-      handleLogout={handleLogout}
-      navigate={navigate}
-      location={location}
-      totalUnread={totalUnread}
-      notifications={notifications}
-      onDismiss={handleDismissNotification}
-      notifPermission={notifPermission}
-      onRequestPermission={requestNotifPermission}
-      toasts={toasts}
-      onDismissToast={handleDismissToast}
-    />
-          {!isExamPage && <StudentBot />}
-</>
+    <div className="relative w-full h-full bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-200">
+      <iframe
+        src={finalUrl}
+        className="w-full h-full border-0 bg-white"
+        title="Reading Material"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+      />
+    </div>
   );
 };
 
-export default StudentLayout;
+export default TextStreamPlayer;
