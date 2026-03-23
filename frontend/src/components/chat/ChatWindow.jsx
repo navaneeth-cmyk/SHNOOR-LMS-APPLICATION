@@ -270,10 +270,28 @@ const ChatWindow = ({
 
             <div className="chat-messages" onClick={() => setShowEmoji(false)}>
                 {loadingMessages ? (
-                    <div style={{ textAlign: 'center', padding: 20 }}>Loading...</div>
+                    <div className="flex flex-col items-center justify-center h-full gap-4">
+                        <div className="relative w-16 h-16">
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full animate-spin opacity-20"></div>
+                            <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center">
+                                <div className="flex gap-1">
+                                    <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
+                                    <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse [animation-delay:200ms]"></span>
+                                    <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse [animation-delay:400ms]"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <p className="text-slate-400 font-semibold">Loading messages...</p>
+                    </div>
                 ) : messages.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: 20 }}>
-                        No messages yet. Say Hi!
+                    <div className="flex flex-col items-center justify-center h-full gap-4">
+                        <div className="w-20 h-20 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-full flex items-center justify-center">
+                            <FaSmile size={32} className="text-slate-300" />
+                        </div>
+                        <div className="text-center">
+                            <p className="text-slate-600 font-semibold text-lg">No messages yet</p>
+                            <p className="text-slate-400 text-sm mt-1">Start a conversation by sending a message</p>
+                        </div>
                     </div>
                 ) : (
                     messages.map((msg, idx) => {
@@ -300,11 +318,21 @@ const ChatWindow = ({
 
             {/* File Preview */}
             {file && (
-                <div className="p-2 bg-gray-100 flex items-center justify-between border-t border-gray-200">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">{file.name}</span>
+                <div className="px-6 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 flex items-center justify-between border-t-2 border-indigo-100 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-100 rounded-lg">
+                            <FaFileAlt className="text-indigo-600" size={18} />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm text-slate-700 font-semibold truncate">{file.name}</p>
+                            <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
+                        </div>
                     </div>
-                    <button onClick={() => { setFile(null); fileInputRef.current.value = ""; }} className="text-red-500">
+                    <button 
+                        onClick={() => { setFile(null); fileInputRef.current.value = ""; }} 
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        title="Remove file"
+                    >
                         <FaTimes />
                     </button>
                 </div>
@@ -312,14 +340,14 @@ const ChatWindow = ({
 
             <div className="chat-input-area relative">
                 {typingUser && (
-                    <div className="absolute -top-8 left-6 pointer-events-none animate-bounce">
-                        <div className="bg-slate-100/80 backdrop-blur-sm px-3 py-1 rounded-full border border-slate-200 shadow-sm flex items-center gap-2">
+                    <div className="absolute -top-10 left-6 pointer-events-none">
+                        <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-1 duration-300">
                             <div className="flex gap-1">
-                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-pulse"></span>
-                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-pulse [animation-delay:200ms]"></span>
-                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-pulse [animation-delay:400ms]"></span>
+                                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                                <span className="w-2 h-2 bg-white rounded-full animate-pulse [animation-delay:200ms]"></span>
+                                <span className="w-2 h-2 bg-white rounded-full animate-pulse [animation-delay:400ms]"></span>
                             </div>
-                            <span className="text-[10px] font-bold text-slate-500 italic">
+                            <span className="text-[11px] font-bold italic">
                                 {typingUser} is typing...
                             </span>
                         </div>
@@ -357,16 +385,18 @@ const ChatWindow = ({
                 <form className="chat-input-form items-center gap-3" onSubmit={handleSubmit}>
                     <button
                         type="button"
-                        className="text-yellow-500 text-xl"
+                        className="text-indigo-500 hover:text-indigo-600 text-xl hover:scale-110 transition-transform"
                         onClick={() => setShowEmoji(!showEmoji)}
+                        title="Add emoji"
                     >
                         <FaSmile />
                     </button>
 
                     <button
                         type="button"
-                        className="text-gray-500 text-lg"
+                        className="text-indigo-500 hover:text-indigo-600 text-lg hover:scale-110 transition-transform"
                         onClick={() => fileInputRef.current.click()}
+                        title="Attach file"
                     >
                         <FaPaperclip />
                     </button>
@@ -384,7 +414,7 @@ const ChatWindow = ({
                         onChange={handleTextChange}
                         className="flex-1"
                     />
-                    <button type="submit" className="send-btn" disabled={!text.trim() && !file}>
+                    <button type="submit" className="send-btn" disabled={!text.trim() && !file} title="Send message">
                         <FaPaperPlane />
                     </button>
                 </form>
