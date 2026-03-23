@@ -12,9 +12,23 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
         .then(res => res.text())
         .then(htmlText => {
           // Normalize any embedded gamma.app links found inside the HTML file
-          let fixedHtml = htmlText.replace(/gamma\.app\/docs\//gi, "gamma.app/embed/");
-          fixedHtml = fixedHtml.replace(/gamma\.app\/public\//gi, "gamma.app/embed/");
-          fixedHtml = fixedHtml.replace(/gamma\.app\/present\//gi, "gamma.app/embed/");
+          let fixedHtml = htmlText;
+          
+          // Replace gamma.app URLs in src attributes with embed format
+          fixedHtml = fixedHtml.replace(/src\s*=\s*["']([^"']*gamma\.app\/(?:docs|public|present|embed)\/[^"']*)["']/gi, (match, url) => {
+            const normalizedUrl = url.replace(/gamma\.app\/(docs|public|present)\//i, 'gamma.app/embed/');
+            return `src="${normalizedUrl}"`;
+          });
+          
+          // Replace gamma.app URLs in href attributes with embed format
+          fixedHtml = fixedHtml.replace(/href\s*=\s*["']([^"']*gamma\.app\/(?:docs|public|present|embed)\/[^"']*)["']/gi, (match, url) => {
+            const normalizedUrl = url.replace(/gamma\.app\/(docs|public|present)\//i, 'gamma.app/embed/');
+            return `href="${normalizedUrl}"`;
+          });
+          
+          // Also handle protocol-relative and absolute URLs
+          fixedHtml = fixedHtml.replace(/(?:https?:)?\/\/gamma\.app\/(docs|public|present)\//gi, 'https://gamma.app/embed/');
+          
           setFetchedHtml(fixedHtml);
         })
         .catch(err => {
@@ -72,9 +86,13 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
 
   if (isEmbedCode) {
     let embedHtml = finalUrl.trim();
+    
+    // Normalize any Gamma.app links in the embed code
+    embedHtml = embedHtml.replace(/(?:https?:)?\/\/gamma\.app\/(docs|public|present)\//gi, 'https://gamma.app/embed/');
+    
     // Ensure the pasted iframe fills the container
     if (embedHtml.toLowerCase().includes("<iframe")) {
-        embedHtml = embedHtml.replace(/<iframe/i, `<iframe style="width: 100%; height: 100%; border: none;" allow="fullscreen" `);
+        embedHtml = embedHtml.replace(/<iframe/i, `<iframe style="width: 100%; height: 100%; border: none;" allow="fullscreen" sandbox="allow-scripts allow-same-origin allow-popups allow-forms" `);
     }
     
     return (
