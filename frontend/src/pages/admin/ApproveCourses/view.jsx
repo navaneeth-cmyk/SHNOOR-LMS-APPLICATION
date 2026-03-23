@@ -3,7 +3,7 @@ import {
   CheckCircle2, XCircle, Play, FileText, AlertCircle, BookOpen, Clock, ShieldCheck, Eye,
 } from "lucide-react";
 import { getEmbedUrl } from "../../../utils/urlHelper";
-import TextStreamPlayer from "../../../components/TextStreamPlayer";
+import TextStreamPlayer from "../../student/CoursePlayer/TextStreamPlayer";
 
 const ApproveCoursesView = ({
   loading, pendingCourses, selectedCourse, setSelectedCourse, handleAction,

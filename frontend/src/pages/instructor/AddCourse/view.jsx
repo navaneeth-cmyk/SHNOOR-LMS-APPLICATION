@@ -15,7 +15,7 @@ import {
   Minus,
   Upload,
 } from "lucide-react";
-import TextStreamPlayer from "../../../components/TextStreamPlayer";
+import TextStreamPlayer from "../../student/CoursePlayer/TextStreamPlayer";
 
 const AddCourseView = ({
   step,
