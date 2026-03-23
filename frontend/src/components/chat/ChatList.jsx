@@ -166,6 +166,7 @@ const ChatList = ({ chats, activeChat, onSelectChat, unreadCounts, currentUserId
             return (
                 <div
                     key={chat.id}
+                    data-type={chat.type}
                     className={`chat-contact-item ${isActive ? 'active' : ''}`}
                     onClick={() => onSelectChat(chat)}
                 >
@@ -186,7 +187,7 @@ const ChatList = ({ chats, activeChat, onSelectChat, unreadCounts, currentUserId
                             )}
                         </div>
                         {chat.type === 'group' && (
-                            <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 rounded uppercase font-bold w-fit mb-1">
+                            <span className="text-[10px] bg-cyan-100 text-cyan-600 px-1.5 rounded uppercase font-bold w-fit mb-1">
                                 Group
                             </span>
                         )}

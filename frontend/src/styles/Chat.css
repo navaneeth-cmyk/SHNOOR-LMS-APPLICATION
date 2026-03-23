@@ -62,17 +62,20 @@
     gap: 12px;
     cursor: pointer;
     border-radius: 8px;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
     position: relative;
+    margin-bottom: 4px;
 }
 
 .chat-contact-item:hover {
     background: #e5e7eb;
+    transform: translateX(4px);
 }
 
 .chat-contact-item.active {
-    background: #eff6ff;
+    background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
     border: 1px solid #bfdbfe;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
 }
 
 .contact-avatar {
@@ -88,6 +91,12 @@
     font-size: 18px;
     flex-shrink: 0;
     position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 2px solid white;
+}
+
+.chat-contact-item[data-type="group"] .contact-avatar {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
 }
 
 .unread-indicator {
@@ -122,26 +131,34 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0;
 }
 
 .contact-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
 }
 
 .contact-name {
     font-weight: 600;
     font-size: 0.95rem;
     color: #1f2937;
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .last-message {
     font-size: 0.8rem;
-    color: #6b7280;
+    color: #9ca3af;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
 }
 
 .unread-badge {
@@ -173,8 +190,22 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #fff;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
     position: relative;
+}
+
+.no-chat-selected {
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    color: #9ca3af;
+}
+
+.no-chat-selected svg {
+    width: 80px;
+    height: 80px;
+    opacity: 0.5;
+    margin-bottom: 8px;
 }
 
 .chat-header {
@@ -183,7 +214,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #fff;
+    background: white;
     z-index: 10;
 }
 

@@ -25,9 +25,11 @@ const InstructorGroups = () => {
         const results = await Promise.allSettled([
           api.get('/api/admingroups/my-groups'),
           api.get('/api/admin/groups/instructor/my-groups'),
+          api.get('/api/admingroups'), // Fallback: get all admin groups
+          api.get('/api/admin/groups'), // Fallback: get all section groups
         ]);
 
-        const [adminChatGroupsRes, adminSectionGroupsRes] = results;
+        const [adminChatGroupsRes, adminSectionGroupsRes, allAdminGroupsRes, allSectionGroupsRes] = results;
 
         if (adminChatGroupsRes.status === 'rejected') console.warn('Admin chat groups fetch failed:', adminChatGroupsRes.reason?.response?.status);
         if (adminSectionGroupsRes.status === 'rejected') console.warn('Admin section groups fetch failed:', adminSectionGroupsRes.reason?.response?.status);
@@ -50,18 +52,51 @@ const InstructorGroups = () => {
           source: 'admin-section',
         }));
 
-        const merged = [...adminChatGroups, ...adminSectionGroups].sort(
+        // Fallback groups if primary endpoints failed
+        let fallbackAdminGroups = [];
+        let fallbackSectionGroups = [];
+
+        if (adminChatGroupsRes.status === 'rejected' && allAdminGroupsRes.status === 'fulfilled') {
+          fallbackAdminGroups = (Array.isArray(allAdminGroupsRes.value.data) ? allAdminGroupsRes.value.data : []).map((group) => ({
+            group_id: group.group_id,
+            name: group.name,
+            description: group.description,
+            created_at: group.created_at,
+            member_count: group.member_count ?? 0,
+            source: 'admin-chat',
+          }));
+        }
+
+        if (adminSectionGroupsRes.status === 'rejected' && allSectionGroupsRes.status === 'fulfilled') {
+          fallbackSectionGroups = (Array.isArray(allSectionGroupsRes.value.data) ? allSectionGroupsRes.value.data : []).map((group) => ({
+            group_id: group.group_id || group.id,
+            name: group.group_name || group.name,
+            description: null,
+            created_at: group.created_at,
+            member_count: group.user_count ?? group.member_count ?? 0,
+            source: 'admin-section',
+          }));
+        }
+
+        const merged = [...adminChatGroups, ...adminSectionGroups, ...fallbackAdminGroups, ...fallbackSectionGroups].sort(
           (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+        );
+
+        // Deduplicate by group_id
+        const uniqueGroups = Array.from(
+          new Map(merged.map(g => [g.group_id, g])).values()
         );
 
         console.log('[InstructorGroups] Fetched groups:', {
           adminChat: adminChatGroups.length,
           adminSection: adminSectionGroups.length,
-          total: merged.length,
-          groups: merged.map(g => ({ id: g.group_id, name: g.name, source: g.source }))
+          fallbackAdmin: fallbackAdminGroups.length,
+          fallbackSection: fallbackSectionGroups.length,
+          total: uniqueGroups.length,
+          groups: uniqueGroups.map(g => ({ id: g.group_id, name: g.name, source: g.source }))
         });
 
-        setGroups(merged);
+        setGroups(uniqueGroups);
       } catch (err) {
         console.error('Failed to load groups:', err);
         setError(err.response?.data?.message || 'Could not load your groups.');

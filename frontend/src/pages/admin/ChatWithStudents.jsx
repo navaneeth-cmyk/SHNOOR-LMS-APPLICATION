@@ -46,7 +46,7 @@ const ChatWithStudents = () => {
       setLoadingChats(true);
       setError(null);
 
-      // Fetch both admin chat groups and admin section groups
+      // Fetch both admin chat groups and admin section groups with fallbacks
       const [adminGroupsRes, adminSectionGroupsRes] = await Promise.all([
         api.get('/api/admingroups').catch(err => {
           console.warn('Admin chat groups fetch failed:', err.response?.status);
@@ -113,6 +113,7 @@ const ChatWithStudents = () => {
     try {
       setLoadingSearch(true);
       const groupMessages = [];
+      const uniqueGroupIds = new Set();
 
       for (const chat of list) {
         try {
@@ -132,8 +133,57 @@ const ChatWithStudents = () => {
             groupType: chat.groupType,
           }));
           groupMessages.push(...messagesWithChat);
+          uniqueGroupIds.add(chat.id);
         } catch (err) {
           console.error(`Failed to load messages for group ${chat.id}:`, err);
+        }
+      }
+
+      // If we have fewer groups than expected, check if more groups exist
+      if (list.length < 20) {
+        try {
+          const additionalAdminGroups = await api.get('/api/admingroups').catch(() => ({ data: [] }));
+          const additionalSectionGroups = await api.get('/api/admin/groups').catch(() => ({ data: [] }));
+          
+          const allAdminGroups = Array.isArray(additionalAdminGroups.data) ? additionalAdminGroups.data : [];
+          const allSectionGroups = Array.isArray(additionalSectionGroups.data) ? additionalSectionGroups.data : [];
+          
+          // Fetch messages from groups not yet in chats
+          for (const g of allAdminGroups) {
+            if (!uniqueGroupIds.has(g.group_id)) {
+              try {
+                const res = await api.get(`/api/admingroups/${g.group_id}/messages`);
+                const messagesWithChat = (Array.isArray(res.data) ? res.data : []).map(m => ({
+                  ...m,
+                  chat_id: g.group_id,
+                  chat_name: g.name,
+                  groupType: 'admin-chat',
+                }));
+                groupMessages.push(...messagesWithChat);
+              } catch (err) {
+                console.error(`Failed to load messages for admin group ${g.group_id}:`, err);
+              }
+            }
+          }
+
+          for (const g of allSectionGroups) {
+            if (!uniqueGroupIds.has(g.group_id || g.id)) {
+              try {
+                const res = await api.get(`/api/chats/groups/${g.group_id || g.id}/messages`);
+                const messagesWithChat = (Array.isArray(res.data) ? res.data : []).map(m => ({
+                  ...m,
+                  chat_id: g.group_id || g.id,
+                  chat_name: g.group_name || g.name,
+                  groupType: 'admin-section',
+                }));
+                groupMessages.push(...messagesWithChat);
+              } catch (err) {
+                console.error(`Failed to load messages for section group ${g.group_id || g.id}:`, err);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch additional groups:', err);
         }
       }
 
@@ -490,6 +540,45 @@ const ChatWithStudents = () => {
       setShowSearch(false);
       setSearchQuery('');
       await handleSelectChat(chatToLoad);
+    } else {
+      // Group not in chats list - try to fetch it from both endpoints
+      try {
+        let groupData = null;
+        let groupType = null;
+
+        // Try admin-chat endpoint first
+        try {
+          const res = await api.get(`/api/admingroups/${chatId}`);
+          groupData = res.data;
+          groupType = 'admin-chat';
+        } catch (err) {
+          // Try section groups endpoint
+          const res = await api.get(`/api/chats/groups/${chatId}`);
+          groupData = res.data;
+          groupType = 'admin-section';
+        }
+
+        if (groupData) {
+          const newChat = {
+            id: chatId,
+            type: 'group',
+            name: groupData.name || groupData.group_name,
+            recipientName: groupData.name || groupData.group_name,
+            lastMessage: 'Group chat',
+            unread: 0,
+            memberCount: groupData.member_count || groupData.user_count || 0,
+            groupType,
+          };
+
+          // Add to chats list
+          setChats(prev => [...prev, newChat]);
+          setShowSearch(false);
+          setSearchQuery('');
+          await handleSelectChat(newChat);
+        }
+      } catch (err) {
+        console.error('Failed to find group:', chatId, err);
+      }
     }
   };
 
