@@ -243,16 +243,25 @@ const MyGroups = () => {
 
     const adminChatGroups = (adminChatRes.status === 'fulfilled' ? adminChatRes.value.data : []).map(g => ({
       ...g,
+      group_id: g.group_id,
+      name: g.name,
+      member_count: g.member_count || 0,
       source: 'admin-chat'
     }));
 
     const collegeGroups = (collegeGroupsRes.status === 'fulfilled' ? collegeGroupsRes.value.data : []).map(g => ({
       ...g,
+      group_id: g.group_id,
+      name: g.name || g.group_name,
+      member_count: g.member_count || 0,
       source: 'student-chat'
     }));
 
     const adminSectionGroups = (adminSectionRes.status === 'fulfilled' ? adminSectionRes.value.data : []).map(g => ({
       ...g,
+      group_id: g.group_id,
+      name: g.name || g.group_name,
+      member_count: g.member_count || 0,
       source: 'admin-section'
     }));
 
@@ -299,10 +308,15 @@ const MyGroups = () => {
       
       for (const group of groups) {
         try {
-          const endpoint =
-            group.source === 'student-chat'
-              ? `/api/chats/groups/${group.group_id}/messages`
-              : `/api/admingroups/${group.group_id}/messages`;
+          let endpoint;
+          if (group.source === 'student-chat') {
+            endpoint = `/api/chats/groups/${group.group_id}/messages`;
+          } else if (group.source === 'admin-section') {
+            endpoint = `/api/chats/groups/${group.group_id}/messages`; // Admin-section groups also use group_messages table
+          } else {
+            // admin-chat
+            endpoint = `/api/admingroups/${group.group_id}/messages`;
+          }
 
           const res = await api.get(endpoint);
           const messagesWithGroup = res.data.map(m => ({

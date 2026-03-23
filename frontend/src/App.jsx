@@ -57,6 +57,8 @@ import Leaderboard from "./pages/student/Leaderboard";
 import AddPractice from "./pages/instructor/AddPractice";
 import InstructorPracticeList from "./pages/instructor/PracticeList";
 import PracticeList from "./pages/student/PracticeList";
+import InstructorGroups from "./pages/instructor/Groups";
+import InstructorGroupChat from "./pages/instructor/GroupChat";
 import Groups from "./pages/admin/Groups";
 import CreateGroup from "./pages/admin/Groups/create";
 import EditGroup from "./pages/admin/Groups/edit";
@@ -152,6 +154,8 @@ function App() {
               <Route path="performance" element={<StudentPerformance />} />
               <Route path="settings" element={<ProfileSettings />} />
               <Route path="chat" element={<InstructorChat />} />
+              <Route path="groups" element={<InstructorGroups />} />
+              <Route path="groups/:groupId" element={<InstructorGroupChat />} />
             </Route>
 
             <Route

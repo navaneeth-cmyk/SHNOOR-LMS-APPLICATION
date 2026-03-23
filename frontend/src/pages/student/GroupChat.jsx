@@ -12,6 +12,7 @@ const GroupChat = () => {
   const { socket, dbUser } = useSocket();
   const source = searchParams.get('source') || 'admin-chat';
   const isStudentSourceGroup = source === 'student-chat';
+  const isAdminSectionGroup = source === 'admin-section';
 
   const [group, setGroup] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -34,13 +35,19 @@ const GroupChat = () => {
         setLoading(true);
         setError(null);
 
-        const groupEndpoint = isStudentSourceGroup
-          ? `/api/chats/groups/${groupId}`
-          : `/api/admingroups/${groupId}`;
+        let groupEndpoint, messageEndpoint;
 
-        const messageEndpoint = isStudentSourceGroup
-          ? `/api/chats/groups/${groupId}/messages`
-          : `/api/admingroups/${groupId}/messages`;
+        if (isStudentSourceGroup) {
+          groupEndpoint = `/api/chats/groups/${groupId}`;
+          messageEndpoint = `/api/chats/groups/${groupId}/messages`;
+        } else if (isAdminSectionGroup) {
+          groupEndpoint = `/api/admin/groups/my-groups/${groupId}`;
+          messageEndpoint = `/api/chats/groups/${groupId}/messages`;
+        } else {
+          // admin-chat (default)
+          groupEndpoint = `/api/admingroups/${groupId}`;
+          messageEndpoint = `/api/admingroups/${groupId}/messages`;
+        }
 
         const groupRes = await api.get(groupEndpoint);
         setGroup(groupRes.data);
@@ -63,7 +70,7 @@ const GroupChat = () => {
     };
 
     fetchGroupAndMessages();
-  }, [groupId, dbUser?.id, isStudentSourceGroup]);
+  }, [groupId, dbUser?.id, isStudentSourceGroup, isAdminSectionGroup]);
 
   // Socket join + listen
   useEffect(() => {

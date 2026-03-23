@@ -38,21 +38,25 @@
     padding: 10px;
 }
 
+/* Scrollbar styling - visible and easy to use */
 .chat-contacts-list::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
 }
 
 .chat-contacts-list::-webkit-scrollbar-track {
-    background: #f1f5f9;
+    background: #e5e7eb;
+    border-radius: 10px;
 }
 
 .chat-contacts-list::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
+    background: #9ca3af;
+    border-radius: 5px;
+    border: 2px solid #e5e7eb;
 }
 
 .chat-contacts-list::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #6b7280;
+    border-color: #d1d5db;
 }
 
 .chat-contact-item {

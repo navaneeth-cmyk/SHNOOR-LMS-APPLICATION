@@ -847,8 +847,16 @@ export const getStudentGroups = async (req, res) => {
 
     // Groups from 'groups' table where student is integrated
     const query = `
-      SELECT g.group_id, g.group_name, g.start_date, g.end_date, g.created_by, g.created_at
+      SELECT 
+        g.group_id, 
+        g.group_name, 
+        g.start_date, 
+        g.end_date, 
+        g.created_by, 
+        g.created_at,
+        COUNT(gu.user_id)::int AS member_count
       FROM groups g
+      LEFT JOIN group_users gu ON g.group_id = gu.group_id
       WHERE 
         -- 1. Manual membership (direct assignment)
         EXISTS (SELECT 1 FROM group_users gu WHERE gu.group_id = g.group_id AND gu.user_id = $1)
@@ -861,6 +869,7 @@ export const getStudentGroups = async (req, res) => {
         (g.created_by IS NULL AND g.start_date IS NULL AND g.end_date IS NULL 
          AND $3::TEXT IS NOT NULL AND REGEXP_REPLACE(UPPER(TRIM($3::TEXT)), '[,.\\-_() ]+', ' ', 'g') 
              = REGEXP_REPLACE(UPPER(TRIM(g.group_name)), '[,.\\-_() ]+', ' ', 'g'))
+      GROUP BY g.group_id, g.group_name, g.start_date, g.end_date, g.created_by, g.created_at
       ORDER BY g.created_at DESC
     `;
 
@@ -874,6 +883,7 @@ export const getStudentGroups = async (req, res) => {
       return { 
         ...g, 
         name: g.group_name, // Map for consistent frontend usage
+        source: 'admin-section', // Tag source for consistent naming
         type: 'admin-section', // Tag source as the main groups section
         group_type 
       };
