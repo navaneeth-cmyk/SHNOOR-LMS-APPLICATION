@@ -8,7 +8,7 @@ import {
   BookOpen,
   Info,
 } from "lucide-react";
-import TextStreamPlayer from "./TextStreamPlayer";
+import TextStreamPlayer from "../../../components/TextStreamPlayer";
 import ReactPlayer from "react-player";
 import { getEmbedUrl } from "../../../utils/urlHelper";
 
