@@ -12,49 +12,10 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     setLoadingHtml(false);
     setError(null);
 
-    // Check if URL itself is gamma.app first
+    // Check if URL itself is gamma.app - these need special handling
     if (url && typeof url === "string" && url.includes("gamma.app")) {
       setGammaUrl(url);
       return;
-    }
-
-    // Fetch HTML files (from any source: supabase, backend, etc) to clean them
-    if (
-      url &&
-      typeof url === "string" &&
-      url.toLowerCase().endsWith(".html")
-    ) {
-      setLoadingHtml(true);
-      fetch(url)
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.text();
-        })
-        .then((htmlText) => {
-          // Look for gamma.app URLs in iframes
-          const gammaMatch = htmlText.match(
-            /(?:src|href)\s*=\s*["'](https?:\/\/[^"']*gamma\.app[^"']*)["']/i
-          );
-          if (gammaMatch) {
-            setGammaUrl(gammaMatch[1]);
-          }
-
-          // Remove gamma.app iframes from HTML to prevent CORS errors
-          let cleanedHtml = htmlText.replace(
-            /<iframe[^>]*(?:src|href)\s*=\s*["'][^"']*gamma\.app[^"']*["'][^>]*>[\s\S]*?<\/iframe>/gi,
-            ""
-          );
-
-          // Set the cleaned HTML
-          setFetchedHtml(cleanedHtml);
-          setError(null);
-        })
-        .catch((err) => {
-          console.error("Failed to fetch HTML:", err);
-          setError(err.message || "Failed to load document");
-          setFetchedHtml(null);
-        })
-        .finally(() => setLoadingHtml(false));
     }
   }, [url]);
 
@@ -99,7 +60,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     );
   }
 
-  // Loading
+  // Loading (if we were fetching)
   if (loadingHtml) {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full text-slate-400 bg-slate-900 border-2 border-dashed border-slate-700 p-8 rounded-xl">
@@ -109,7 +70,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     );
   }
 
-  // Fetched local HTML file
+  // Fetched local HTML file (if any)
   if (fetchedHtml !== null) {
     return (
       <div className="relative w-full h-full bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-200">
@@ -166,7 +127,7 @@ const TextStreamPlayer = ({ moduleId, url, onComplete }) => {
     );
   }
 
-  // All other URLs
+  // Direct loading: HTML files, PDFs, videos, etc.
   return (
     <div className="relative w-full h-full bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-200">
       <iframe
