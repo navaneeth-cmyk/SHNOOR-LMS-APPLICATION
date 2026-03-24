@@ -313,8 +313,8 @@ const CourseListView = ({
 
       {/* Comments Modal */}
       {commentsModalOpen && selectedCourseForComments && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-[1000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
             <div className="flex justify-between p-4 border-b">
               <h2 className="font-bold">
                 {selectedCourseForComments.title}
