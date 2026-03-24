@@ -222,6 +222,7 @@ const AdminViolations = () => {
       const headers = [
         "Student Name", "Email",
         "Exam Name", "Date Attempted",
+        "Marks Obtained", "Total Marks", "Percentage", "Status",
         "No Face", "Multiple Faces", "Phone/Object Detected", "Loud Noise", "Voice Detected",
         "Total Violations", "Risk Level"
       ];
@@ -232,6 +233,10 @@ const AdminViolations = () => {
           r.name, r.email,
           r.exam_title,
           r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB') : '---',
+          r.marks.obtained ?? '---',
+          r.marks.total ?? '---',
+          r.examScore !== null && r.examScore !== undefined ? parseFloat(r.examScore).toFixed(1) + '%' : '---',
+          r.examStatus === true ? 'Pass' : r.examStatus === false ? 'Fail' : '---',
           r.counts.no_face, r.counts.multiple_faces, r.counts.phone_detected, r.counts.loud_noise, r.counts.voice_detected,
           r.violations.length,
           isSerious ? 'SERIOUS' : 'SLIGHT'
@@ -424,6 +429,8 @@ const AdminViolations = () => {
                     <tr className="bg-rose-50 text-rose-900">
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-rose-100">Student</th>
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-rose-100">Date Attempted</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-rose-100">Score</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-rose-100 text-center">Status</th>
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-rose-100 text-center">No Face</th>
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-rose-100 text-center">Multi Faces</th>
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-rose-100 text-center">Phone</th>
@@ -448,6 +455,20 @@ const AdminViolations = () => {
                             </td>
                             <td className="p-4 text-xs font-bold text-slate-600">
                               {new Date(attempt.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="p-4">
+                              <span className="text-xs font-black text-rose-600">
+                                {attempt.marks.obtained !== undefined && attempt.marks.obtained !== null ? `${attempt.marks.obtained} / ${attempt.marks.total}` : '---'}
+                                {attempt.examScore !== undefined && attempt.examScore !== null && ` (${parseFloat(attempt.examScore).toFixed(1)}%)`}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${attempt.examStatus === true ? 'bg-emerald-50 border-emerald-200 text-emerald-600' :
+                                attempt.examStatus === false ? 'bg-rose-50 border-rose-200 text-rose-600' :
+                                  'bg-slate-50 border-slate-200 text-slate-400'
+                                }`}>
+                                {attempt.examStatus === true ? 'Pass' : attempt.examStatus === false ? 'Fail' : '---'}
+                              </span>
                             </td>
                             <td className="p-4 text-center text-xs font-bold text-slate-600">{attempt.counts.no_face}</td>
                             <td className="p-4 text-center text-xs font-bold text-slate-600">{attempt.counts.multiple_faces}</td>
@@ -558,6 +579,8 @@ const AdminViolations = () => {
                     <tr className="bg-[#1e40af] text-white">
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-indigo-800">Student</th>
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-indigo-800">Date Attempted</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-indigo-800">Score</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-indigo-800 text-center">Status</th>
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-indigo-800 text-center">No Face</th>
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-indigo-800 text-center">Multi Faces</th>
                       <th className="p-4 text-[10px] font-black uppercase tracking-widest border-b border-indigo-800 text-center text-slate-300">Phone</th>
@@ -582,6 +605,20 @@ const AdminViolations = () => {
                             </td>
                             <td className="p-4 text-xs font-bold text-slate-600">
                               {new Date(attempt.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="p-4">
+                              <span className="text-xs font-black text-indigo-600">
+                                {attempt.marks.obtained !== undefined && attempt.marks.obtained !== null ? `${attempt.marks.obtained} / ${attempt.marks.total}` : '---'}
+                                {attempt.examScore !== undefined && attempt.examScore !== null && ` (${parseFloat(attempt.examScore).toFixed(1)}%)`}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${attempt.examStatus === true ? 'bg-emerald-50 border-emerald-200 text-emerald-600' :
+                                attempt.examStatus === false ? 'bg-rose-50 border-rose-200 text-rose-600' :
+                                  'bg-slate-50 border-slate-200 text-slate-400'
+                                }`}>
+                                {attempt.examStatus === true ? 'Pass' : attempt.examStatus === false ? 'Fail' : '---'}
+                              </span>
                             </td>
                             <td className="p-4 text-center text-xs font-bold text-slate-600">{attempt.counts.no_face}</td>
                             <td className="p-4 text-center text-xs font-bold text-slate-600">{attempt.counts.multiple_faces}</td>
