@@ -15,7 +15,6 @@ const ChatWithStudents = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingChats, setLoadingChats] = useState(true);
   const [error, setError] = useState(null);
-  const [showChatModal, setShowChatModal] = useState(false);
 
   // ── Search ──────────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,6 +23,7 @@ const ChatWithStudents = () => {
   const [groupResults, setGroupResults] = useState([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef(null);
 
   // ── Group modal ─────────────────────────────────────────────────────────────
@@ -333,7 +333,6 @@ const ChatWithStudents = () => {
   const handleSelectChat = async (chat) => {
     console.log('[ChatWithStudents] Selected chat:', { id: chat.id, name: chat.name, type: chat.type, groupType: chat.groupType });
     setActiveChat(chat);
-    setShowChatModal(true);
     handleSetActiveChat(chat.id);
     markChatRead(chat.id);
     setLoadingMessages(true);
@@ -586,107 +585,117 @@ const ChatWithStudents = () => {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* ── Sidebar ── */}
-      <div className="chat-sidebar h-screen flex flex-col min-w-0">
+    <div className="flex h-screen flex-col bg-gray-50">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-6 py-5 border-b bg-white shadow-sm">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Admin Chat</h2>
+          <p className="text-gray-500 text-sm mt-1">Connect with student groups</p>
+        </div>
 
-        {/* Header */}
-        <div className="p-4 border-b bg-white sticky top-0 z-10 shadow-sm space-y-3">
-          <button
-            onClick={() => setShowGroupModal(true)}
-            disabled={loadingChats || creatingGroup}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600/10 text-indigo-600 rounded-xl font-bold hover:bg-indigo-600 hover:text-white transition-all border border-indigo-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <PlusCircle size={20} />
-            Create New Group
-          </button>
-
+        {/* Search Bar and Create Button */}
+        <div className="flex items-center gap-4">
           {/* Search bar */}
-          <div ref={searchRef} className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <div ref={searchRef} className="relative w-72">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
               placeholder="Search groups or messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowSearch(true)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+              className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
             />
             {hasSearchQuery && (
               <button
                 onClick={() => { setSearchQuery(''); setShowSearch(false); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             )}
           </div>
-        </div>
 
-        {/* ── Search results panel ── */}
+          {/* Create Group Button */}
+          <button
+            onClick={() => setShowGroupModal(true)}
+            disabled={loadingChats || creatingGroup}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          >
+            <PlusCircle size={18} />
+            Create Group
+          </button>
+        </div>
+      </div>
+
+      {/* ── Main Chat Layout (side-by-side) ── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── Sidebar (Chat List) ── */}
+        <div className="chat-sidebar h-full flex flex-col min-w-0 border-r bg-white">
+
+        {/* ── Chat List ── */}
         {showSearchPanel ? (
-          <div className="chat-contacts-list">
+          <div className="chat-contacts-list overflow-y-auto flex-1">
             {loadingSearch ? (
               <div className="flex items-center justify-center h-32">
-                <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+                <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
               </div>
             ) : (
               <>
-                {/* Group / contact matches */}
+                {/* Group Matches */}
                 {groupResults.length > 0 && (
                   <div>
-                    <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b">
+                    <div className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b">
                       Groups
                     </div>
                     {groupResults.map(group => (
                       <div
                         key={group.id}
                         onClick={() => handleSearchResultClick(group.id)}
-                        // FIX: was broken string concatenation in className — use template literal
-                        className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-orange-50 border-b transition-colors ${activeChat?.id === group.id ? 'bg-orange-50' : ''}`}
+                        className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors ${activeChat?.id === group.id ? 'bg-slate-100 border-l-4 border-indigo-500' : ''}`}
                       >
-                        <div className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                           <span className="text-indigo-600 font-bold text-sm">
                             {group.name?.charAt(0).toUpperCase()}
                           </span>
                         </div>
-                        <div className="min-w-0">
-                          <div className="font-semibold text-gray-900 text-sm truncate">{group.name}</div>
-                          <div className="text-xs text-gray-400">{group.memberCount} members</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-slate-900 text-sm truncate">{group.name}</div>
+                          <div className="text-xs text-slate-500">{group.memberCount} members</div>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Message matches */}
+                {/* Message Matches */}
                 {searchResults.length > 0 && (
                   <div>
-                    <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b">
+                    <div className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b">
                       Messages
                     </div>
                     {searchResults.map((result, idx) => (
-                      <div
+                      <button
                         key={idx}
                         onClick={() => handleSearchResultClick(result.chat_id)}
-                        className="p-4 border-b cursor-pointer hover:bg-orange-50 transition-colors"
+                        className="w-full p-4 border-b hover:bg-slate-50 transition-colors text-left"
                       >
-                        <div className="font-semibold text-gray-900 text-sm mb-1">{result.chat_name}</div>
-                        <div className="text-gray-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
-                        <div className="text-xs text-gray-400 mt-1">
+                        <div className="font-semibold text-slate-900 text-sm mb-1">{result.chat_name}</div>
+                        <div className="text-slate-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
+                        <div className="text-xs text-slate-400 mt-1">
                           {new Date(result.created_at).toLocaleDateString('en-US', {
                             month: 'short', day: 'numeric', year: 'numeric',
                             hour: '2-digit', minute: '2-digit',
                           })}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
 
-                {/* No results */}
+                {/* No Results */}
                 {groupResults.length === 0 && searchResults.length === 0 && !loadingSearch && (
-                  <div className="p-6 text-center text-gray-500">
+                  <div className="p-8 text-center text-slate-500">
                     No groups or messages found
                   </div>
                 )}
@@ -695,13 +704,14 @@ const ChatWithStudents = () => {
           </div>
         ) : loadingChats ? (
           <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
           </div>
         ) : error ? (
-          <div className="flex-1 p-6 text-center text-red-600">{error}</div>
+          <div className="flex-1 p-6 text-center text-red-600 text-sm">{error}</div>
         ) : chats.length === 0 ? (
-          <div className="flex-1 p-6 text-center text-gray-500">
-            No groups yet. Create one to get started!
+          <div className="flex-1 p-6 text-center">
+            <div className="text-slate-400">No groups yet.</div>
+            <div className="text-sm text-slate-500 mt-1">Create one to get started!</div>
           </div>
         ) : (
           <ChatList
@@ -713,204 +723,181 @@ const ChatWithStudents = () => {
         )}
       </div>
 
-      {/* ── Chat window ── */}
-      {!showChatModal && (
-      <div className="flex-1 flex flex-col bg-gray-50 min-w-0 h-screen overflow-hidden">
-        <ChatWindow
-          socket={socket}
-          activeChat={activeChat}
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          loadingMessages={loadingMessages}
-          onClose={() => setActiveChat(null)}
-          isAdmin={true}
-          currentUser={dbUser}
-        />
-      </div>
-      )}
-
-      {/* ── Create Group Modal ── */}
-      {showGroupModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-5 flex items-center justify-between z-10">
-              <h3 className="text-xl font-bold text-gray-900">Create New Student Group</h3>
-              <button onClick={() => setShowGroupModal(false)}>
-                <X size={24} className="text-gray-600 hover:text-gray-800" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Group Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Group Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={groupName}
-                  onChange={e => setGroupName(e.target.value)}
-                  placeholder="e.g. B.Tech CSE 2025 Batch"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description (optional)
-                </label>
-                <textarea
-                  value={groupDescription}
-                  onChange={e => setGroupDescription(e.target.value)}
-                  placeholder="Purpose, schedule, rules..."
-                  rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none resize-none"
-                />
-              </div>
-
-              {/* Mode Toggle */}
-              <div className="flex items-center gap-4 flex-wrap">
-                <label className="text-sm font-medium text-gray-700">Add students by:</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio" name="addMode" value="college"
-                      checked={addMode === 'college'}
-                      onChange={() => setAddMode('college')}
-                      className="h-4 w-4 text-orange-500 focus:ring-orange-500"
-                    />
-                    <span className="text-sm">College (auto-add all)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio" name="addMode" value="manual"
-                      checked={addMode === 'manual'}
-                      onChange={() => setAddMode('manual')}
-                      className="h-4 w-4 text-orange-500 focus:ring-orange-500"
-                    />
-                    <span className="text-sm">Manual Selection</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* College mode */}
-              {addMode === 'college' ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select College <span className="text-red-500">*</span>
-                  </label>
-                  {loadingColleges ? (
-                    <div className="flex items-center gap-2 text-gray-500">
-                      <Loader2 className="h-5 w-5 animate-spin" /> Loading colleges...
-                    </div>
-                  ) : colleges.length === 0 ? (
-                    <p className="text-red-600">No colleges found in the system</p>
-                  ) : (
-                    <select
-                      value={selectedCollege}
-                      onChange={e => setSelectedCollege(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
-                    >
-                      <option value="">-- Choose a college --</option>
-                      {colleges.map(c => (
-                        <option key={c.college_id} value={c.college_id}>
-                          {c.name} ({c.student_count || 0} students)
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <p className="mt-2 text-sm text-gray-500">
-                    All students from the selected college will be automatically added.
-                  </p>
-                </div>
-              ) : (
-                /* Manual mode */
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Students <span className="text-red-500">*</span>
-                  </label>
-                  <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
-                    {loadingStudents ? (
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <Loader2 className="h-5 w-5 animate-spin" /> Loading students...
-                      </div>
-                    ) : students.length === 0 ? (
-                      <p className="text-red-600">No active students found</p>
-                    ) : (
-                      students.map(student => (
-                        <label key={student.user_id} className="flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedMembers.includes(student.user_id)}
-                            onChange={e => {
-                              if (e.target.checked) {
-                                setSelectedMembers(prev => [...prev, student.user_id]);
-                              } else {
-                                setSelectedMembers(prev => prev.filter(id => id !== student.user_id));
-                              }
-                            }}
-                            className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
-                          />
-                          <span className="text-gray-900 font-medium">
-                            {student.full_name || student.name || student.email}
-                          </span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  <p className="mt-2 text-sm text-gray-500">
-                    {/* FIX: was broken string concatenation — use JSX expression */}
-                    {selectedMembers.length} student{selectedMembers.length !== 1 ? 's' : ''} selected
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="sticky bottom-0 bg-white border-t px-6 py-5 flex justify-end gap-4">
-              <button
-                onClick={() => setShowGroupModal(false)}
-                disabled={creatingGroup}
-                className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateGroup}
-                disabled={
-                  creatingGroup ||
-                  !groupName.trim() ||
-                  (addMode === 'college' && (!selectedCollege || loadingColleges)) ||
-                  (addMode === 'manual' && selectedMembers.length === 0)
-                }
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {creatingGroup && <Loader2 className="h-5 w-5 animate-spin" />}
-                {creatingGroup ? 'Creating...' : 'Create Group'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Chat Modal (Popup View) ── */}
-      {showChatModal && activeChat && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] max-w-4xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
-            <ChatWindow
-              socket={socket}
-              activeChat={activeChat}
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              loadingMessages={loadingMessages}
-              onClose={() => setShowChatModal(false)}
-              isAdmin={true}
-              currentUser={dbUser}
-            />
-          </div>
-        </div>
-      )}
+      {/* ── Chat Window (Main Area) ── */}
+      <ChatWindow
+        socket={socket}
+        activeChat={activeChat}
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        loadingMessages={loadingMessages}
+        onClose={() => setActiveChat(null)}
+        isAdmin={true}
+        currentUser={dbUser}
+      />
     </div>
+
+    {/* ── Create Group Modal ── */}
+    {showGroupModal && (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-white border-b px-6 py-5 flex items-center justify-between z-10">
+            <h3 className="text-xl font-bold text-gray-900">Create New Student Group</h3>
+            <button onClick={() => setShowGroupModal(false)}>
+              <X size={24} className="text-gray-600 hover:text-gray-800" />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Group Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Group Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={groupName}
+                onChange={e => setGroupName(e.target.value)}
+                placeholder="e.g. B.Tech CSE 2025 Batch"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description (optional)
+              </label>
+              <textarea
+                value={groupDescription}
+                onChange={e => setGroupDescription(e.target.value)}
+                placeholder="Purpose, schedule, rules..."
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+              />
+            </div>
+
+            {/* Mode Toggle */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <label className="text-sm font-medium text-gray-700">Add students by:</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio" name="addMode" value="college"
+                    checked={addMode === 'college'}
+                    onChange={() => setAddMode('college')}
+                    className="h-4 w-4 text-orange-500 focus:ring-orange-500"
+                  />
+                  <span className="text-sm">College (auto-add all)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio" name="addMode" value="manual"
+                    checked={addMode === 'manual'}
+                    onChange={() => setAddMode('manual')}
+                    className="h-4 w-4 text-orange-500 focus:ring-orange-500"
+                  />
+                  <span className="text-sm">Manual Selection</span>
+                </label>
+              </div>
+            </div>
+
+            {/* College mode */}
+            {addMode === 'college' ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select College <span className="text-red-500">*</span>
+                </label>
+                {loadingColleges ? (
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Loader2 className="h-5 w-5 animate-spin" /> Loading colleges...
+                  </div>
+                ) : colleges.length === 0 ? (
+                  <p className="text-red-600">No colleges found in the system</p>
+                ) : (
+                  <select
+                    value={selectedCollege}
+                    onChange={e => setSelectedCollege(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                  >
+                    <option value="">-- Choose a college --</option>
+                    {colleges.map(c => (
+                      <option key={c.college_id} value={c.college_id}>
+                        {c.name} ({c.student_count || 0} students)
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="mt-2 text-sm text-gray-500">
+                  All students from the selected college will be automatically added.
+                </p>
+              </div>
+            ) : (
+              /* Manual mode */
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Students <span className="text-red-500">*</span>
+                </label>
+                <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+                  {loadingStudents ? (
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <Loader2 className="h-5 w-5 animate-spin" /> Loading students...
+                    </div>
+                  ) : students.length === 0 ? (
+                    <p className="text-red-600">No active students found</p>
+                  ) : (
+                    students.map(student => (
+                      <label key={student.user_id} className="flex items-center gap-3 p-3 hover:bg-white rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedMembers.includes(student.user_id)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedMembers(prev => [...prev, student.user_id]);
+                            } else {
+                              setSelectedMembers(prev => prev.filter(id => id !== student.user_id));
+                            }
+                          }}
+                          className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                        />
+                        <span className="text-gray-900 font-medium">
+                          {student.full_name || student.name || student.email}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  {selectedMembers.length} student{selectedMembers.length !== 1 ? 's' : ''} selected
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="sticky bottom-0 bg-white border-t px-6 py-5 flex justify-end gap-4">
+            <button
+              onClick={() => setShowGroupModal(false)}
+              disabled={creatingGroup}
+              className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateGroup}
+              disabled={
+                creatingGroup ||
+                !groupName.trim() ||
+                (addMode === 'college' && (!selectedCollege || loadingColleges)) ||
+                (addMode === 'manual' && selectedMembers.length === 0)
+              }
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {creatingGroup && <Loader2 className="h-5 w-5 animate-spin" />}
+              {creatingGroup ? 'Creating...' : 'Create Group'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   );
 };
 

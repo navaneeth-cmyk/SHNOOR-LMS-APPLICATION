@@ -537,9 +537,9 @@ const AddCourseView = ({
                         onChange={handleModuleChange}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md focus:border-indigo-500 outline-none text-sm"
                       >
-                        <option value="video">Video</option>
+                        {/* <option value="video">Video</option> */}
                         <option value="pdf">PDF</option>
-                        <option value="text_stream">Text Stream</option>
+                        {/* <option value="text_stream">Text Stream</option> */}
                       </select>
                     </div>
                     {moduleForm.type === "video" && (
