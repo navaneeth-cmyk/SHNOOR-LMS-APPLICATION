@@ -580,33 +580,10 @@ const AddCourseView = ({
                     </div>
 
                     {/* 🚫 COMMENTED OUT: Video URL input (video support removed) */}
-                    {false && videoInputType === "url" ? (
-                      <input
-                        name="url"
-                        placeholder={moduleForm.type === "video" ? "https://youtube.com/..." : "https://example.com/file.pdf"}
-                        value={moduleForm.url}
-                        onChange={handleModuleChange}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md focus:border-indigo-500 outline-none text-sm"
-                      />
-                    ) : false && (
-                        {/* 🚫 COMMENTED OUT: Video file upload (video support removed) */}
-                        {false && <div className="border border-dashed border-slate-300 rounded-md p-4 text-center cursor-pointer hover:bg-slate-50 transition-colors relative">
-                        <input
-                          type="file"
-                          accept={moduleForm.type === "video" ? "video/*" : "application/pdf"}
-                          onChange={(e) => handleFileUpload(e.target.files[0], "url")}
-                          disabled={uploading}
-                          className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                        />
-                        <div className="text-xs text-slate-500">
-                          {uploading ? `Uploading ${Math.round(uploadProgress)}%...` : moduleForm.url ? "File Uploaded" : "Click to Upload Content"}
-                        </div>
-                        {uploading && (
-                          <div className="w-full bg-slate-200 h-1 mt-2 rounded-full overflow-hidden">
-                            <div className="bg-indigo-600 h-full transition-all" style={{ width: `${uploadProgress}%` }} />
-                          </div>
-                        )}
-                      </div>
+                    {false ? (
+                      null
+                    ) : (
+                      null
                     )}
                   </div>
 

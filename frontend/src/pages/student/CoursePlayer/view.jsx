@@ -342,110 +342,10 @@ const CoursePlayerView = ({
           {/* UPDATED: dynamic height based on currentModule?.notes */}
           <div className={`${currentModule?.notes ? "min-h-[70vh]" : "flex-1"} relative`}>
 
-            {/* TEXT STREAM */}
             {/* 🚫 COMMENTED OUT: Video and text stream support removed - only PDF */}
-            {false ? (
-              // Text stream player (disabled)
-              null
-
-              /* VIDEO - Managed by ReactPlayer */
-              <div className="absolute inset-0 w-full h-full bg-black">
-                {!currentModule?.url ? (
-                  <div className="flex flex-col items-center justify-center h-full text-white p-8">
-                    <div className="text-6xl mb-4">⚠️</div>
-                    <h3 className="text-2xl font-bold mb-2">Video Not Available</h3>
-                    <p className="text-slate-400 text-center max-w-md">
-                      The video URL for this module is missing or invalid. Please contact your instructor to fix this issue.
-                    </p>
-                  </div>
-                ) : isGoogleDriveUrl(normalizedModuleUrl) ? (
-                  <iframe
-                    src={normalizedModuleUrl}
-                    className="w-full h-full border-0 bg-black"
-                    title={currentModule.title || "Google Drive Video"}
-                    allow="fullscreen"
-                  />
-                ) : isGammaUrl(normalizedModuleUrl) ? (
-                  <iframe
-                    src={normalizeGammaUrl(normalizedModuleUrl)}
-                    className="w-full h-full border-0 bg-black"
-                    title={currentModule.title || "Gamma Presentation"}
-                    allow="fullscreen"
-                  />
-                ) : isYouTubeUrl(normalizedModuleUrl) ? (
-                  <iframe
-                    src={getEmbedUrl(normalizedModuleUrl)}
-                    className="w-full h-full border-0 bg-black"
-                    title={currentModule.title || "YouTube Video"}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                ) : !isLocalOrMp4Url(normalizedModuleUrl) ? (
-                  <div className="relative w-full h-full group">
-                    <ReactPlayer
-                      ref={playerRef}
-                      url={normalizedModuleUrl}
-                      className="react-player bg-black"
-                      width="100%"
-                      height="100%"
-                      controls={true}
-                      light={false}
-                      config={{
-                        youtube: {
-                          playerVars: { showinfo: 1 },
-                        },
-                      }}
-                      onDuration={handleVideoReady}
-                      onProgress={(state) => {
-                        handleProgress(state);
-                      }}
-                      onSeek={handleSeekAttempt}
-                      onEnded={handleVideoEnded}
-                      onError={(e) => {
-                        console.error('ReactPlayer error:', e);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="relative w-full h-full group bg-black">
-                    <video
-                      ref={playerRef}
-                      src={normalizedModuleUrl}
-                      className="w-full h-full object-contain"
-                      controls
-                      controlsList="nodownload"
-                      onLoadedMetadata={(e) => {
-                        handleVideoReady(e.target.duration);
-                      }}
-                      onTimeUpdate={(e) => {
-                        handleProgress({ playedSeconds: e.target.currentTime });
-                      }}
-                      onSeeking={(e) => {
-                        handleSeekAttempt(e.target.currentTime);
-                      }}
-                      onEnded={handleVideoEnded}
-                      onError={(e) => console.error('Native Video error:', e)}
-                    />
-                  </div>
-                )}
-              </div>
-
-
-
-
-            ) : false ? ( // 🚫 COMMENTED OUT: text_stream and html support removed
-              <div className="absolute inset-0 w-full h-full overflow-y-auto">
-                <TextStreamPlayer
-                  moduleId={currentModule.id}
-                  url={currentModule.url}
-                  onComplete={handleMarkComplete}
-                />
-              </div>
-
-            ) : currentModule?.type === "pdf" ||
-              currentModule?.url?.toLowerCase().includes(".pdf") ||
-              currentModule?.url?.toLowerCase().endsWith("/pdf") ? (
-
+            {currentModule?.type === "pdf" ||
+            currentModule?.url?.toLowerCase().includes(".pdf") ||
+            currentModule?.url?.toLowerCase().endsWith("/pdf") ? (
               /* PDF */
               <iframe
                 src={buildPdfViewerUrl(currentModule.url, authToken)}
@@ -453,7 +353,6 @@ const CoursePlayerView = ({
                 title={currentModule.title || "PDF Document"}
                 allow="fullscreen"
               />
-
             ) : (
               <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-300 p-8">
                 <FileText size={64} className="text-slate-500 mb-6" />
