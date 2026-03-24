@@ -161,9 +161,11 @@ const StudentLayoutView = ({
 
               {notifOpen && (
                 <div style={{
-                  position: 'absolute', right: 0, marginTop: '8px', width: '320px',
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                  width: 'min(360px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 96px)',
                   background: '#fff', borderRadius: '16px', boxShadow: '0 12px 40px rgba(0,0,0,.12)',
-                  border: '1px solid #e2e8f0', overflow: 'hidden', zIndex: 50
+                  border: '1px solid #e2e8f0', overflow: 'hidden', zIndex: 50,
+                  display: 'flex', flexDirection: 'column'
                 }}>
                   <div style={{ padding: '16px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -186,7 +188,7 @@ const StudentLayoutView = ({
                       </div>
                     )}
                   </div>
-                  <div style={{ maxHeight: '384px', overflowY: 'auto' }}>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
                       <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>No new notifications</div>
                     ) : (
