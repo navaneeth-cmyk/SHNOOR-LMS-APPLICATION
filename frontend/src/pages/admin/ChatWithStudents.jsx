@@ -15,6 +15,7 @@ const ChatWithStudents = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingChats, setLoadingChats] = useState(true);
   const [error, setError] = useState(null);
+  const [showChatModal, setShowChatModal] = useState(false);
 
   // ── Search ──────────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -332,6 +333,7 @@ const ChatWithStudents = () => {
   const handleSelectChat = async (chat) => {
     console.log('[ChatWithStudents] Selected chat:', { id: chat.id, name: chat.name, type: chat.type, groupType: chat.groupType });
     setActiveChat(chat);
+    setShowChatModal(true);
     handleSetActiveChat(chat.id);
     markChatRead(chat.id);
     setLoadingMessages(true);
@@ -584,9 +586,9 @@ const ChatWithStudents = () => {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* ── Sidebar ── */}
-      <div className="chat-sidebar">
+      <div className="chat-sidebar h-screen flex flex-col min-w-0">
 
         {/* Header */}
         <div className="p-4 border-b bg-white sticky top-0 z-10 shadow-sm space-y-3">
@@ -712,15 +714,20 @@ const ChatWithStudents = () => {
       </div>
 
       {/* ── Chat window ── */}
-      <div className="flex-1 flex flex-col bg-gray-50">
+      {!showChatModal && (
+      <div className="flex-1 flex flex-col bg-gray-50 min-w-0 h-screen overflow-hidden">
         <ChatWindow
+          socket={socket}
           activeChat={activeChat}
           messages={messages}
           onSendMessage={handleSendMessage}
           loadingMessages={loadingMessages}
           onClose={() => setActiveChat(null)}
+          isAdmin={true}
+          currentUser={dbUser}
         />
       </div>
+      )}
 
       {/* ── Create Group Modal ── */}
       {showGroupModal && (
@@ -882,6 +889,24 @@ const ChatWithStudents = () => {
                 {creatingGroup ? 'Creating...' : 'Create Group'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Chat Modal (Popup View) ── */}
+      {showChatModal && activeChat && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] max-w-4xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+            <ChatWindow
+              socket={socket}
+              activeChat={activeChat}
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              loadingMessages={loadingMessages}
+              onClose={() => setShowChatModal(false)}
+              isAdmin={true}
+              currentUser={dbUser}
+            />
           </div>
         </div>
       )}

@@ -58,6 +58,7 @@
     padding: 12px;
     scroll-behavior: smooth;
     position: relative;
+    min-height: 0;
 }
 
 /* Firefox Scrollbar Styling */
@@ -273,6 +274,9 @@
     flex-direction: column;
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fc 50%, #f0f1f3 100%);
     position: relative;
+    overflow: hidden;
+    min-height: 0;
+    height: 100%;
 }
 
 .no-chat-selected {
@@ -321,6 +325,8 @@
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fc 50%, #f0f1f3 100%);
     scroll-behavior: smooth;
     scroll-padding: 20px;
+    min-height: 0;
+    width: 100%;
 }
 
 /* Firefox Scrollbar Styling */

@@ -1137,14 +1137,25 @@ export const editModule = async (req, res) => {
 
     if (req.file) {
       const ext = req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase();
-      let subFolder = "docs";
-      if (req.file.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
-          subFolder = "videos";
-      } else if (req.file.mimetype === "application/pdf" || ext === ".pdf") {
-          subFolder = "pdfs";
+      if (ext.toLowerCase() === ".pdf" || req.file.mimetype === "application/pdf") {
+        try {
+          const { url, objectPath } = await uploadLocalFileToSupabase(
+            req.file.path,
+            {
+              originalName: req.file.originalname,
+              mimeType: req.file.mimetype,
+              folder: "pdfs",
+            }
+          );
+          finalContentUrl = url;
+          await removeLocalFileSafe(req.file.path);
+        } catch (uploadErr) {
+          console.error("Error uploading PDF to Supabase:", uploadErr.message);
+          throw uploadErr;
+        }
+      } else {
+        throw new Error("Only PDF files are supported for course module content.");
       }
-      const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
-      finalContentUrl = `${backendUrl}/uploads/${subFolder}/${req.file.filename}`;
     }
 
     if (!title || !type) {
@@ -1232,14 +1243,25 @@ export const addModule = async (req, res) => {
 
     if (req.file) {
       const ext = req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase();
-      let subFolder = "docs";
-      if (req.file.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
-          subFolder = "videos";
-      } else if (req.file.mimetype === "application/pdf" || ext === ".pdf") {
-          subFolder = "pdfs";
+      if (ext.toLowerCase() === ".pdf" || req.file.mimetype === "application/pdf") {
+        try {
+          const { url, objectPath } = await uploadLocalFileToSupabase(
+            req.file.path,
+            {
+              originalName: req.file.originalname,
+              mimeType: req.file.mimetype,
+              folder: "pdfs",
+            }
+          );
+          finalContentUrl = url;
+          await removeLocalFileSafe(req.file.path);
+        } catch (uploadErr) {
+          console.error("Error uploading PDF to Supabase:", uploadErr.message);
+          throw uploadErr;
+        }
+      } else {
+        throw new Error("Only PDF files are supported for course module content.");
       }
-      const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
-      finalContentUrl = `${backendUrl}/uploads/${subFolder}/${req.file.filename}`;
     }
 
     if (!title || !type) {

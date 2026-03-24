@@ -93,7 +93,7 @@ app.use("/uploads", (req, res, next) => {
     return res.status(200).end();
   }
   next();
-}, express.static(path.join(__dirname, "uploads")));
+});
 
 app.use(
   cors({

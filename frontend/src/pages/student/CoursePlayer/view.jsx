@@ -13,7 +13,7 @@ import ReactPlayer from "react-player";
 import { getEmbedUrl } from "../../../utils/urlHelper";
 
 const isGoogleDriveUrl = (url) => url && url.includes("drive.google.com");
-const isLocalOrMp4Url = (url) => url && (url.includes("localhost") || url.includes("127.0.0.1") || url.match(/\.(mp4|webm|ogg)$/i) || url.startsWith("/uploads/"));
+const isLocalOrMp4Url = (url) => url && (url.includes("localhost") || url.includes("127.0.0.1") || url.match(/\.(mp4|webm|ogg)$/i));
 const isYouTubeUrl = (url) => Boolean(url && /(?:youtube\.com|youtu\.be)/i.test(url));
 const isGammaUrl = (url) => Boolean(url && url.includes("gamma.app"));
 
