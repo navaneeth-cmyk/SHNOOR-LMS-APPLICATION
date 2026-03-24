@@ -175,7 +175,7 @@ export const CourseList = () => {
       );
     } catch (err) {
       console.error("Failed to edit module", err);
-      alert("Failed to edit module");
+      throw err;
     }
   };
 
@@ -220,7 +220,7 @@ export const CourseList = () => {
       );
     } catch (err) {
       console.error("Failed to add module", err);
-      alert("Failed to add module");
+      throw err;
     }
   };
 

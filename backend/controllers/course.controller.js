@@ -1132,8 +1132,21 @@ export const editModule = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to edit this module" });
     }
 
+    const currentModuleResult = await pool.query(
+      `SELECT title, type, content_url, notes, duration_mins
+       FROM modules
+       WHERE module_id = $1`,
+      [moduleId]
+    );
+
+    if (currentModuleResult.rows.length === 0) {
+      return res.status(404).json({ message: "Module not found" });
+    }
+
+    const currentModule = currentModuleResult.rows[0];
+
     const { title, type, content_url, notes, duration_mins } = req.body;
-    let finalContentUrl = content_url || null;
+    let finalContentUrl = content_url;
 
     if (req.file) {
       const ext = req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase();
@@ -1158,13 +1171,19 @@ export const editModule = async (req, res) => {
       }
     }
 
-    if (!title || !type) {
+    const effectiveTitle = title !== undefined ? title : currentModule.title;
+    const effectiveType = type !== undefined ? type : currentModule.type;
+    const effectiveContentUrl =
+      finalContentUrl !== undefined ? finalContentUrl : currentModule.content_url;
+    const effectiveNotes = notes !== undefined ? notes : currentModule.notes;
+
+    if (!effectiveTitle || !effectiveType) {
       return res.status(400).json({ message: "Title and type are required" });
     }
-    if ((type === "video" || type === "pdf" || type === "html") && !finalContentUrl) {
+    if ((effectiveType === "video" || effectiveType === "pdf" || effectiveType === "html") && !effectiveContentUrl) {
       return res.status(400).json({ message: "Please provide a file or valid URL for this module type" });
     }
-    if (type === "text_stream" && !notes && !finalContentUrl) {
+    if (effectiveType === "text_stream" && !effectiveNotes && !effectiveContentUrl) {
       return res.status(400).json({ message: "Text stream requires notes text or a text/HTML URL" });
     }
 
@@ -1172,26 +1191,41 @@ export const editModule = async (req, res) => {
     const values = [];
     let idx = 1;
 
-    fields.push(`title = $${idx++}`); values.push(title);
-    fields.push(`type = $${idx++}`); values.push(type);
-    fields.push(`notes = $${idx++}`); values.push(notes || null);
+    if (title !== undefined) {
+      fields.push(`title = $${idx++}`);
+      values.push(title);
+    }
+
+    if (type !== undefined) {
+      fields.push(`type = $${idx++}`);
+      values.push(type);
+    }
+
+    if (notes !== undefined) {
+      fields.push(`notes = $${idx++}`);
+      values.push(notes || null);
+    }
 
     if (duration_mins !== undefined && duration_mins !== "") {
       fields.push(`duration_mins = $${idx++}`);
       values.push(Number(duration_mins));
     }
 
-    if (finalContentUrl) {
+    if (finalContentUrl !== undefined) {
       fields.push(`content_url = $${idx++}`); values.push(finalContentUrl);
       fields.push(`pdf_data = $${idx++}`); values.push(null);
       fields.push(`pdf_filename = $${idx++}`); values.push(null);
       fields.push(`pdf_mime = $${idx++}`); values.push(null);
     }
 
-    if (type === "text_stream") {
+    if (fields.length === 0) {
+      return res.status(400).json({ message: "No changes provided" });
+    }
+
+    if (effectiveType === "text_stream") {
       const textContent = await extractTextStreamContent({
-        notes,
-        contentUrl: finalContentUrl,
+        notes: effectiveNotes,
+        contentUrl: effectiveContentUrl,
         file: req.file,
       });
       await rebuildTextChunks(moduleId, textContent);
