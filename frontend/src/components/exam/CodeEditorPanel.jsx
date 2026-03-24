@@ -229,26 +229,26 @@ const CodeEditorPanel = ({
   const results = testResults?.results || [];
 
   return (
-    <div className="flex flex-col h-full bg-[#1e1e1e] border-l border-[#333]">
+    <div className="flex flex-col h-full bg-[#111318] border-l border-slate-800">
 
       {/* Header */}
-      <div className="flex justify-between items-center px-4 py-2 bg-[#252526] border-b border-[#333]">
+      <div className="flex justify-between items-center px-4 py-2 bg-[#181b22] border-b border-slate-800">
         <div className="flex items-center gap-2">
           <span role="img" aria-label="code">💻</span>
           <select
             value={language}
             onChange={(e) => onLanguageChange?.(e.target.value)}
-            className="bg-transparent border-none text-sm font-semibold text-slate-200 focus:outline-none"
+            className="bg-[#242933] border border-slate-700 rounded-md px-2.5 py-1 text-sm font-semibold text-slate-100 focus:outline-none focus:border-indigo-500"
           >
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
-            <option value="java">Java</option>
-            <option value="cpp">C++</option>
+            <option value="javascript" className="text-slate-900">JavaScript</option>
+            <option value="python" className="text-slate-900">Python</option>
+            <option value="java" className="text-slate-900">Java</option>
+            <option value="cpp" className="text-slate-900">C++</option>
           </select>
         </div>
-        <div className="flex gap-2 text-slate-400">
-          <FaCog />
-          <FaExpand />
+        <div className="flex gap-3 text-slate-500">
+          <FaCog className="hover:text-slate-300 transition-colors cursor-pointer" />
+          <FaExpand className="hover:text-slate-300 transition-colors cursor-pointer" />
         </div>
       </div>
 
@@ -272,13 +272,13 @@ const CodeEditorPanel = ({
       </div>
 
       {/* Bottom panel */}
-      <div className="h-56 flex flex-col bg-[#1e1e1e] border-t border-[#333]">
+      <div className="h-56 flex flex-col bg-[#111318] border-t border-slate-800">
         {/* Tabs */}
-        <div className="flex border-b border-[#333] bg-[#252526]">
+        <div className="flex border-b border-slate-800 bg-[#181b22]">
           <div
             className={`px-4 py-2 text-xs font-bold cursor-pointer transition-colors ${activeTab === 'testcases'
-              ? 'text-blue-400 border-b-2 border-blue-400 bg-[#1e1e1e]'
-              : 'text-slate-500 hover:text-slate-300'
+              ? 'text-indigo-300 border-b-2 border-indigo-400 bg-[#111318]'
+              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
               }`}
             onClick={() => setActiveTab('testcases')}
           >
@@ -286,16 +286,16 @@ const CodeEditorPanel = ({
           </div>
           <div
             className={`px-4 py-2 text-xs font-bold cursor-pointer transition-colors ${activeTab === 'results'
-              ? 'text-blue-400 border-b-2 border-blue-400 bg-[#1e1e1e]'
-              : 'text-slate-500 hover:text-slate-300'
+              ? 'text-indigo-300 border-b-2 border-indigo-400 bg-[#111318]'
+              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
               }`}
             onClick={() => setActiveTab('results')}
           >
             Test Results
             {summary && (
               <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold ${summary.passed === summary.total
-                ? 'bg-emerald-600/30 text-emerald-400'
-                : 'bg-red-600/30 text-red-400'
+                ? 'bg-emerald-500/20 text-emerald-300'
+                : 'bg-red-500/20 text-red-300'
                 }`}>
                 {summary.passed}/{summary.total}
               </span>
@@ -303,8 +303,8 @@ const CodeEditorPanel = ({
           </div>
           <div
             className={`px-4 py-2 text-xs font-bold cursor-pointer transition-colors ${activeTab === 'console'
-              ? 'text-blue-400 border-b-2 border-blue-400 bg-[#1e1e1e]'
-              : 'text-slate-500 hover:text-slate-300'
+              ? 'text-indigo-300 border-b-2 border-indigo-400 bg-[#111318]'
+              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
               }`}
             onClick={() => setActiveTab('console')}
           >
@@ -451,11 +451,11 @@ const CodeEditorPanel = ({
       </div>
 
       {/* Actions */}
-      <div className="p-3 bg-[#252526] border-t border-[#333] flex justify-end gap-3">
+      <div className="p-3 bg-[#181b22] border-t border-slate-800 flex justify-end gap-3">
         <button
           onClick={onRun}
           disabled={isRunning}
-          className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-emerald-900/20"
         >
           {isRunning ? (
             <><span className="animate-spin">⟳</span> Running...</>
@@ -467,7 +467,7 @@ const CodeEditorPanel = ({
           <button
             onClick={onSubmit}
             disabled={isSubmitting}
-            className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-900/20"
           >
             {isSubmitting ? (
               <><span className="animate-spin">⟳</span> Submitting...</>

@@ -15,32 +15,32 @@ const ProblemDescription = ({ question }) => {
     difficultyColors.medium;
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-slate-50 text-slate-700">
-      <div className="mb-6 pb-6 border-b border-slate-200">
-        <h2 className="text-2xl font-bold text-slate-800 mb-3">
+    <div className="h-full overflow-y-auto p-6 bg-white text-slate-700">
+      <div className="mb-6 pb-5 border-b border-slate-200 sticky top-0 bg-white/95 backdrop-blur z-10">
+        <h2 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">
           {question.title}
         </h2>
 
         <span
-          className={`px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wide ${difficultyClass}`}
+          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-sm ${difficultyClass}`}
         >
           {question.difficulty}
         </span>
       </div>
 
       {/* ✅ Description from DB */}
-      <div className="mb-6">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+      <div className="mb-8">
+        <div className="text-xs font-extrabold text-slate-400 uppercase tracking-[0.12em] mb-2">
           Description
         </div>
-        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+        <div className="text-sm leading-7 whitespace-pre-wrap text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4">
           {question.description}
         </div>
       </div>
 
       {/* ✅ Examples from test_cases */}
-      <div className="mb-6">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+      <div className="mb-2">
+        <div className="text-xs font-extrabold text-slate-400 uppercase tracking-[0.12em] mb-3">
           Examples
         </div>
 
@@ -50,22 +50,22 @@ const ProblemDescription = ({ question }) => {
           .map((tc, idx) => (
             <div
               key={idx}
-              className="bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm"
+              className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 shadow-sm"
             >
               <div className="mb-3">
-                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase mr-2">
+                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-extrabold uppercase mr-2 tracking-wide">
                   Input
                 </span>
-                <div className="mt-1 p-2 bg-slate-800 text-slate-200 rounded-lg font-mono text-xs overflow-x-auto">
+                <div className="mt-1 p-2.5 bg-slate-900 text-slate-100 rounded-lg font-mono text-xs overflow-x-auto border border-slate-700">
                   {tc.input}
                 </div>
               </div>
 
               <div>
-                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase mr-2">
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-extrabold uppercase mr-2 tracking-wide">
                   Output
                 </span>
-                <div className="mt-1 p-2 bg-slate-800 text-slate-200 rounded-lg font-mono text-xs overflow-x-auto">
+                <div className="mt-1 p-2.5 bg-slate-900 text-slate-100 rounded-lg font-mono text-xs overflow-x-auto border border-slate-700">
                   {tc.output}
                 </div>
               </div>
