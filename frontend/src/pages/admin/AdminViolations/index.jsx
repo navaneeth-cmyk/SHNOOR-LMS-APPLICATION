@@ -31,7 +31,7 @@ const formatViolationDateTime = (log) => {
     ? (details.timestamp ?? details.time ?? details.detectedAt)
     : null;
 
-  const rawValue = log?.created_at ?? detailTimestamp;
+  const rawValue = detailTimestamp ?? log?.created_at;
   if (!rawValue) return '---';
 
   let date;
@@ -45,12 +45,26 @@ const formatViolationDateTime = (log) => {
   if (Number.isNaN(date.getTime())) return '---';
 
   return date.toLocaleString('en-GB', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit'
+  });
+};
+
+const formatAttemptDateIST = (rawDate) => {
+  if (!rawDate) return '---';
+  const date = new Date(rawDate);
+  if (Number.isNaN(date.getTime())) return '---';
+
+  return date.toLocaleDateString('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
   });
 };
 
@@ -469,7 +483,7 @@ const AdminViolations = () => {
                               </div>
                             </td>
                             <td className="p-4 text-xs font-bold text-slate-600">
-                              {new Date(attempt.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {formatAttemptDateIST(attempt.created_at)}
                             </td>
                             <td className="p-4">
                               <span className="text-xs font-black text-rose-600">
@@ -619,7 +633,7 @@ const AdminViolations = () => {
                               </div>
                             </td>
                             <td className="p-4 text-xs font-bold text-slate-600">
-                              {new Date(attempt.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {formatAttemptDateIST(attempt.created_at)}
                             </td>
                             <td className="p-4">
                               <span className="text-xs font-black text-indigo-600">

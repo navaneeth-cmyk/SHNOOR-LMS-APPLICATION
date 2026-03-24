@@ -15,7 +15,7 @@ import {
   Minus,
   Upload,
 } from "lucide-react";
-import TextStreamPlayer from "../../student/CoursePlayer/TextStreamPlayer";
+// import TextStreamPlayer from "../../student/CoursePlayer/TextStreamPlayer";
 
 const AddCourseView = ({
   step,
@@ -694,13 +694,13 @@ const AddCourseView = ({
                             </div>
                           </div>
                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {m.type === "text_stream" && (
+                            {/* {m.type === "text_stream" && (
                               <button
                                 onClick={() => setPreviewModuleId(m.id)}
                                 className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
                                 title="Preview"
                               >👁</button>
-                            )}
+                            )} */}
                             <button onClick={() => moveModule(idx, -1)} disabled={idx === 0} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded">
                               <ArrowUp size={12} />
                             </button>
@@ -720,7 +720,7 @@ const AddCourseView = ({
             </div>
           )}
 
-          {previewModuleId && (
+          {/* {previewModuleId && (
             <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden relative">
                 <button
@@ -734,7 +734,7 @@ const AddCourseView = ({
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* STEP 3: Review */}
           {step === 3 && (
