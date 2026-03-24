@@ -6,6 +6,20 @@ import ChatWindow from '../../components/chat/ChatWindow';
 import api from '../../api/axios';
 import '../../styles/Chat.css';
 
+const formatDateTimeIST = (rawValue) => {
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 const ChatWithStudents = () => {
   const { socket, dbUser, unreadCounts, markChatRead, handleSetActiveChat } = useSocket();
 
@@ -284,7 +298,11 @@ const ChatWithStudents = () => {
       }
     };
     socket.on('new_message', onNewMessage);
-    return () => socket.off('new_message', onNewMessage);
+    socket.on('receive_message', onNewMessage);
+    return () => {
+      socket.off('new_message', onNewMessage);
+      socket.off('receive_message', onNewMessage);
+    };
   }, [socket, activeChat, dbUser, chats]);
 
   // ── Socket: group messages ──────────────────────────────────────────────────
@@ -723,10 +741,7 @@ const ChatWithStudents = () => {
                         <div className="font-semibold text-slate-900 text-sm mb-1">{result.chat_name}</div>
                         <div className="text-slate-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
                         <div className="text-xs text-slate-400 mt-1">
-                          {new Date(result.created_at).toLocaleDateString('en-US', {
-                            month: 'short', day: 'numeric', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit',
-                          })}
+                          {formatDateTimeIST(result.created_at)}
                         </div>
                       </button>
                     ))}

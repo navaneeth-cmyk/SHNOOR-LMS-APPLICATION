@@ -3,6 +3,17 @@ import { FaPaperPlane, FaPaperclip, FaTimes, FaFileAlt, FaImage, FaVideo, FaSmil
 import EmojiPicker from 'emoji-picker-react';
 import GroupInfoDrawer from './GroupInfoDrawer';
 
+const formatMessageTimeIST = (rawValue) => {
+    const date = new Date(rawValue || Date.now());
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+    });
+};
+
 const ChatWindow = ({
     socket,
     activeChat,
@@ -706,7 +717,7 @@ const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onRe
             </div>
 
             <div className={`text-[9px] mt-1 font-bold text-slate-400 flex items-center gap-1.5 px-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                {new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {formatMessageTimeIST(msg.created_at)}
                 {isMe && <FaCheck size={8} className="text-indigo-400 opacity-50" />}
             </div>
         </div>

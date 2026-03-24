@@ -1,11 +1,39 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import api from '../../../api/axios';
 import { MessageSquare, Users, Calendar, Loader2, Search, X } from 'lucide-react';
+import { useSocket } from '../../../context/SocketContext';
+
+const formatDateTimeIST = (rawValue) => {
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
+const formatDateIST = (rawValue) => {
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
 const InstructorGroups = () => {
   const navigate = useNavigate();
+  const { socket, dbUser } = useSocket();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -159,6 +187,42 @@ const InstructorGroups = () => {
     }
   }, [showSearch, groups]);
 
+  useEffect(() => {
+    if (!socket || groups.length === 0) return;
+
+    const showGroupPopup = (msg) => {
+      if (!msg || msg.sender_id === dbUser?.id) return;
+
+      const targetGroup = groups.find((group) => group.group_id === msg.group_id || group.group_id === msg.chat_id);
+      if (!targetGroup) return;
+
+      toast.custom((t) => (
+        <div
+          className="bg-white border-l-4 border-blue-500 shadow-lg rounded-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
+          onClick={() => {
+            navigate(`/instructor/groups/${targetGroup.group_id}?source=${targetGroup.source}`);
+            toast.dismiss(t.id);
+          }}
+        >
+          <p className="font-semibold text-gray-900">{msg.group_name || targetGroup.name || 'Group'}</p>
+          <p className="text-gray-700 text-sm font-medium">{msg.sender_name || 'User'}</p>
+          <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
+        </div>
+      ), {
+        duration: 5,
+        position: 'top-right',
+      });
+    };
+
+    socket.on('group_message', showGroupPopup);
+    socket.on('receive_message', showGroupPopup);
+
+    return () => {
+      socket.off('group_message', showGroupPopup);
+      socket.off('receive_message', showGroupPopup);
+    };
+  }, [socket, dbUser, groups, navigate]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
@@ -287,10 +351,7 @@ const InstructorGroups = () => {
                             <div className="font-semibold text-gray-900 text-sm">{result.group_name}</div>
                             <div className="text-gray-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
                             <div className="text-xs text-gray-400">
-                              {new Date(result.created_at).toLocaleDateString('en-US', {
-                                month: 'short', day: 'numeric', year: 'numeric',
-                                hour: '2-digit', minute: '2-digit'
-                              })}
+                              {formatDateTimeIST(result.created_at)}
                             </div>
                           </div>
                         </div>
@@ -329,7 +390,7 @@ const InstructorGroups = () => {
                 </div>
                 <div className="flex items-center gap-1 text-sm text-gray-500">
                   <Calendar size={14} />
-                  {group.created_at ? new Date(group.created_at).toLocaleDateString() : '—'}
+                  {formatDateIST(group.created_at)}
                 </div>
               </div>
 
