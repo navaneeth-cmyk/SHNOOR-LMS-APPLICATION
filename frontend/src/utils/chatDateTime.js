@@ -1,4 +1,5 @@
 const NO_TIMEZONE_REGEX = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/;
+const IST_OFFSET = "+05:30";
 
 export const parseChatDate = (rawValue) => {
   if (rawValue instanceof Date) return rawValue;
@@ -9,7 +10,7 @@ export const parseChatDate = (rawValue) => {
   if (!normalized) return new Date();
 
   const valueWithTimezone = NO_TIMEZONE_REGEX.test(normalized)
-    ? `${normalized.replace(" ", "T")}Z`
+    ? `${normalized.replace(" ", "T")}${IST_OFFSET}`
     : normalized;
 
   const parsed = new Date(valueWithTimezone);

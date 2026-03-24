@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../../../api/axios';
 import { MessageSquare, Users, Calendar, Loader2, Search, X } from 'lucide-react';
 import { useSocket } from '../../../context/SocketContext';
-import { formatChatDateTime } from '../../../utils/chatDateTime';
+import { formatChatDate, formatChatDateTime } from '../../../utils/chatDateTime';
 
 const InstructorGroups = () => {
   const navigate = useNavigate();
@@ -366,7 +366,7 @@ const InstructorGroups = () => {
                 </div>
                 <div className="flex items-center gap-1 text-sm text-gray-500">
                   <Calendar size={14} />
-                  {formatDateIST(group.created_at)}
+                  {formatChatDate(group.created_at)}
                 </div>
               </div>
 
