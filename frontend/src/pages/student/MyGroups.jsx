@@ -201,31 +201,7 @@ import api from '../../api/axios';
 import { MessageSquare, Users, Calendar, Loader2, Search, X } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { useSocket } from '../../context/SocketContext';
-
-const formatDateTimeIST = (rawValue) => {
-  const date = new Date(rawValue);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
-};
-
-const formatDateIST = (rawValue) => {
-  const date = new Date(rawValue);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
+import { formatChatDateTime } from '../../utils/chatDateTime';
 
 const MyGroups = () => {
   const navigate = useNavigate();
@@ -557,7 +533,7 @@ return (
                             <div className="font-semibold text-gray-900 text-sm">{result.group_name}</div>
                             <div className="text-gray-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
                             <div className="text-xs text-gray-400">
-                              {formatDateTimeIST(result.created_at)}
+                              {formatChatDateTime(result.created_at)}
                             </div>
                           </div>
                         </div>

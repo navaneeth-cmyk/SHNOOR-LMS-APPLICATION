@@ -9,7 +9,7 @@ import '../../styles/Chat.css';
 const InstructorGroupChat = () => {
   const { groupId } = useParams();
   const [searchParams] = useSearchParams();
-  const { socket, dbUser } = useSocket();
+  const { socket, dbUser, handleSetActiveChat } = useSocket();
   const source = searchParams.get('source') || 'admin-chat';
   const isAdminSectionGroup = source === 'admin-section';
 
@@ -65,6 +65,7 @@ const InstructorGroupChat = () => {
     if (!socket || !groupId) return;
 
     socket.emit('join_group', groupId);
+    handleSetActiveChat(groupId);
 
     const handleNewMessage = (msg) => {
       setMessages(prev => [
@@ -82,9 +83,10 @@ const InstructorGroupChat = () => {
 
     return () => {
       socket.emit('leave_group', groupId);
+      handleSetActiveChat(null);
       socket.off('group_message', handleNewMessage);
     };
-  }, [socket, groupId, dbUser?.id]);
+  }, [socket, groupId, dbUser?.id, handleSetActiveChat];
 
   const handleSendMessage = async (text, file = null) => {
     if (!text.trim() && !file) return;
