@@ -2,6 +2,7 @@ import pool from "../db/postgres.js";
 import csv from "csv-parser";
 import { Readable } from "stream";
 import axios from "axios";
+import fs from "fs";
 import {
   uploadLocalFileToSupabase,
   resolveModuleStorageFolder,
@@ -49,9 +50,23 @@ const toISTTimestamp = (value) => {
   return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 };
 
-const extractTextStreamContent = async ({ notes, contentUrl }) => {
+const extractTextStreamContent = async ({ notes, contentUrl, file }) => {
+  // 🚫 COMMENTED OUT: text_stream support removed - only PDFs supported
+  /*
   let text = String(notes || "").trim();
 
+  // If a file was just uploaded, read it directly from disk (most reliable)
+  if (!text && file && file.path) {
+    try {
+      if (fs.existsSync(file.path)) {
+        text = fs.readFileSync(file.path, "utf-8");
+      }
+    } catch (err) {
+      console.warn("Could not read uploaded text_stream file from disk:", err.message);
+    }
+  }
+
+  // Fallback: fetch contentUrl if it's an external link
   if (!text && contentUrl && /^https?:\/\//i.test(contentUrl)) {
     try {
       const response = await axios.get(contentUrl, {
@@ -75,28 +90,45 @@ const extractTextStreamContent = async ({ notes, contentUrl }) => {
     }
   }
 
-  // ✅ DO NOT strip HTML tags - preserve them for iframe display
-  // if (text && /\.html?($|\?)/i.test(String(contentUrl || ""))) {
-  //   text = text.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
-  // }
+  // Strip HTML tags if content is HTML
+  if (text && (/\.html?($|\?)/i.test(String(contentUrl || "")) || /<[a-z][\s\S]*>/i.test(text))) {
+    text = text.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim();
+  }
 
   return text;
+  */
+  return "";
 };
 
 const rebuildTextChunks = async (moduleId, textContent) => {
+  // 🚫 COMMENTED OUT: text_stream support removed - only PDFs supported
+  /*
   await pool.query(`DELETE FROM module_text_chunks WHERE module_id = $1`, [moduleId]);
 
-  const chunks = String(textContent || "")
+  const allWords = String(textContent || "")
     .split(/\s+/)
-    .filter((c) => c.length > 0)
-    .map((c) => `${c} `);
+    .filter((c) => c.length > 0);
 
-  if (!chunks.length) return 0;
+  if (!allWords.length) return 0;
+
+  // Group words into blocks of 50
+  const chunks = [];
+  const wordsPerChunk = 50;
+  for (let i = 0; i < allWords.length; i += wordsPerChunk) {
+    const chunkText = allWords.slice(i, i + wordsPerChunk).join(" ") + " ";
+    chunks.push({
+      content: chunkText,
+      wordCount: allWords.slice(i, i + wordsPerChunk).length,
+    });
+  }
 
   const chunkVals = [];
   const chunkPlaceholders = [];
   for (let k = 0; k < chunks.length; k++) {
-    chunkVals.push(moduleId, chunks[k], k, 1);
+    const c = chunks[k];
+    // roughly 1 second per 5 words
+    const duration = Math.max(1, Math.ceil(c.wordCount / 5));
+    chunkVals.push(moduleId, c.content, k, duration);
     const o = k * 4;
     chunkPlaceholders.push(`($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4})`);
   }
@@ -108,6 +140,8 @@ const rebuildTextChunks = async (moduleId, textContent) => {
   );
 
   return chunks.length;
+  */
+  return 0;
 };
 
 export const addCourse = async (req, res) => {
@@ -125,7 +159,8 @@ export const addCourse = async (req, res) => {
     price_type,
     price_amount,
     prereq_description,
-    prereq_video_urls,
+    // 🚫 COMMENTED OUT: Video URLs no longer supported
+    // prereq_video_urls,
     prereq_pdf_url,
   } = req.body || {};
 
@@ -166,11 +201,10 @@ export const addCourse = async (req, res) => {
         price_type,
         price_amount,
         prereq_description,
-        prereq_video_urls,
         prereq_pdf_url
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
       )
       RETURNING *
     `;
@@ -190,8 +224,7 @@ export const addCourse = async (req, res) => {
       price_type, // $12
       price_type === "paid" ? price_amount : null, // $13
       prereq_description || null,
-      prereq_video_urls ? JSON.stringify(prereq_video_urls) : "[]",
-      prereq_pdf_url || null,
+      prereq_pdf_url || null, // Only PDF URL, no video URLs
     ];
 
     const result = await pool.query(query, values);
@@ -475,7 +508,8 @@ export const getCourseById = async (req, res) => {
         c.difficulty AS level,        -- 👈 FIX LEVEL
         c.created_at AS updatedAt, 
          c.prereq_description,
-        c.prereq_video_urls,
+        -- 🚫 COMMENTED OUT: Video URLs no longer supported
+        -- c.prereq_video_urls,
         c.prereq_pdf_url,
 
         json_build_object(            -- 👈 FIX INSTRUCTOR
@@ -1102,20 +1136,15 @@ export const editModule = async (req, res) => {
     let finalContentUrl = content_url || null;
 
     if (req.file) {
-      try {
-        const uploadResult = await uploadLocalFileToSupabase(req.file.path, {
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype,
-          folder: `modules/${resolveModuleStorageFolder({
-            type,
-            mimeType: req.file.mimetype,
-            originalName: req.file.originalname,
-          })}`,
-        });
-        finalContentUrl = uploadResult.url;
-      } finally {
-        await removeLocalFileSafe(req.file.path);
+      const ext = req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase();
+      let subFolder = "docs";
+      if (req.file.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
+          subFolder = "videos";
+      } else if (req.file.mimetype === "application/pdf" || ext === ".pdf") {
+          subFolder = "pdfs";
       }
+      const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+      finalContentUrl = `${backendUrl}/uploads/${subFolder}/${req.file.filename}`;
     }
 
     if (!title || !type) {
@@ -1152,6 +1181,7 @@ export const editModule = async (req, res) => {
       const textContent = await extractTextStreamContent({
         notes,
         contentUrl: finalContentUrl,
+        file: req.file,
       });
       await rebuildTextChunks(moduleId, textContent);
     }
@@ -1201,20 +1231,15 @@ export const addModule = async (req, res) => {
     let finalContentUrl = content_url || null;
 
     if (req.file) {
-      try {
-        const uploadResult = await uploadLocalFileToSupabase(req.file.path, {
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype,
-          folder: `modules/${resolveModuleStorageFolder({
-            type,
-            mimeType: req.file.mimetype,
-            originalName: req.file.originalname,
-          })}`,
-        });
-        finalContentUrl = uploadResult.url;
-      } finally {
-        await removeLocalFileSafe(req.file.path);
+      const ext = req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase();
+      let subFolder = "docs";
+      if (req.file.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
+          subFolder = "videos";
+      } else if (req.file.mimetype === "application/pdf" || ext === ".pdf") {
+          subFolder = "pdfs";
       }
+      const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+      finalContentUrl = `${backendUrl}/uploads/${subFolder}/${req.file.filename}`;
     }
 
     if (!title || !type) {
@@ -1258,6 +1283,7 @@ export const addModule = async (req, res) => {
       const textContent = await extractTextStreamContent({
         notes,
         contentUrl: finalContentUrl,
+        file: req.file,
       });
       await rebuildTextChunks(moduleId, textContent);
     }

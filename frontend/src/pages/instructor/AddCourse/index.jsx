@@ -39,7 +39,7 @@ export const AddCourse = () => {
 
   const [moduleForm, setModuleForm] = useState({
     title: "",
-    type: "video",
+    type: "pdf", // 🚫 Changed from "video" to "pdf" - only PDF support
     url: "",
     duration: "",
     notes: "",
@@ -259,9 +259,11 @@ export const AddCourse = () => {
       }));
 
       const displayType = fieldName === 'notes' ? 'Notes PDF' : 
-                         moduleForm.type === 'video' ? 'Video' : 
                          moduleForm.type === 'pdf' ? 'PDF' : 
-                         moduleForm.type === 'text_stream' ? 'Text Stream' : 'File';
+                         // 🚫 COMMENTED OUT: Video and text stream support removed
+                         // moduleForm.type === 'video' ? 'Video' : 
+                         // moduleForm.type === 'text_stream' ? 'Text Stream' : 
+                         'File';
       
       alert(`${displayType} uploaded successfully!`);
 

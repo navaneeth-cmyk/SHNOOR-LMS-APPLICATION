@@ -39,15 +39,35 @@ export const addModules = async (req, res) => {
       let uploadProvider = null;
 
       if (pdf) {
+        // ✅ Upload PDF to Supabase instead of local storage
         const ext = pdf.originalname.slice(pdf.originalname.lastIndexOf('.')).toLowerCase();
-        let subFolder = "docs";
-        if (pdf.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
-            subFolder = "videos";
-        } else if (pdf.mimetype === "application/pdf" || ext === ".pdf") {
-            subFolder = "pdfs";
+        if (ext.toLowerCase() === ".pdf" || pdf.mimetype === "application/pdf") {
+          try {
+            const { url, objectPath } = await uploadLocalFileToSupabase(
+              pdf.path,
+              {
+                originalName: pdf.originalname,
+                mimeType: pdf.mimetype,
+                folder: "pdfs",
+              }
+            );
+            finalContentUrl = url;
+            uploadProvider = "supabase";
+          } catch (uploadErr) {
+            console.error("Error uploading PDF to Supabase:", uploadErr.message);
+            throw uploadErr;
+          }
+        } else {
+          // 🚫 COMMENTED OUT: Only PDFs are supported now
+          // const ext = pdf.originalname.slice(pdf.originalname.lastIndexOf('.')).toLowerCase();
+          // let subFolder = "docs";
+          // if (pdf.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
+          //     subFolder = "videos";
+          // } else if (pdf.mimetype === "application/pdf" || ext === ".pdf") {
+          //     subFolder = "pdfs";
+          // }
+          throw new Error("Only PDF files are supported for module content.");
         }
-        const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
-        finalContentUrl = `${backendUrl}/uploads/${subFolder}/${pdf.filename}`;
       }
 
       const result = await pool.query(
@@ -81,8 +101,8 @@ export const addModules = async (req, res) => {
         ]
       );
 
-      // Handle text_stream chunking for batch upload or file upload
-      if (m.type === "text_stream") {
+      // 🚫 COMMENTED OUT: text_stream support removed - only PDFs supported
+      /* if (m.type === "text_stream") {
         const moduleId = result.rows[0].module_id;
         let textToChunk = m.notes || "";
 
@@ -126,22 +146,33 @@ export const addModules = async (req, res) => {
         }
 
         if (textToChunk) {
-          const chunks = textToChunk.split(/\s+/).filter((c) => c.length > 0).map((c) => c + " ");
-          if (chunks.length > 0) {
+          const allWords = textToChunk.split(/\s+/).filter((c) => c.length > 0);
+          if (allWords.length > 0) {
+            // Group words into blocks of 50
+            const chunks = [];
+            const wordsPerChunk = 50;
+            for (let i = 0; i < allWords.length; i += wordsPerChunk) {
+              const chunkText = allWords.slice(i, i + wordsPerChunk).join(" ") + " ";
+              chunks.push({
+                content: chunkText,
+                wordCount: allWords.slice(i, i + wordsPerChunk).length,
+              });
+            }
+
             const chunkVals = [];
             const chunkPlaceholders = [];
             for (let k = 0; k < chunks.length; k++) {
-              chunkVals.push(moduleId, chunks[k], k, 1);
+              const c = chunks[k];
+              const duration = Math.max(1, Math.ceil(c.wordCount / 5)); // ~1 sec per 5 words
+              chunkVals.push(moduleId, c.content, k, duration);
               const o = k * 4;
               chunkPlaceholders.push(`($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4})`);
             }
-            // Batch inserts to avoid too many parameters in a single query if file is large
-            const batchSize = 100; // 100 chunks * 4 params = 400 params (safe)
+
+            const batchSize = 100;
             for (let i = 0; i < chunkPlaceholders.length; i += batchSize) {
               const pBatch = chunkPlaceholders.slice(i, i + batchSize);
               const vBatch = chunkVals.slice(i * 4, (i + batchSize) * 4);
-
-              // We need to re-index the placeholders for each batch
               const rebindexedPlaceholders = pBatch.map((_, idx) => {
                 const base = idx * 4;
                 return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`;
@@ -155,7 +186,8 @@ export const addModules = async (req, res) => {
             }
           }
         }
-      }
+      } */
+      // END: text_stream support removed
 
       if (pdf?.path) {
         if (!uploadProvider || uploadProvider === "supabase") {
@@ -186,12 +218,8 @@ export const getModulesByCourse = async (req, res) => {
         module_id,
         title,
         type,
-        CASE 
-          WHEN type = 'pdf' OR pdf_filename IS NOT NULL OR content_url LIKE '%.pdf%' THEN '${baseUrl}/api/modules/' || module_id || '/view?type=pdf'
-          WHEN type = 'html' OR content_url LIKE '%.html%' THEN '${baseUrl}/api/modules/' || module_id || '/view?type=html'
-          WHEN type = 'text_stream' AND content_url IS NOT NULL AND content_url NOT LIKE '<iframe%' THEN '${baseUrl}/api/modules/' || module_id || '/view?type=html'
-          ELSE content_url 
-        END AS content_url,
+        -- ✅ Return Supabase URL directly for PDFs
+        content_url,
         duration_mins,
         module_order,
         notes,
@@ -230,31 +258,13 @@ export const getModuleView = async (req, res) => {
     }
 
     const moduleData = result.rows[0];
-    
-    const isHtml = queryType === 'html' || moduleData.type === 'html' || moduleData.type === 'text_stream';
-    const isPdf = queryType === 'pdf' || moduleData.type === 'pdf';
-    const isGamma = moduleData.content_url && moduleData.content_url.includes('gamma.app');
 
-    // ✅ Set security headers for iframe compatibility and CORS
+    // ✅ Set security headers for iframe compatibility
     res.removeHeader("X-Frame-Options");
-    
-    // Allow framing and cross-origin requests
-    res.setHeader("Content-Security-Policy", "frame-ancestors 'self' *; default-src 'self' * data: blob:;");
+    res.setHeader("Content-Security-Policy", "frame-ancestors 'self' *");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
-    
-    // Anti-MIME sniffing
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    
-    // For HTML/text content, send directly
-    if (isHtml) {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-    } else if (isPdf) {
-      res.setHeader("Content-Type", "application/pdf");
-    }
 
     // 1️⃣ Priority: Binary data in DB
     if (moduleData.pdf_data) {
@@ -269,31 +279,28 @@ export const getModuleView = async (req, res) => {
     // 2️⃣ URL — proxy the content to maintain our security headers
     if (moduleData.content_url) {
       try {
-        const response = await axios.get(moduleData.content_url, { 
-          responseType: "stream",
-          timeout: 10000,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-        
-        // Copy content-type from source if not already set
-        const contentType = response.headers['content-type'];
-        if (contentType && !res.getHeader('Content-Type')) {
-          res.setHeader('Content-Type', contentType);
+        const urlObj = new URL(moduleData.content_url);
+        const fileName = urlObj.pathname.split("/").pop() || "document";
+        const isHtml = queryType === 'html' || fileName.match(/\.html?($|\?)/i) || moduleData.type === 'html';
+        const isPdf = queryType === 'pdf' || fileName.match(/\.pdf($|\?)/i) || moduleData.type === 'pdf';
+
+        if (isHtml) {
+          res.setHeader("Content-Type", "text/html");
+        } else if (isPdf) {
+          res.setHeader("Content-Type", "application/pdf");
         }
-        
+
+        const response = await axios.get(moduleData.content_url, { responseType: "stream" });
         return response.data.pipe(res);
       } catch (proxyErr) {
-        console.warn("Proxy failed for module URL:", proxyErr.message);
-        console.warn("Falling back to redirect for URL:", moduleData.content_url.substring(0, 100));
+        console.warn("Proxy fallback failed, redirecting:", proxyErr.message);
         return res.redirect(moduleData.content_url);
       }
     }
 
     res.status(404).json({ message: "Content not found" });
   } catch (error) {
-    console.error("getModuleView error:", error);
+    console.error("getModulePdf error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

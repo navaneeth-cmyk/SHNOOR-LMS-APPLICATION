@@ -343,16 +343,10 @@ const CoursePlayerView = ({
           <div className={`${currentModule?.notes ? "min-h-[70vh]" : "flex-1"} relative`}>
 
             {/* TEXT STREAM */}
-            {currentModule?.type === "text_stream" ? (
-              <div className="absolute inset-0 w-full h-full overflow-y-auto">
-                <TextStreamPlayer
-                  moduleId={currentModule.id}
-                  url={currentModule.url}
-                  onComplete={handleMarkComplete}
-                />
-              </div>
-
-            ) : currentModule?.type === "video" ? (
+            {/* 🚫 COMMENTED OUT: Video and text stream support removed - only PDF */}
+            {false ? (
+              // Text stream player (disabled)
+              <div>
 
               /* VIDEO - Managed by ReactPlayer */
               <div className="absolute inset-0 w-full h-full bg-black">
@@ -439,10 +433,7 @@ const CoursePlayerView = ({
 
 
 
-            ) : currentModule?.type === "text_stream" || 
-                currentModule?.type === "html" || 
-                (currentModule?.url && currentModule.url.trim().toLowerCase().startsWith("<iframe")) ||
-                currentModule?.url?.toLowerCase().endsWith(".html") ? (
+            ) : false ? ( // 🚫 COMMENTED OUT: text_stream and html support removed
               <div className="absolute inset-0 w-full h-full overflow-y-auto">
                 <TextStreamPlayer
                   moduleId={currentModule.id}

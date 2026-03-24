@@ -537,12 +537,14 @@ const AddCourseView = ({
                         onChange={handleModuleChange}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md focus:border-indigo-500 outline-none text-sm"
                       >
-                        <option value="video">Video</option>
+                        {/* 🚫 COMMENTED OUT: Only PDF support */}
+                        {/* <option value="video">Video</option> */}
                         <option value="pdf">PDF</option>
-                        <option value="text_stream">Text Stream</option>
+                        {/* <option value="text_stream">Text Stream</option> */}
                       </select>
                     </div>
-                    {moduleForm.type === "video" && (
+                    {/* 🚫 COMMENTED OUT: Video duration field (video support removed) */}
+                    {false && moduleForm.type === "video" && (
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-slate-500">Duration (m)</label>
                         <input
@@ -560,7 +562,8 @@ const AddCourseView = ({
                     <div className="flex justify-between items-center">
                       <label className="text-xs font-semibold text-slate-500">Source</label>
                       <div className="flex gap-2">
-                        <span
+                        {/* 🚫 COMMENTED OUT: Video input type toggle (video support removed) */}
+                    {/* <span
                           onClick={() => setVideoInputType("url")}
                           className={`cursor-pointer text-xs ${videoInputType === "url" ? "text-indigo-600 font-bold" : "text-slate-400"}`}
                         >
@@ -572,11 +575,12 @@ const AddCourseView = ({
                           className={`cursor-pointer text-xs ${videoInputType === "upload" ? "text-indigo-600 font-bold" : "text-slate-400"}`}
                         >
                           Upload
-                        </span>
+                        </span> */}
                       </div>
                     </div>
 
-                    {videoInputType === "url" ? (
+                    {/* 🚫 COMMENTED OUT: Video URL input (video support removed) */}
+                    {false && videoInputType === "url" ? (
                       <input
                         name="url"
                         placeholder={moduleForm.type === "video" ? "https://youtube.com/..." : "https://example.com/file.pdf"}
@@ -584,8 +588,9 @@ const AddCourseView = ({
                         onChange={handleModuleChange}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md focus:border-indigo-500 outline-none text-sm"
                       />
-                    ) : (
-                      <div className="border border-dashed border-slate-300 rounded-md p-4 text-center cursor-pointer hover:bg-slate-50 transition-colors relative">
+                    ) : false && (
+                        {/* 🚫 COMMENTED OUT: Video file upload (video support removed) */}
+                        {false && <div className="border border-dashed border-slate-300 rounded-md p-4 text-center cursor-pointer hover:bg-slate-50 transition-colors relative">
                         <input
                           type="file"
                           accept={moduleForm.type === "video" ? "video/*" : "application/pdf"}
