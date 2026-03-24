@@ -1,24 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, X, Loader2, Search } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { useSocket } from '../../context/SocketContext';
 import ChatWindow from '../../components/chat/ChatWindow';
 import api from '../../api/axios';
+import { formatChatDateTime } from '../../utils/chatDateTime';
 import '../../styles/Chat.css';
-
-const formatDateTimeIST = (rawValue) => {
-  const date = new Date(rawValue);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
-};
 
 const ChatWithStudents = () => {
   const { socket, dbUser, unreadCounts, markChatRead, handleSetActiveChat } = useSocket();
@@ -271,30 +257,6 @@ const ChatWithStudents = () => {
       if (msg.chat_id === activeChat?.id) {
         // Message is for the active chat - add to messages and show subtle notification
         setMessages(prev => [...prev, { ...msg, isMyMessage }]);
-        if (!isMyMessage) {
-          toast.success(`New message from ${msg.sender_name || 'User'}`, {
-            duration: 2,
-            position: 'top-right'
-          });
-        }
-      } else if (!isMyMessage) {
-        // Message from another chat - show prominent notification with action
-        toast.custom((t) => (
-          <div className="bg-white border-l-4 border-blue-500 shadow-lg rounded-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
-            onClick={() => {
-              const targetChat = chats.find(c => c.id === msg.chat_id);
-              if (targetChat) {
-                handleSelectChat(targetChat);
-                toast.dismiss(t.id);
-              }
-            }}>
-            <p className="font-semibold text-gray-900">{msg.sender_name || 'User'}</p>
-            <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
-          </div>
-        ), {
-          duration: 5,
-          position: 'top-right'
-        });
       }
     };
     socket.on('new_message', onNewMessage);
@@ -318,31 +280,6 @@ const ChatWithStudents = () => {
           isMyMessage,
           sender_name: msg.sender_name || 'Unknown',
         }]);
-        if (!isMyMessage) {
-          toast.success(`New message in ${msg.group_name || 'group'}`, {
-            duration: 2,
-            position: 'top-right'
-          });
-        }
-      } else if (!isMyMessage) {
-        // Message from another group - show prominent notification with action
-        toast.custom((t) => (
-          <div className="bg-white border-l-4 border-purple-500 shadow-lg rounded-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
-            onClick={() => {
-              const targetChat = chats.find(c => c.id === msg.group_id);
-              if (targetChat) {
-                handleSelectChat(targetChat);
-                toast.dismiss(t.id);
-              }
-            }}>
-            <p className="font-semibold text-gray-900">{msg.group_name || 'Group'}</p>
-            <p className="text-gray-700 text-sm font-medium">{msg.sender_name}</p>
-            <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
-          </div>
-        ), {
-          duration: 5,
-          position: 'top-right'
-        });
       }
     };
     socket.on('group_message', handleGroupMessage);
@@ -741,7 +678,7 @@ const ChatWithStudents = () => {
                         <div className="font-semibold text-slate-900 text-sm mb-1">{result.chat_name}</div>
                         <div className="text-slate-600 text-sm line-clamp-2">{result.text || '(No text)'}</div>
                         <div className="text-xs text-slate-400 mt-1">
-                          {formatDateTimeIST(result.created_at)}
+                          {formatChatDateTime(result.created_at)}
                         </div>
                       </button>
                     ))}

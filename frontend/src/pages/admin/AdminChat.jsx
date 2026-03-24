@@ -7,6 +7,7 @@ import { useAuth } from '@auth/useAuth';
 import ChatList from '../../components/chat/ChatList';
 import ChatWindow from '../../components/chat/ChatWindow';
 import { Search, X } from 'lucide-react';
+import { formatChatDate, formatChatTime } from '../../utils/chatDateTime';
 import '../../styles/Chat.css';
 
 const AdminChat = () => {
@@ -338,7 +339,9 @@ const AdminChat = () => {
                                                             {result.other_user_name}
                                                         </span>
                                                         <span className="text-xs text-slate-400 whitespace-nowrap">
-                                                            {result.display_time}
+                                                            {result.created_at
+                                                                ? formatChatTime(result.created_at)
+                                                                : result.display_time || '—'}
                                                         </span>
                                                     </div>
                                                     <p className="text-sm text-slate-600 line-clamp-2">
@@ -347,7 +350,9 @@ const AdminChat = () => {
                                                 </div>
                                             </div>
                                             <div className="text-xs text-slate-400 mt-1">
-                                                {result.display_date}
+                                                {result.created_at
+                                                    ? formatChatDate(result.created_at)
+                                                    : result.display_date || '—'}
                                             </div>
                                         </button>
                                     ))

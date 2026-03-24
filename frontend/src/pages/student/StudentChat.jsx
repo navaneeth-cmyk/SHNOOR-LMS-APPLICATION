@@ -1,13 +1,13 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
-import toast from 'react-hot-toast';
 import api from "../../api/axios";
 import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../auth/useAuth";
 import ChatList from "../../components/chat/ChatList";
 import ChatWindow from "../../components/chat/ChatWindow";
 import { Users, Search, X } from "lucide-react";
+import { formatChatDate, formatChatTime } from "../../utils/chatDateTime";
 import "../../styles/Chat.css";
 
 const StudentChat = () => {
@@ -138,31 +138,6 @@ const StudentChat = () => {
           },
         ]);
         if (msg.chat_id) api.put("/api/chats/read", { chatId: msg.chat_id });
-        if (!isMyMessage) {
-          toast.success(`New message from ${msg.sender_name || 'User'}`, {
-            duration: 2,
-            position: 'top-right'
-          });
-        }
-      } else if (!isMyMessage) {
-        // Message from inactive chat - show prominent notification
-        const chatName = msg.sender_name || msg.chat_name || 'User';
-        toast.custom((t) => (
-          <div className="bg-white border-l-4 border-blue-500 shadow-lg rounded-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
-            onClick={() => {
-              const targetChat = chats.find(c => c.id === msg.chat_id || c.id === msg.group_id);
-              if (targetChat) {
-                handleSelectChat(targetChat);
-                toast.dismiss(t.id);
-              }
-            }}>
-            <p className="font-semibold text-gray-900">{chatName}</p>
-            <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
-          </div>
-        ), {
-          duration: 5,
-          position: 'top-right'
-        });
       }
     };
     socket.on("receive_message", handleReceive);
@@ -658,11 +633,9 @@ const StudentChat = () => {
                                 : result.other_user_name}
                             </span>
                             <span className="text-xs text-slate-400 whitespace-nowrap">
-                              {result.display_time ||
-                                new Date(result.created_at).toLocaleTimeString(
-                                  "en-US",
-                                  { hour: "2-digit", minute: "2-digit" },
-                                )}
+                              {result.created_at
+                                ? formatChatTime(result.created_at)
+                                : result.display_time || "—"}
                             </span>
                           </div>
                           {result.type === "group" && (
@@ -681,15 +654,9 @@ const StudentChat = () => {
                         </div>
                       </div>
                       <div className="text-xs text-slate-400 mt-1">
-                        {result.display_date ||
-                          new Date(result.created_at).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}
+                        {result.created_at
+                          ? formatChatDate(result.created_at)
+                          : result.display_date || "—"}
                       </div>
                     </button>
                   ))

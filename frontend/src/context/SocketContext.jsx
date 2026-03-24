@@ -182,6 +182,62 @@ export const SocketProvider = ({ children }) => {
     return () => socket.off('new_notification', handleNotification);
   }, [socket, dbUser, notificationPermission]);
 
+  useEffect(() => {
+    if (!socket || !dbUser) return;
+
+    const handleIncomingMessagePopup = (data = {}) => {
+      const senderId = data.sender_id ?? data.senderId;
+      if (senderId === dbUser.id) return;
+
+      const targetId = data.chat_id ?? data.chatId ?? data.group_id ?? data.groupId;
+      if (!targetId) return;
+      if (activeChatRef.current === targetId) return;
+
+      const popupId = `chat-popup-${
+        data.message_id || data.id || `${targetId}-${data.created_at || data.timestamp || Date.now()}`
+      }`;
+
+      const title =
+        data.group_name ||
+        data.chat_name ||
+        data.sender_name ||
+        data.senderName ||
+        'New message';
+
+      const preview =
+        data.text ||
+        data.message_text ||
+        (data.attachment_file_id ? '📎 Attachment' : 'You have a new message');
+
+      toast.custom(
+        (t) => (
+          <div
+            className="bg-white border-l-4 border-indigo-500 shadow-lg rounded-lg p-4 max-w-sm"
+            onClick={() => toast.dismiss(t.id)}
+          >
+            <p className="font-semibold text-gray-900">{title}</p>
+            <p className="text-gray-600 text-sm truncate">{preview}</p>
+          </div>
+        ),
+        {
+          id: popupId,
+          duration: 5000,
+          position: 'top-right',
+        }
+      );
+    };
+
+    socket.on('receive_message', handleIncomingMessagePopup);
+    socket.on('new_message', handleIncomingMessagePopup);
+    socket.on('group_message', handleIncomingMessagePopup);
+
+    return () => {
+      socket.off('receive_message', handleIncomingMessagePopup);
+      socket.off('new_message', handleIncomingMessagePopup);
+      socket.off('group_message', handleIncomingMessagePopup);
+    };
+  }, [socket, dbUser]);
+
   /* -------------------- Helpers -------------------- */
   const handleSetActiveChat = useCallback((chatId) => {
     activeChatRef.current = chatId;
