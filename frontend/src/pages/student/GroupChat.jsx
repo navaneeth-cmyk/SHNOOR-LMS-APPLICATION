@@ -98,7 +98,7 @@ const GroupChat = () => {
       handleSetActiveChat(null);
       socket.off('group_message', handleNewMessage);
     };
-  }, [socket, groupId, dbUser?.id, handleSetActiveChat];
+  }, [socket, groupId, dbUser?.id, handleSetActiveChat]);
 
   // Send message
   const handleSendMessage = async (text, file = null) => {

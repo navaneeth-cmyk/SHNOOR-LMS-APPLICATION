@@ -86,7 +86,7 @@ const InstructorGroupChat = () => {
       handleSetActiveChat(null);
       socket.off('group_message', handleNewMessage);
     };
-  }, [socket, groupId, dbUser?.id, handleSetActiveChat];
+  }, [socket, groupId, dbUser?.id, handleSetActiveChat]);
 
   const handleSendMessage = async (text, file = null) => {
     if (!text.trim() && !file) return;
