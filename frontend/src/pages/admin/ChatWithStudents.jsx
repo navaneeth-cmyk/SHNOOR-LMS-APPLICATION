@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, X, Loader2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSocket } from '../../context/SocketContext';
-import ChatList from '../../components/chat/ChatList';
 import ChatWindow from '../../components/chat/ChatWindow';
 import api from '../../api/axios';
+import '../../styles/Chat.css';
 
 const ChatWithStudents = () => {
   const { socket, dbUser, unreadCounts, markChatRead, handleSetActiveChat } = useSocket();
@@ -535,6 +535,39 @@ const ChatWithStudents = () => {
   const hasSearchQuery = searchQuery.trim().length > 0;
   const showSearchPanel = showSearch && hasSearchQuery;
 
+  const renderChatItem = (chat) => {
+    const unreadCount = unreadCounts?.[chat.id] || 0;
+    const isActive = activeChat?.id === chat.id;
+
+    return (
+      <div
+        key={chat.id}
+        onClick={() => handleSelectChat(chat)}
+        className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors ${isActive ? 'bg-slate-100 border-l-4 border-indigo-500' : ''}`}
+      >
+        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+          <span className="text-indigo-600 font-bold text-sm">
+            {chat.name?.charAt(0).toUpperCase() || 'G'}
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-semibold text-slate-900 text-sm truncate">{chat.name}</div>
+            {unreadCount > 0 && !isActive && (
+              <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">
+                {unreadCount}
+              </span>
+            )}
+          </div>
+          <div className="text-[10px] bg-cyan-100 text-cyan-600 px-1.5 py-0.5 rounded uppercase font-bold w-fit mt-1">
+            Group
+          </div>
+          <div className="text-xs text-slate-500 mt-1 truncate">{chat.lastMessage || 'No messages yet'}</div>
+        </div>
+      </div>
+    );
+  };
+
   const handleSearchResultClick = async (chatId) => {
     const chatToLoad = chats.find(c => c.id === chatId);
     if (chatToLoad) {
@@ -585,9 +618,9 @@ const ChatWithStudents = () => {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div className="student-chat-page p-6 bg-slate-50/20 min-h-full">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-6 py-5 border-b bg-white shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-5">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Admin Chat</h2>
           <p className="text-gray-500 text-sm mt-1">Connect with student groups</p>
@@ -629,7 +662,7 @@ const ChatWithStudents = () => {
       </div>
 
       {/* ── Main Chat Layout (side-by-side) ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden h-[calc(100vh-245px)] bg-white border border-slate-200 rounded-lg shadow-sm">
         {/* ── Sidebar (Chat List) ── */}
         <div className="chat-sidebar h-full flex flex-col min-w-0 border-r bg-white">
           {/* ── Chat List ── */}
@@ -713,12 +746,9 @@ const ChatWithStudents = () => {
             <div className="text-sm text-slate-500 mt-1">Create one to get started!</div>
           </div>
         ) : (
-          <ChatList
-            chats={chats}
-            activeChat={activeChat}
-            onSelectChat={handleSelectChat}
-            unreadCounts={unreadCounts}
-          />
+          <div className="chat-contacts-list overflow-y-auto flex-1">
+            {chats.map(renderChatItem)}
+          </div>
         )}
         </div>
 
