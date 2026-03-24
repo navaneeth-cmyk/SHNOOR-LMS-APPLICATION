@@ -62,10 +62,8 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
         hasChanges = true;
       }
 
-      // 🚫 COMMENTED OUT: Only PDF support\n      if ((false && (type === \"video\" || type === \"text_stream\")) && nextContentUrl !== initialContentUrl) {
-        formData.append("content_url", nextContentUrl);
-        hasChanges = true;
-      } else if (type === "pdf" && pdfFile) {
+      // 🚫 COMMENTED OUT: Only PDF support
+      if (type === "pdf" && pdfFile) {
         formData.append("file", pdfFile);
         hasChanges = true;
       }
@@ -101,9 +99,11 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
   };
 
   const typeConfig = {
-    // 🚫 COMMENTED OUT: Only PDF support\n    // video: { icon: Video, label: \"Video\", color: \"text-violet-600 bg-violet-50 border-violet-200\" },
+    // 🚫 COMMENTED OUT: Only PDF support
+    // video: { icon: Video, label: "Video", color: "text-violet-600 bg-violet-50 border-violet-200" },
     pdf: { icon: FileText, label: "PDF", color: "text-rose-600 bg-rose-50 border-rose-200" },
-    // 🚫 COMMENTED OUT: Only PDF support\n    // text_stream: { icon: FileText, label: \"Text Stream\", color: \"text-sky-600 bg-sky-50 border-sky-200\" },
+    // 🚫 COMMENTED OUT: Only PDF support
+    // text_stream: { icon: FileText, label: "Text Stream", color: "text-sky-600 bg-sky-50 border-sky-200" },
   };
 
   return (
