@@ -1166,14 +1166,11 @@ export const getAllViolations = async (req, res) => {
         er.obtained_marks,
         er.total_marks,
         er.percentage AS exam_score,
-        er.passed AS exam_status,
-        EXTRACT(EPOCH FROM (v.created_at - ea.start_time)) AS elapsed_seconds,
-        ea.start_time
+        er.passed AS exam_status
       FROM exam_violations v
       LEFT JOIN users u ON v.student_id = u.user_id
       LEFT JOIN exams e ON v.exam_id::text = e.exam_id::text
       LEFT JOIN exam_results er ON v.student_id = er.student_id AND v.exam_id::text = er.exam_id::text
-      LEFT JOIN exam_attempts ea ON v.student_id = ea.student_id AND v.exam_id::text = ea.exam_id::text
       ORDER BY v.created_at DESC`
     );
 

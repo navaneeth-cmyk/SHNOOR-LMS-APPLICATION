@@ -230,13 +230,31 @@ export const getModuleView = async (req, res) => {
     }
 
     const moduleData = result.rows[0];
+    
+    const isHtml = queryType === 'html' || moduleData.type === 'html' || moduleData.type === 'text_stream';
+    const isPdf = queryType === 'pdf' || moduleData.type === 'pdf';
+    const isGamma = moduleData.content_url && moduleData.content_url.includes('gamma.app');
 
-    // ✅ Set security headers for iframe compatibility
+    // ✅ Set security headers for iframe compatibility and CORS
     res.removeHeader("X-Frame-Options");
-    res.setHeader("Content-Security-Policy", "frame-ancestors 'self' *");
+    
+    // Allow framing and cross-origin requests
+    res.setHeader("Content-Security-Policy", "frame-ancestors 'self' *; default-src 'self' * data: blob:;");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
+    
+    // Anti-MIME sniffing
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    
+    // For HTML/text content, send directly
+    if (isHtml) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+    } else if (isPdf) {
+      res.setHeader("Content-Type", "application/pdf");
+    }
 
     // 1️⃣ Priority: Binary data in DB
     if (moduleData.pdf_data) {
@@ -251,28 +269,31 @@ export const getModuleView = async (req, res) => {
     // 2️⃣ URL — proxy the content to maintain our security headers
     if (moduleData.content_url) {
       try {
-        const urlObj = new URL(moduleData.content_url);
-        const fileName = urlObj.pathname.split("/").pop() || "document";
-        const isHtml = queryType === 'html' || fileName.match(/\.html?($|\?)/i) || moduleData.type === 'html';
-        const isPdf = queryType === 'pdf' || fileName.match(/\.pdf($|\?)/i) || moduleData.type === 'pdf';
-
-        if (isHtml) {
-          res.setHeader("Content-Type", "text/html");
-        } else if (isPdf) {
-          res.setHeader("Content-Type", "application/pdf");
+        const response = await axios.get(moduleData.content_url, { 
+          responseType: "stream",
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
+        // Copy content-type from source if not already set
+        const contentType = response.headers['content-type'];
+        if (contentType && !res.getHeader('Content-Type')) {
+          res.setHeader('Content-Type', contentType);
         }
-
-        const response = await axios.get(moduleData.content_url, { responseType: "stream" });
+        
         return response.data.pipe(res);
       } catch (proxyErr) {
-        console.warn("Proxy fallback failed, redirecting:", proxyErr.message);
+        console.warn("Proxy failed for module URL:", proxyErr.message);
+        console.warn("Falling back to redirect for URL:", moduleData.content_url.substring(0, 100));
         return res.redirect(moduleData.content_url);
       }
     }
 
     res.status(404).json({ message: "Content not found" });
   } catch (error) {
-    console.error("getModulePdf error:", error);
+    console.error("getModuleView error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

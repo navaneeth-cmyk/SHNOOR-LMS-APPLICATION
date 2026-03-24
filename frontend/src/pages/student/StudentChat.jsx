@@ -725,9 +725,9 @@ const StudentChat = () => {
         </div>
       </div>
 
-      <div className="chat-container">
+      <div className="flex flex-1 overflow-hidden h-[calc(100vh-280px)]">
         {activeTab === "discover" ? (
-          <div className="discover-groups p-8 bg-white border border-slate-200 w-full h-full overflow-y-auto rounded-lg shadow-sm flex flex-col">
+          <div className="flex-1 p-8 bg-white border border-slate-200 w-full h-full overflow-y-auto rounded-lg shadow-sm flex flex-col">
             <div className="flex items-center gap-4 mb-8">
               <div className="w-14 h-14 bg-indigo-600/10 text-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0">
                 <Users size={28} />
@@ -800,21 +800,25 @@ const StudentChat = () => {
           </div>
         ) : (
           <>
-            <div className="flex flex-col h-full bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-              {activeTab === "groups" && (
-                <button
-                  onClick={() => setShowCreateGroup(true)}
-                  className="m-4 py-3 bg-indigo-600/10 text-indigo-600 rounded-xl font-bold hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 border border-indigo-200 shadow-sm"
-                >
-                  <span className="text-lg">+</span> Create New Group
-                </button>
-              )}
-              <ChatList
-                chats={activeTab === "dm" ? chats : groups}
-                activeChat={activeChat}
-                onSelectChat={handleSelectChat}
-                unreadCounts={unreadCounts}
-              />
+            <div className="chat-sidebar">
+              <div className="px-4 pt-4 pb-2 border-b bg-gradient-to-b from-white to-slate-50 sticky top-0 z-10 shadow-sm">
+                {activeTab === "groups" && (
+                  <button
+                    onClick={() => setShowCreateGroup(true)}
+                    className="w-full py-3 bg-indigo-600/10 text-indigo-600 rounded-xl font-bold hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 border border-indigo-200 shadow-sm"
+                  >
+                    <span className="text-lg">+</span> Create New Group
+                  </button>
+                )}
+              </div>
+              <div className="chat-contacts-list">
+                <ChatList
+                  chats={activeTab === "dm" ? chats : groups}
+                  activeChat={activeChat}
+                  onSelectChat={handleSelectChat}
+                  unreadCounts={unreadCounts}
+                />
+              </div>
             </div>
             <ChatWindow
               socket={socket}

@@ -306,9 +306,9 @@ const InstructorChat = () => {
     };
 
     return (
-        <div className="instructor-chat-page p-4">
+        <div className="flex h-screen flex-col bg-gray-50">
             {/* ── Header ── */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between px-4 py-4 border-b bg-white">
                 <h2 className="text-2xl font-bold">Instructor Chat</h2>
 
                 {/* Search Bar */}
@@ -381,13 +381,17 @@ const InstructorChat = () => {
             </div>
 
             {/* Chat Layout */}
-            <div className="chat-container">
-                <ChatList
-                    chats={chats}
-                    activeChat={activeChat}
-                    onSelectChat={handleSelectChat}
-                    unreadCounts={unreadCounts}
-                />
+            <div className="flex flex-1 overflow-hidden">
+                <div className="chat-sidebar">
+                    <div className="chat-contacts-list">
+                        <ChatList
+                            chats={chats}
+                            activeChat={activeChat}
+                            onSelectChat={handleSelectChat}
+                            unreadCounts={unreadCounts}
+                        />
+                    </div>
+                </div>
                 <ChatWindow
                     activeChat={activeChat}
                     messages={messages}

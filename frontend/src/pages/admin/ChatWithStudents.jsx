@@ -586,7 +586,7 @@ const ChatWithStudents = () => {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* ── Sidebar ── */}
-      <div className="w-80 md:w-96 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col">
+      <div className="chat-sidebar">
 
         {/* Header */}
         <div className="p-4 border-b bg-white sticky top-0 z-10 shadow-sm space-y-3">
@@ -623,7 +623,7 @@ const ChatWithStudents = () => {
 
         {/* ── Search results panel ── */}
         {showSearchPanel ? (
-          <div className="flex-1 overflow-y-auto">
+          <div className="chat-contacts-list">
             {loadingSearch ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
