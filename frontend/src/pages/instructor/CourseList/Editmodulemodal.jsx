@@ -62,7 +62,7 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
         hasChanges = true;
       }
 
-      if ((type === "video" || type === "text_stream") && nextContentUrl !== initialContentUrl) {
+      if (type === "video" && nextContentUrl !== initialContentUrl) {
         formData.append("content_url", nextContentUrl);
         hasChanges = true;
       } else if (type === "pdf" && pdfFile) {
@@ -103,7 +103,7 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
   const typeConfig = {
     video: { icon: Video, label: "Video", color: "text-violet-600 bg-violet-50 border-violet-200" },
     pdf: { icon: FileText, label: "PDF", color: "text-rose-600 bg-rose-50 border-rose-200" },
-    text_stream: { icon: FileText, label: "Text Stream", color: "text-sky-600 bg-sky-50 border-sky-200" },
+    // text_stream: { icon: FileText, label: "Text Stream", color: "text-sky-600 bg-sky-50 border-sky-200" },
   };
 
   return (
@@ -174,10 +174,10 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
             />
           </div>
 
-          {(type === "video" || type === "text_stream") && (
+          {type === "video" && (
             <div>
               <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
-                {type === "video" ? "Video URL" : "Text Stream URL"}
+                Video URL
               </label>
               <div className="relative">
                 <Link
@@ -188,7 +188,7 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
                   type="url"
                   value={contentUrl}
                   onChange={(e) => setContentUrl(e.target.value)}
-                  placeholder={type === "video" ? "https://..." : "https://example.com/article-or-html"}
+                  placeholder="https://..."
                   className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 outline-none transition-all"
                 />
               </div>
@@ -237,21 +237,19 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
           )}
 
           {/* Duration */}
-          {type !== "text_stream" && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
-                Duration (minutes)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={durationMins}
-                onChange={(e) => setDurationMins(e.target.value)}
-                placeholder="e.g. 15"
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 outline-none transition-all"
-              />
-            </div>
-          )}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
+              Duration (minutes)
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={durationMins}
+              onChange={(e) => setDurationMins(e.target.value)}
+              placeholder="e.g. 15"
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 outline-none transition-all"
+            />
+          </div>
 
           {/* Optional Notes PDF */}
           <div>

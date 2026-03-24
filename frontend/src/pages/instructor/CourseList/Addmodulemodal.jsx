@@ -90,19 +90,19 @@ const AddModuleModal = ({ onClose, onSave }) => {
   const types = [
     { key: "video",       label: "Video",       Icon: Video,     active: "text-violet-600 bg-violet-50 border-violet-300" },
     { key: "pdf",        label: "PDF",        Icon: FileText,  active: "text-rose-600 bg-rose-50 border-rose-300" },
-    { key: "text_stream", label: "Text Stream",  Icon: AlignLeft, active: "text-sky-600 bg-sky-50 border-sky-300" },
+    // { key: "text_stream", label: "Text Stream",  Icon: AlignLeft, active: "text-sky-600 bg-sky-50 border-sky-300" },
   ];
 
   const urlPlaceholders = {
     video:       "https://youtube.com/watch?v=...",
     pdf:         "https://example.com/document.pdf",
-    text_stream: "https://example.com/article",
+    // text_stream: "https://example.com/article",
   };
 
   const uploadLabels = {
     video:       "video file",
     pdf:         "PDF file",
-    text_stream: "text file (.txt, .md, .html)",
+    // text_stream: "text file (.txt, .md, .html)",
   };
 
   return (
@@ -220,7 +220,7 @@ const AddModuleModal = ({ onClose, onSave }) => {
                       <p className="text-xs text-slate-400">
                         {type === "video"       && "MP4, MOV, WebM, etc."}
                         {type === "pdf"         && "PDF files only"}
-                        {type === "text_stream" && ".txt, .md or .html files"}
+                        {/* {type === "text_stream" && ".txt, .md or .html files"} */}
                       </p>
                     </>
                   )}

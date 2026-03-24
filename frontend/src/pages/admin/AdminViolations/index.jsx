@@ -24,19 +24,34 @@ import {
   BarChart3
 } from "lucide-react";
 
-// Helper function to format elapsed seconds to HH:MM:SS
-const formatElapsedTime = (elapsedSeconds) => {
-  if (!elapsedSeconds && elapsedSeconds !== 0) return '---';
-  
-  const seconds = Math.floor(Math.abs(elapsedSeconds));
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  
-  if (hours > 0) {
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+// Helper function to format violation timestamp into date + time
+const formatViolationDateTime = (log) => {
+  const details = log?.details;
+  const detailTimestamp = details && typeof details === 'object'
+    ? (details.timestamp ?? details.time ?? details.detectedAt)
+    : null;
+
+  const rawValue = log?.created_at ?? detailTimestamp;
+  if (!rawValue) return '---';
+
+  let date;
+  if (typeof rawValue === 'number') {
+    const normalized = rawValue > 1e12 ? rawValue : rawValue * 1000;
+    date = new Date(normalized);
+  } else {
+    date = new Date(rawValue);
   }
-  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+  if (Number.isNaN(date.getTime())) return '---';
+
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
 };
 
 const AdminViolations = () => {
@@ -508,7 +523,7 @@ const AdminViolations = () => {
                                               <span className="text-xs font-black text-slate-700">{log.violation_type}</span>
                                             </div>
                                             <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5 tabular-nums">
-                                              <Clock size={12} /> {formatElapsedTime(log.elapsed_seconds)}
+                                              <Clock size={12} /> {formatViolationDateTime(log)}
                                             </div>
                                             <div className="col-span-2 flex items-center justify-between">
                                               <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 font-mono truncate max-w-[300px]">
@@ -658,7 +673,7 @@ const AdminViolations = () => {
                                               <span className="text-xs font-black text-slate-700">{log.violation_type}</span>
                                             </div>
                                             <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5 tabular-nums">
-                                              <Clock size={12} /> {formatElapsedTime(log.elapsed_seconds)}
+                                              <Clock size={12} /> {formatViolationDateTime(log)}
                                             </div>
                                             <div className="col-span-2 flex items-center justify-between">
                                               <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 font-mono truncate max-w-[300px]">
