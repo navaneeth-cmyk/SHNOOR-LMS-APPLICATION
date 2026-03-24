@@ -632,9 +632,8 @@ const ChatWithStudents = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* ── Sidebar (Chat List) ── */}
         <div className="chat-sidebar h-full flex flex-col min-w-0 border-r bg-white">
-
-        {/* ── Chat List ── */}
-        {showSearchPanel ? (
+          {/* ── Chat List ── */}
+          {showSearchPanel ? (
           <div className="chat-contacts-list overflow-y-auto flex-1">
             {loadingSearch ? (
               <div className="flex items-center justify-center h-32">
@@ -721,20 +720,20 @@ const ChatWithStudents = () => {
             unreadCounts={unreadCounts}
           />
         )}
-      </div>
+        </div>
 
-      {/* ── Chat Window (Main Area) ── */}
-      <ChatWindow
-        socket={socket}
-        activeChat={activeChat}
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        loadingMessages={loadingMessages}
-        onClose={() => setActiveChat(null)}
-        isAdmin={true}
-        currentUser={dbUser}
-      />
-    </div>
+        {/* ── Chat Window (Main Area) ── */}
+        <ChatWindow
+          socket={socket}
+          activeChat={activeChat}
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          loadingMessages={loadingMessages}
+          onClose={() => setActiveChat(null)}
+          isAdmin={true}
+          currentUser={dbUser}
+        />
+      </div>
 
     {/* ── Create Group Modal ── */}
     {showGroupModal && (
