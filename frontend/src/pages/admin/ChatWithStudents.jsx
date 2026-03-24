@@ -897,6 +897,7 @@ const ChatWithStudents = () => {
         </div>
       </div>
     )}
+    </div>
   );
 };
 
