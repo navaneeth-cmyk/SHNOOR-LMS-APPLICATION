@@ -26,6 +26,15 @@ const StudentCourses = () => {
   const [learningPaths, setLearningPaths] = useState([]);
   const [allLearningPaths, setAllLearningPaths] = useState([]);
 
+  const getCourseId = (course) => course?.courses_id ?? course?.id;
+
+  const mergedCourses = [
+    ...myCourses,
+    ...allCourses.filter(
+      (course) => !myCourses.some((mine) => getCourseId(mine) === getCourseId(course)),
+    ),
+  ];
+
   // 🔑 derive enrolledIds for the VIEW
   const enrolledIds = myCourses.map((c) => c.courses_id || c.id);
 
@@ -218,16 +227,18 @@ const StudentCourses = () => {
   const getDisplayCourses = () => {
     switch (activeTab) {
       case "my-learning":
-        return myCourses;
+        return myCourses.filter((course) => course.is_enrolled && !course.is_completed);
 
       case "explore":
-        return allCourses;
+        return allCourses.filter(
+          (course) => course.is_assigned && !course.is_enrolled,
+        );
 
       case "free-courses":
-        return allCourses.filter((c) => c.price_type === "free");
+        return mergedCourses.filter((course) => course.price_type === "free");
 
       case "paid-courses":
-        return allCourses.filter((c) => c.price_type === "paid");
+        return mergedCourses.filter((course) => course.price_type === "paid");
 
       case "recommended":
         return recommendedCourses;
