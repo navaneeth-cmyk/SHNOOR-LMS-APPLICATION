@@ -39,7 +39,7 @@ export const AddCourse = () => {
 
   const [moduleForm, setModuleForm] = useState({
     title: "",
-    type: "pdf", // 🚫 Changed from "video" to "pdf" - only PDF support
+    type: "video", // Default to video
     url: "",
     duration: "",
     notes: "",

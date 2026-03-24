@@ -88,24 +88,21 @@ const AddModuleModal = ({ onClose, onSave }) => {
   };
 
   const types = [
-    { key: "pdf", label: "PDF", Icon: FileText, active: "text-rose-600 bg-rose-50 border-rose-300" },
-    // 🚫 COMMENTED OUT: Only PDF support
-    // { key: "video",       label: "Video",       Icon: Video,     active: "text-violet-600 bg-violet-50 border-violet-300" },
-    // { key: "text_stream", label: "Text Stream",  Icon: AlignLeft, active: "text-sky-600 bg-sky-50 border-sky-300" },
+    { key: "video",       label: "Video",       Icon: Video,     active: "text-violet-600 bg-violet-50 border-violet-300" },
+    { key: "pdf",        label: "PDF",        Icon: FileText,  active: "text-rose-600 bg-rose-50 border-rose-300" },
+    { key: "text_stream", label: "Text Stream",  Icon: AlignLeft, active: "text-sky-600 bg-sky-50 border-sky-300" },
   ];
 
   const urlPlaceholders = {
+    video:       "https://youtube.com/watch?v=...",
     pdf:         "https://example.com/document.pdf",
-    // 🚫 COMMENTED OUT: Only PDF support
-    // video:       "https://youtube.com/watch?v=...",
-    // text_stream: "https://example.com/article",
+    text_stream: "https://example.com/article",
   };
 
   const uploadLabels = {
+    video:       "video file",
     pdf:         "PDF file",
-    // 🚫 COMMENTED OUT: Only PDF support
-    // video:       "video file",
-    // text_stream: "text file (.txt, .md, .html)",
+    text_stream: "text file (.txt, .md, .html)",
   };
 
   return (

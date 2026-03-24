@@ -4,7 +4,7 @@ import api from "../../../api/axios";
 
 const EditModuleModal = ({ module, onClose, onSave }) => {
   const [title, setTitle] = useState(module.title || "");
-  const [type, setType] = useState(module.type === "video" || module.type === "text_stream" ? "pdf" : module.type || "pdf"); // 🚫 Default to PDF only
+  const [type, setType] = useState(module.type || "video");
   const [contentUrl, setContentUrl] = useState(module.content_url || "");
   const [notesUrl] = useState(module.notes || "");
   const [durationMins, setDurationMins] = useState(module.duration_mins || "");
@@ -62,8 +62,10 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
         hasChanges = true;
       }
 
-      // 🚫 COMMENTED OUT: Only PDF support
-      if (type === "pdf" && pdfFile) {
+      if ((type === "video" || type === "text_stream") && nextContentUrl !== initialContentUrl) {
+        formData.append("content_url", nextContentUrl);
+        hasChanges = true;
+      } else if (type === "pdf" && pdfFile) {
         formData.append("file", pdfFile);
         hasChanges = true;
       }
@@ -99,11 +101,9 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
   };
 
   const typeConfig = {
-    // 🚫 COMMENTED OUT: Only PDF support
-    // video: { icon: Video, label: "Video", color: "text-violet-600 bg-violet-50 border-violet-200" },
+    video: { icon: Video, label: "Video", color: "text-violet-600 bg-violet-50 border-violet-200" },
     pdf: { icon: FileText, label: "PDF", color: "text-rose-600 bg-rose-50 border-rose-200" },
-    // 🚫 COMMENTED OUT: Only PDF support
-    // text_stream: { icon: FileText, label: "Text Stream", color: "text-sky-600 bg-sky-50 border-sky-200" },
+    text_stream: { icon: FileText, label: "Text Stream", color: "text-sky-600 bg-sky-50 border-sky-200" },
   };
 
   return (
@@ -174,9 +174,7 @@ const EditModuleModal = ({ module, onClose, onSave }) => {
             />
           </div>
 
-          {/* 🚫 COMMENTED OUT: Only PDF content supported */}
-          {/* {(type === "video" || type === "text_stream") && ( */}
-          {false && (
+          {(type === "video" || type === "text_stream") && (
             <div>
               <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
                 {type === "video" ? "Video URL" : "Text Stream URL"}
