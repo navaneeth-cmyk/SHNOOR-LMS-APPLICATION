@@ -24,6 +24,21 @@ import {
   BarChart3
 } from "lucide-react";
 
+// Helper function to format elapsed seconds to HH:MM:SS
+const formatElapsedTime = (elapsedSeconds) => {
+  if (!elapsedSeconds && elapsedSeconds !== 0) return '---';
+  
+  const seconds = Math.floor(Math.abs(elapsedSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 const AdminViolations = () => {
   const [summary, setSummary] = useState([]);
   const [allViolations, setAllViolations] = useState([]);
@@ -493,7 +508,7 @@ const AdminViolations = () => {
                                               <span className="text-xs font-black text-slate-700">{log.violation_type}</span>
                                             </div>
                                             <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5 tabular-nums">
-                                              <Clock size={12} /> {new Date(log.created_at).toLocaleString()}
+                                              <Clock size={12} /> {formatElapsedTime(log.elapsed_seconds)}
                                             </div>
                                             <div className="col-span-2 flex items-center justify-between">
                                               <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 font-mono truncate max-w-[300px]">
@@ -643,7 +658,7 @@ const AdminViolations = () => {
                                               <span className="text-xs font-black text-slate-700">{log.violation_type}</span>
                                             </div>
                                             <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5 tabular-nums">
-                                              <Clock size={12} /> {new Date(log.created_at).toLocaleString()}
+                                              <Clock size={12} /> {formatElapsedTime(log.elapsed_seconds)}
                                             </div>
                                             <div className="col-span-2 flex items-center justify-between">
                                               <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 font-mono truncate max-w-[300px]">

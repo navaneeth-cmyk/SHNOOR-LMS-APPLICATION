@@ -163,6 +163,39 @@
     padding: 1.5rem;
     overflow-y: auto;
     background: #f8fafc;
+    scrollbar-width: auto;
+    scrollbar-color: #94a3b8 #f0f1f3;
+}
+
+.chat-messages-area::-webkit-scrollbar {
+    width: 12px;
+}
+
+.chat-messages-area::-webkit-scrollbar-track {
+    background: #f0f1f3;
+    border-radius: 10px;
+    margin: 4px 0;
+}
+
+.chat-messages-area::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #64748b 0%, #475569 100%);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.chat-messages-area::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #475569 0%, #334155 100%);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.chat-messages-area::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+    background-clip: padding-box;
+    border: 2px solid transparent;
 }
 
 .message-bubble {

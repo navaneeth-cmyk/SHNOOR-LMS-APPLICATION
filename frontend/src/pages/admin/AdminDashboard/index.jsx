@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../../../auth/firebase";
 import api from "../../../api/axios";
 import AdminDashboardView from "./view";
-import { db } from "../../../auth/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -29,14 +27,34 @@ const AdminDashboard = () => {
   const [activeFilter, setActiveFilter] = useState(null);
 
   /* =========================
-     FETCH LIVE SESSIONS (REAL-TIME)
+     FETCH LIVE SESSIONS (REAL-TIME) - From Backend API
   ========================= */
   useEffect(() => {
-    const q = collection(db, "live_sessions");
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setLiveSessionCount(snapshot.size);
-    });
-    return () => unsubscribe();
+    let isMounted = true;
+    let pollTimer = null;
+
+    const fetchActiveSessions = async () => {
+      try {
+        const res = await api.get("/api/proctoring/active");
+        if (isMounted) {
+          setLiveSessionCount((res.data || []).length);
+          console.log("[DASHBOARD] Active sessions:", (res.data || []).length);
+        }
+      } catch (err) {
+        console.error("[DASHBOARD] Failed to fetch active sessions:", err);
+        // Continue with existing count on error
+      }
+    };
+
+    // Initial fetch
+    fetchActiveSessions();
+    // Poll every 8 seconds to stay in sync with proctoring page
+    pollTimer = setInterval(fetchActiveSessions, 8000);
+
+    return () => {
+      isMounted = false;
+      if (pollTimer) clearInterval(pollTimer);
+    };
   }, []);
 
   /* =========================

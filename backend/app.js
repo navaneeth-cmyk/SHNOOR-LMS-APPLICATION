@@ -80,6 +80,21 @@ io.use(async (socket, next) => {
     next();
   }
 });
+
+// Serve static uploads with CORS headers BEFORE general CORS middleware
+app.use("/uploads", (req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Range");
+  res.header("Access-Control-Expose-Headers", "Content-Length, Content-Range, Content-Type");
+  res.header("Cross-Origin-Resource-Policy", "cross-origin");
+  res.header("Cross-Origin-Embedder-Policy", "credentialless");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+}, express.static(path.join(__dirname, "uploads")));
+
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -672,20 +687,6 @@ app.use((req, res, next) => {
 
   next();
 });
-
-// Serve static uploads with CORS headers
-app.use("/uploads", (req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Range");
-  res.header("Access-Control-Expose-Headers", "Content-Length, Content-Range");
-  res.header("Cross-Origin-Resource-Policy", "cross-origin");
-  res.header("Cross-Origin-Embedder-Policy", "credentialless");
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-  next();
-}, express.static(path.join(__dirname, "uploads")));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
