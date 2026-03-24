@@ -346,7 +346,7 @@ const CoursePlayerView = ({
             {/* 🚫 COMMENTED OUT: Video and text stream support removed - only PDF */}
             {false ? (
               // Text stream player (disabled)
-              <div>
+              null
 
               /* VIDEO - Managed by ReactPlayer */
               <div className="absolute inset-0 w-full h-full bg-black">
