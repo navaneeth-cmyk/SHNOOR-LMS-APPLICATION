@@ -80,25 +80,36 @@ export const handleUpload = async (req, res) => {
 
     try {
         const ext = path.extname(req.file.originalname).toLowerCase();
-        let subFolder;
+        let folder;
         if (req.file.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
-            subFolder = "videos";
+            folder = "videos";
         } else if (req.file.mimetype === "application/pdf" || ext === ".pdf") {
-            subFolder = "pdfs";
+            folder = "pdfs";
         } else {
-            subFolder = "docs";
+            folder = "docs";
         }
         
-        const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
-        const fileUrl = `${backendUrl}/uploads/${subFolder}/${req.file.filename}`;
+        // Upload to Supabase
+        console.log(`[Upload] Uploading ${req.file.originalname} to Supabase folder: ${folder}`);
+        const { objectPath, url } = await uploadLocalFileToSupabase(req.file.path, {
+            originalName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            folder: folder,
+        });
 
+        // Delete local file after successful upload
+        await removeLocalFileSafe(req.file.path);
+
+        console.log(`[Upload] File uploaded to Supabase: ${url}`);
         res.status(200).json({
-            message: "File uploaded successfully",
-            url: fileUrl,
+            message: "File uploaded successfully to Supabase",
+            url: url,
+            objectPath: objectPath,
             filename: req.file.originalname,
             mimetype: req.file.mimetype,
         });
     } catch (error) {
+        console.error(`[Upload] Error uploading file:`, error.message);
         await removeLocalFileSafe(req.file.path);
         return res.status(500).json({ message: error.message || "File upload failed" });
     }
