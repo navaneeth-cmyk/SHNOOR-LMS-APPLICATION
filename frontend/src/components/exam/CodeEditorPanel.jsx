@@ -238,12 +238,12 @@ const CodeEditorPanel = ({
           <select
             value={language}
             onChange={(e) => onLanguageChange?.(e.target.value)}
-            className="bg-[#242933] border border-slate-700 rounded-md px-2.5 py-1 text-sm font-semibold text-slate-100 focus:outline-none focus:border-indigo-500"
+            className="bg-white border border-indigo-200 rounded-md px-2.5 py-1 text-sm font-semibold text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
           >
-            <option value="javascript" className="text-slate-900">JavaScript</option>
-            <option value="python" className="text-slate-900">Python</option>
-            <option value="java" className="text-slate-900">Java</option>
-            <option value="cpp" className="text-slate-900">C++</option>
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="cpp">C++</option>
           </select>
         </div>
         <div className="flex gap-3 text-slate-500">
