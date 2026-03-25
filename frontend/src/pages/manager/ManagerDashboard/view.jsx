@@ -1,5 +1,15 @@
 import React from "react";
-import { Building, Mail, User, FileText } from "lucide-react";
+import {
+  Building,
+  Mail,
+  User,
+  FileText,
+  Users,
+  BookOpen,
+  Activity,
+  ClipboardCheck,
+  Award,
+} from "lucide-react";
 
 const ManagerDashboardView = ({ loading, profile, stats }) => {
   if (loading) {
@@ -15,6 +25,44 @@ const ManagerDashboardView = ({ loading, profile, stats }) => {
     );
   }
 
+  const statCards = [
+    {
+      label: "Total Students",
+      value: stats.totalStudents,
+      icon: Users,
+      tone: "text-indigo-300",
+      chip: "bg-indigo-400/10 border-indigo-300/20",
+    },
+    {
+      label: "Course Enrollments",
+      value: stats.totalCourseEnrollments,
+      icon: BookOpen,
+      tone: "text-cyan-300",
+      chip: "bg-cyan-400/10 border-cyan-300/20",
+    },
+    {
+      label: "Avg Course Progress",
+      value: `${stats.averageCourseProgress}%`,
+      icon: Activity,
+      tone: "text-emerald-300",
+      chip: "bg-emerald-400/10 border-emerald-300/20",
+    },
+    {
+      label: "Exam Attempts",
+      value: stats.totalExamAttempts,
+      icon: ClipboardCheck,
+      tone: "text-violet-300",
+      chip: "bg-violet-400/10 border-violet-300/20",
+    },
+    {
+      label: "Certificates Issued",
+      value: stats.totalCertificates,
+      icon: Award,
+      tone: "text-amber-300",
+      chip: "bg-amber-400/10 border-amber-300/20",
+    },
+  ];
+
   return (
     <div className="space-y-6 font-sans max-w-[1440px] mx-auto">
       <div className="relative overflow-hidden rounded-2xl p-6 lg:p-8" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%)" }}>
@@ -28,31 +76,24 @@ const ManagerDashboardView = ({ loading, profile, stats }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Students</p>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{stats.totalStudents}</p>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Course Enrollments</p>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{stats.totalCourseEnrollments}</p>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Avg Course Progress</p>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{stats.averageCourseProgress}%</p>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Exam Attempts</p>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{stats.totalExamAttempts}</p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Certificates Issued</p>
-        <p className="text-2xl font-bold text-slate-900 mt-2">{stats.totalCertificates}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        {statCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className="bg-[#181F4D] rounded-2xl p-5 border border-white/10 shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5 transition-all duration-200"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className={`w-10 h-10 rounded-xl border ${card.chip} flex items-center justify-center`}>
+                  <Icon size={18} className={card.tone} />
+                </div>
+              </div>
+              <p className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">{card.label}</p>
+              <p className="text-2xl font-bold text-white mt-2">{card.value}</p>
+            </div>
+          );
+        })}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 lg:p-8">
