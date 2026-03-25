@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaTimes, FaUser, FaPen, FaCheck, FaUsers, FaSignOutAlt, FaTrash, FaUserShield } from 'react-icons/fa';
 import api from '../../api/axios';
 import { useSocket } from '@context/useSocket';
+import { formatChatDate } from '../../utils/chatDateTime';
 
 const GroupInfoDrawer = ({ chat, isOpen, onClose, onLeaveSuccess, onDeleteSuccess }) => {
     const { dbUser } = useSocket();
@@ -183,7 +184,7 @@ const GroupInfoDrawer = ({ chat, isOpen, onClose, onLeaveSuccess, onDeleteSucces
                             <div className="text-center">
                                 <h3 className="text-2xl font-extrabold text-slate-900 mb-2">{chat.name}</h3>
                                 <p className="text-slate-500 text-sm leading-relaxed">{chat.description || "No description provided."}</p>
-                                <p className="text-[10px] text-slate-300 uppercase tracking-tighter mt-1 font-bold">Group • {new Date(chat.created_at || Date.now()).toLocaleDateString()}</p>
+                                <p className="text-[10px] text-slate-300 uppercase tracking-tighter mt-1 font-bold">Group • {formatChatDate(chat.created_at)}</p>
                                 {isAdmin && (
                                     <button
                                         onClick={() => setIsEditing(true)}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, X, Loader2, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useSocket } from '../../context/SocketContext';
 import ChatWindow from '../../components/chat/ChatWindow';
 import api from '../../api/axios';
@@ -393,6 +394,7 @@ const ChatWithStudents = () => {
     };
 
     const optimisticMessage = {
+      message_id: `temp-${Date.now()}`,
       text,
       created_at: new Date().toISOString(),
       sender_id: dbUser?.id,
@@ -408,10 +410,17 @@ const ChatWithStudents = () => {
     setMessages(prev => [...prev, optimisticMessage]);
 
     try {
-      socket.emit('send_message', payload);
+      socket.emit('send_message', payload, (serverMsg) => {
+        if (!serverMsg) return;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.message_id === optimisticMessage.message_id ? { ...serverMsg, isMyMessage: true } : m
+          )
+        );
+      });
     } catch (err) {
       console.error('Socket emit failed:', err);
-      setMessages(prev => prev.filter(m => m.created_at !== optimisticMessage.created_at));
+      setMessages(prev => prev.filter(m => m.message_id !== optimisticMessage.message_id));
       alert('Failed to send message');
     }
   };
@@ -578,6 +587,64 @@ const ChatWithStudents = () => {
       }
     }
   };
+
+  // ── Popup notifications for inactive chats/groups ─────────────────────────
+  useEffect(() => {
+    if (!socket || chats.length === 0) return;
+
+    const showIncomingPopup = (msg = {}) => {
+      const incomingSenderId = msg.sender_id ?? msg.senderId;
+      if (incomingSenderId && incomingSenderId === dbUser?.id) return;
+
+      const incomingChatId = msg.group_id ?? msg.groupId ?? msg.chat_id ?? msg.chatId;
+      if (!incomingChatId) return;
+      if (incomingChatId === activeChat?.id) return;
+
+      const targetChat = chats.find((chat) => chat.id === incomingChatId);
+      if (!targetChat) return;
+
+      const popupId = `chat-popup-${
+        msg.message_id || msg.id || `${incomingChatId}-${msg.created_at || msg.timestamp || Date.now()}`
+      }`;
+
+      toast.custom(
+        (t) => (
+          <div
+            className="bg-white border-l-4 border-indigo-500 shadow-lg rounded-lg p-4 cursor-pointer hover:shadow-xl transition-shadow"
+            onClick={async () => {
+              toast.dismiss(t.id);
+              await handleSelectChat(targetChat);
+            }}
+          >
+            <p className="font-semibold text-gray-900">
+              {msg.group_name || msg.groupName || msg.chat_name || targetChat.name || 'Group'}
+            </p>
+            <p className="text-gray-700 text-sm font-medium">
+              {msg.sender_name || msg.senderName || 'User'}
+            </p>
+            <p className="text-gray-600 text-sm truncate">
+              {msg.text || msg.message_text || '📎 Attachment'}
+            </p>
+          </div>
+        ),
+        {
+          id: popupId,
+          duration: 5000,
+          position: 'top-right',
+        }
+      );
+    };
+
+    socket.on('group_message', showIncomingPopup);
+    socket.on('receive_message', showIncomingPopup);
+    socket.on('new_message', showIncomingPopup);
+
+    return () => {
+      socket.off('group_message', showIncomingPopup);
+      socket.off('receive_message', showIncomingPopup);
+      socket.off('new_message', showIncomingPopup);
+    };
+  }, [socket, chats, activeChat?.id, dbUser, handleSelectChat]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (

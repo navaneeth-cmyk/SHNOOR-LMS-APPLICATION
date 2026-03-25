@@ -236,14 +236,12 @@ const MyGroups = () => {
     // Use allSettled to prevent one endpoint crashing the entire view
     const results = await Promise.allSettled([
       api.get('/api/admingroups/my-groups', { headers: { Authorization: `Bearer ${freshToken}` } }),
-      api.get('/api/chats/groups/my', { headers: { Authorization: `Bearer ${freshToken}` } }),
       api.get('/api/admin/groups/my-groups', { headers: { Authorization: `Bearer ${freshToken}` } })
     ]);
 
-    const [adminChatRes, collegeGroupsRes, adminSectionRes] = results;
+    const [adminChatRes, adminSectionRes] = results;
 
     if (adminChatRes.status === 'rejected') console.error('Admin Groups call failed:', adminChatRes.reason);
-    if (collegeGroupsRes.status === 'rejected') console.error('College Groups call failed:', collegeGroupsRes.reason);
     if (adminSectionRes.status === 'rejected') console.error('Admin Section Groups call failed:', adminSectionRes.reason);
 
     const adminChatGroups = (adminChatRes.status === 'fulfilled' ? adminChatRes.value.data : []).map(g => ({
@@ -254,14 +252,6 @@ const MyGroups = () => {
       source: 'admin-chat'
     }));
 
-    const collegeGroups = (collegeGroupsRes.status === 'fulfilled' ? collegeGroupsRes.value.data : []).map(g => ({
-      ...g,
-      group_id: g.group_id,
-      name: g.name || g.group_name,
-      member_count: g.member_count || 0,
-      source: 'student-chat'
-    }));
-
     const adminSectionGroups = (adminSectionRes.status === 'fulfilled' ? adminSectionRes.value.data : []).map(g => ({
       ...g,
       group_id: g.group_id,
@@ -270,13 +260,12 @@ const MyGroups = () => {
       source: 'admin-section'
     }));
 
-    const merged = [...adminChatGroups, ...collegeGroups, ...adminSectionGroups].sort(
+    const merged = [...adminChatGroups, ...adminSectionGroups].sort(
       (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
     );
 
     console.log('[MyGroups] Total Groups found:', {
       adminChat: adminChatGroups.length,
-      college: collegeGroups.length,
       adminSection: adminSectionGroups.length,
       merged: merged.length
     });
@@ -314,9 +303,7 @@ const MyGroups = () => {
       for (const group of groups) {
         try {
           let endpoint;
-          if (group.source === 'student-chat') {
-            endpoint = `/api/chats/groups/${group.group_id}/messages`;
-          } else if (group.source === 'admin-section') {
+          if (group.source === 'admin-section') {
             endpoint = `/api/chats/groups/${group.group_id}/messages`; // Admin-section groups also use group_messages table
           } else {
             // admin-chat
@@ -368,9 +355,13 @@ const MyGroups = () => {
     if (!socket || groups.length === 0) return;
 
     const showGroupPopup = (msg) => {
-      if (!msg || msg.sender_id === dbUser?.id) return;
+      if (!msg) return;
 
-      const targetGroup = groups.find((group) => group.group_id === msg.group_id || group.group_id === msg.chat_id);
+      const incomingSenderId = msg.sender_id ?? msg.senderId;
+      if (incomingSenderId && incomingSenderId === dbUser?.id) return;
+
+      const incomingGroupId = msg.group_id ?? msg.groupId ?? msg.chat_id ?? msg.chatId;
+      const targetGroup = groups.find((group) => group.group_id === incomingGroupId);
       if (!targetGroup) return;
 
       toast.custom((t) => (
@@ -381,9 +372,9 @@ const MyGroups = () => {
             toast.dismiss(t.id);
           }}
         >
-          <p className="font-semibold text-gray-900">{msg.group_name || targetGroup.name || 'Group'}</p>
-          <p className="text-gray-700 text-sm font-medium">{msg.sender_name || 'User'}</p>
-          <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
+          <p className="font-semibold text-gray-900">{msg.group_name || msg.groupName || targetGroup.name || 'Group'}</p>
+          <p className="text-gray-700 text-sm font-medium">{msg.sender_name || msg.senderName || 'User'}</p>
+          <p className="text-gray-600 text-sm truncate">{msg.text || msg.message_text || '📎 Attachment'}</p>
         </div>
       ), {
         duration: 5,
@@ -393,10 +384,12 @@ const MyGroups = () => {
 
     socket.on('group_message', showGroupPopup);
     socket.on('receive_message', showGroupPopup);
+    socket.on('new_message', showGroupPopup);
 
     return () => {
       socket.off('group_message', showGroupPopup);
       socket.off('receive_message', showGroupPopup);
+      socket.off('new_message', showGroupPopup);
     };
   }, [socket, dbUser, groups, navigate]);
 

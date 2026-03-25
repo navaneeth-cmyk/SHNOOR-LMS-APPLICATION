@@ -135,12 +135,14 @@ const GroupChat = () => {
       attachment_type: attachmentType,
     };
 
+    const tempId = `temp-${Date.now()}`;
+
     // Optimistic UI
     setMessages(prev => [
       ...prev,
       {
         ...payload,
-        message_id: `temp-${Date.now()}`,
+        message_id: tempId,
         created_at: new Date().toISOString(),
         sender_id: dbUser.id,
         sender_name: payload.senderName,
@@ -150,7 +152,12 @@ const GroupChat = () => {
       },
     ]);
 
-    socket?.emit('send_message', payload);
+    socket?.emit('send_message', payload, (serverMsg) => {
+      if (!serverMsg) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.message_id === tempId ? { ...serverMsg, isMyMessage: true } : m))
+      );
+    });
   };
 
   // ── STATES ─────────────────────────────────────────────

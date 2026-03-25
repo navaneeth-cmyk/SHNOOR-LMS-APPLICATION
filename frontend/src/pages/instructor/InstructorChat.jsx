@@ -203,8 +203,10 @@ const InstructorChat = () => {
             }
         }
 
+        const tempId = `temp-${Date.now()}`;
+
         setMessages(prev => [...prev, {
-            message_id: Date.now(),
+            message_id: tempId,
             text,
             isMyMessage: true,
             created_at: new Date().toISOString(),
@@ -225,6 +227,11 @@ const InstructorChat = () => {
             attachment_file_id: attachmentFileId,
             attachment_name: attachmentName,
             attachment_type: attachmentType
+        }, (serverMsg) => {
+            if (!serverMsg) return;
+            setMessages((prev) =>
+                prev.map((m) => (m.message_id === tempId ? { ...serverMsg, isMyMessage: true } : m))
+            );
         });
     };
 

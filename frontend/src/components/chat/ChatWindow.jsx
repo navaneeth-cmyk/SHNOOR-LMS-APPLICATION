@@ -707,7 +707,7 @@ const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onRe
             </div>
 
             <div className={`text-[9px] mt-1 font-bold text-slate-400 flex items-center gap-1.5 px-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                {formatChatTime(msg.created_at)}
+                {formatChatTime(msg.created_at ?? msg.timestamp)}
                 {isMe && <FaCheck size={8} className="text-indigo-400 opacity-50" />}
             </div>
         </div>

@@ -194,9 +194,11 @@ const AdminChat = () => {
     }
   }
 
-  // Optimistic UI
-  setMessages(prev => [...prev, {
-    message_id: Date.now(),
+    const tempId = `temp-${Date.now()}`;
+
+    // Optimistic UI
+    setMessages(prev => [...prev, {
+        message_id: tempId,
     text,
     isMyMessage: true,
     created_at: new Date().toISOString(),
@@ -206,7 +208,7 @@ const AdminChat = () => {
     attachment_url: attachmentUrl
   }]);
 
-  socket.emit('send_message', {
+    socket.emit('send_message', {
     chatId: activeChat.id,
     text,
     senderId: dbUser?.id,
@@ -216,7 +218,12 @@ const AdminChat = () => {
     attachment_file_id: attachmentFileId,
     attachment_type: attachmentType,
     attachment_name: attachmentName,
-  });
+    }, (serverMsg) => {
+        if (!serverMsg) return;
+        setMessages((prev) =>
+            prev.map((m) => (m.message_id === tempId ? { ...serverMsg, isMyMessage: true } : m))
+        );
+    });
 
   console.log('[SEND DEBUG] emit("send_message") was called');
 };

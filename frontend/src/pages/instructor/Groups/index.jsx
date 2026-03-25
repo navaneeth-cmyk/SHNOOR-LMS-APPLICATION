@@ -167,9 +167,13 @@ const InstructorGroups = () => {
     if (!socket || groups.length === 0) return;
 
     const showGroupPopup = (msg) => {
-      if (!msg || msg.sender_id === dbUser?.id) return;
+      if (!msg) return;
 
-      const targetGroup = groups.find((group) => group.group_id === msg.group_id || group.group_id === msg.chat_id);
+      const incomingSenderId = msg.sender_id ?? msg.senderId;
+      if (incomingSenderId && incomingSenderId === dbUser?.id) return;
+
+      const incomingGroupId = msg.group_id ?? msg.groupId ?? msg.chat_id ?? msg.chatId;
+      const targetGroup = groups.find((group) => group.group_id === incomingGroupId);
       if (!targetGroup) return;
 
       toast.custom((t) => (
@@ -180,9 +184,9 @@ const InstructorGroups = () => {
             toast.dismiss(t.id);
           }}
         >
-          <p className="font-semibold text-gray-900">{msg.group_name || targetGroup.name || 'Group'}</p>
-          <p className="text-gray-700 text-sm font-medium">{msg.sender_name || 'User'}</p>
-          <p className="text-gray-600 text-sm truncate">{msg.text || '📎 Attachment'}</p>
+          <p className="font-semibold text-gray-900">{msg.group_name || msg.groupName || targetGroup.name || 'Group'}</p>
+          <p className="text-gray-700 text-sm font-medium">{msg.sender_name || msg.senderName || 'User'}</p>
+          <p className="text-gray-600 text-sm truncate">{msg.text || msg.message_text || '📎 Attachment'}</p>
         </div>
       ), {
         duration: 5,
@@ -192,10 +196,12 @@ const InstructorGroups = () => {
 
     socket.on('group_message', showGroupPopup);
     socket.on('receive_message', showGroupPopup);
+    socket.on('new_message', showGroupPopup);
 
     return () => {
       socket.off('group_message', showGroupPopup);
       socket.off('receive_message', showGroupPopup);
+      socket.off('new_message', showGroupPopup);
     };
   }, [socket, dbUser, groups, navigate]);
 
