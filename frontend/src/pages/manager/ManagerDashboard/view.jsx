@@ -1,7 +1,7 @@
 import React from "react";
 import { Building, Mail, User, FileText } from "lucide-react";
 
-const ManagerDashboardView = ({ loading, profile }) => {
+const ManagerDashboardView = ({ loading, profile, stats }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -22,7 +22,37 @@ const ManagerDashboardView = ({ loading, profile }) => {
           <p className="text-indigo-300 text-sm font-medium mb-1">Welcome</p>
           <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Manager Dashboard</h1>
           <p className="text-slate-400 mt-1 text-sm">Your account details and access panel.</p>
+          <p className="text-slate-200 mt-3 text-sm">
+            College: <span className="font-semibold">{profile.college || "-"}</span>
+          </p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Students</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">{stats.totalStudents}</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Course Enrollments</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">{stats.totalCourseEnrollments}</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Avg Course Progress</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">{stats.averageCourseProgress}%</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Exam Attempts</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">{stats.totalExamAttempts}</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Certificates Issued</p>
+        <p className="text-2xl font-bold text-slate-900 mt-2">{stats.totalCertificates}</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 lg:p-8">
