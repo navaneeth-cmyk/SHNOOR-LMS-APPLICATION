@@ -103,9 +103,9 @@ const InstructorLayoutView = ({
 
                         <SectionHeader title="Management" />
                         <NavItem path="courses" icon={List} label="My Courses" />
-                        <NavItem path="contests" icon={Trophy} label="Manage Contests" />
-                        <NavItem path="practice" icon={Code} label="Practice Arena" />
                         <NavItem path="learning-paths" icon={Map} label="Learning Paths" />
+                        <NavItem path="practice" icon={Code} label="Practice Arena" />
+                        <NavItem path="contests" icon={Trophy} label="Manage Contests" />
                         <NavItem path="exams" icon={BookOpen} label="Exams" />
                         <NavItem path="groups" icon={Users} label="My Groups" />
                         <NavItem path="chat" icon={MessageSquare} label="Messages" badgeCount={totalUnread} />

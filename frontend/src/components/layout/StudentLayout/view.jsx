@@ -105,11 +105,11 @@ const StudentLayoutView = ({
             <NavItem path="dashboard" icon={TrendingUp} label="Dashboard" />
             <NavItem path="courses" icon={List} label="My Courses" />
             <NavItem path="mock-test" icon={ClipboardList} label="Mock Test" />
-            <NavItem path="exams" icon={ClipboardList} label="Exams" />
-            <NavItem path="groups" icon={Users} label="My Groups" />
-            <NavItem path="certificates" icon={Trophy} label="Certificates" />
             <NavItem path="practice" icon={Code} label="Practice Arena" />
+            <NavItem path="exams" icon={ClipboardList} label="Exams" />
             <NavItem path="contests" icon={Trophy} label="Weekly Contests" />
+            <NavItem path="certificates" icon={Trophy} label="Certificates" />
+            <NavItem path="groups" icon={Users} label="My Groups" />
             <NavItem path="chat" icon={MessageSquare} label="Messages" badgeCount={totalUnread} />
             <NavItem path="settings" icon={Settings} label="Settings" />
           </ul>

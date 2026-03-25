@@ -51,7 +51,7 @@ const Certificates = () => {
   );
 
   const exportToExcel = () => {
-    const headers = ["Sr No", "Student Name", "Student Email", "Certificate ID", "Course Name", "Issued At"];
+    const headers = ["Sr No", "Student Name", "Student Email", "Certificate ID", "Course/Exam Name", "Issued At"];
 
     const lines = [
       headers.join("\t"),
@@ -87,7 +87,7 @@ const Certificates = () => {
       { key: "studentName", label: "Student Name", width: 150 },
       { key: "studentEmail", label: "Student Email", width: 170 },
       { key: "certificateId", label: "Certificate ID", width: 150 },
-      { key: "courseName", label: "Course Name", width: 180 },
+      { key: "courseName", label: "Course/Exam Name", width: 180 },
       { key: "issuedAt", label: "Issued At", width: 120 },
     ];
 
@@ -113,7 +113,7 @@ const Certificates = () => {
         studentName: "Student Name",
         studentEmail: "Student Email",
         certificateId: "Certificate ID",
-        courseName: "Course Name",
+        courseName: "Course/Exam Name",
         issuedAt: "Issued At",
       },
       true,
@@ -129,7 +129,7 @@ const Certificates = () => {
             studentName: "Student Name",
             studentEmail: "Student Email",
             certificateId: "Certificate ID",
-            courseName: "Course Name",
+            courseName: "Course/Exam Name",
             issuedAt: "Issued At",
           },
           true,
@@ -148,7 +148,7 @@ const Certificates = () => {
           <div>
             <p className="text-indigo-300 text-sm font-medium mb-1">Manager</p>
             <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Certificates</h1>
-            <p className="text-slate-400 mt-1 text-sm">Certificate ID and course name for students.</p>
+            <p className="text-slate-400 mt-1 text-sm">Certificate ID and course/exam name for students.</p>
           </div>
 
           <div className="flex gap-2 w-full sm:w-auto">
@@ -186,7 +186,7 @@ const Certificates = () => {
                   <th className="px-4 py-3 font-semibold">Student</th>
                   <th className="px-4 py-3 font-semibold">Email</th>
                   <th className="px-4 py-3 font-semibold">Certificate ID</th>
-                  <th className="px-4 py-3 font-semibold">Course Name</th>
+                  <th className="px-4 py-3 font-semibold">Course/Exam Name</th>
                   <th className="px-4 py-3 font-semibold">Issued At</th>
                 </tr>
               </thead>
