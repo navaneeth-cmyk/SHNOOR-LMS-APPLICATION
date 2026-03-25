@@ -1,9 +1,11 @@
 import admin from "../services/firebaseAdmin.js";
 import pool from "../db/postgres.js";
-import { sendInstructorInvite } from "../services/email.service.js";
+import { sendInstructorInvite, generatePasswordResetLink } from "../services/email.service.js";
 import { validateInstructorData } from "../utils/validation.js";
 import { Readable } from "stream";
 import csvParser from "csv-parser";
+
+const defaultFrontendUrl = (process.env.FRONTEND_URL || "https://lms.shnoor.com").replace(/\/$/, "");
 
 /**
  * Parse CSV buffer into array of objects
@@ -212,7 +214,16 @@ export const bulkUploadInstructors = async (req, res) => {
         // Send email (non-blocking, after transaction)
         setImmediate(async () => {
           try {
-            await sendInstructorInvite(instructor.email, instructor.fullName);
+            const createPasswordUrl = await generatePasswordResetLink(instructor.email);
+            await sendInstructorInvite(
+              {
+                email: instructor.email,
+                name: instructor.fullName,
+                createPasswordUrl,
+                loginUrl: `${defaultFrontendUrl}/login`,
+              },
+              instructor.fullName,
+            );
             console.log(`📧 Email sent to ${instructor.email}`);
           } catch (emailError) {
             console.error(`📧 Email failed for ${instructor.email}:`, emailError.message);

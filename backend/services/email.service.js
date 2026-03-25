@@ -1,6 +1,20 @@
 import { sendMail } from "../config/mailer.js";
+import admin from "./firebaseAdmin.js";
 
 const defaultFrontendUrl = (process.env.FRONTEND_URL || "https://lms.shnoor.com").replace(/\/$/, "");
+
+// Generate Firebase password reset link
+export const generatePasswordResetLink = async (email) => {
+  try {
+    const link = await admin.auth().generatePasswordResetLink(email);
+    // Convert to frontend create-password route with oobCode
+    const createPasswordUrl = `${defaultFrontendUrl}/create-password?oobCode=${link.split("oobCode=")[1]}&email=${encodeURIComponent(email)}`;
+    return createPasswordUrl;
+  } catch (error) {
+    console.error(`Failed to generate password reset link for ${email}:`, error);
+    return null;
+  }
+};
 
 const normalizeInviteInput = (emailOrObj, name) => {
   if (typeof emailOrObj === "object" && emailOrObj !== null) {

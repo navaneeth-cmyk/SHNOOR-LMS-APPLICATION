@@ -1,9 +1,29 @@
 import admin from "../services/firebaseAdmin.js";
 import pool from "../db/postgres.js";
-import { sendInstructorInvite, sendManagerInvite, sendStudentInvite } from "../services/email.service.js";
+import {
+  sendInstructorInvite,
+  sendManagerInvite,
+  sendStudentInvite,
+  generatePasswordResetLink,
+} from "../services/email.service.js";
 import { validateBulkInstructors } from "../utils/csvValidator.js";
 import csvParser from "csv-parser";
 import { Readable } from "stream";
+
+const defaultFrontendUrl = (process.env.FRONTEND_URL || "https://lms.shnoor.com").replace(/\/$/, "");
+
+const buildInvitePayload = async ({ email, fullName, password = null }) => {
+  const createPasswordUrl = await generatePasswordResetLink(email);
+
+  return {
+    email,
+    name: fullName,
+    createPasswordUrl,
+    loginUrl: `${defaultFrontendUrl}/login`,
+    hasPredefinedPassword: Boolean(password),
+    temporaryPassword: password || null,
+  };
+};
 
 export const getMyProfile = async (req, res) => {
   try {
@@ -56,6 +76,7 @@ export const addInstructor = async (req, res) => {
   const subject = req.body?.subject?.trim();
   const phone = req.body?.phone?.trim() || null;
   const bio = req.body?.bio?.trim() || null;
+  const password = req.body?.password?.trim() || null;
   let firebaseUid = null;
   const client = await pool.connect();
 
@@ -102,6 +123,7 @@ export const addInstructor = async (req, res) => {
     const firebaseUser = await admin.auth().createUser({
       email,
       displayName: fullName,
+      ...(password ? { password } : {}),
     });
     firebaseUid = firebaseUser.uid;
 
@@ -132,7 +154,12 @@ export const addInstructor = async (req, res) => {
 
     // 6) Send invite (do not break API if email fails)
     try {
-      await sendInstructorInvite(email, fullName);
+      const invitePayload = await buildInvitePayload({
+        email,
+        fullName,
+        password,
+      });
+      await sendInstructorInvite(invitePayload, fullName);
     } catch (mailError) {
       console.error("SMTP failed:", mailError);
     }
@@ -190,7 +217,11 @@ export const addInstructor = async (req, res) => {
 };
 
 export const addStudent = async (req, res) => {
-  const { fullName, email, phone, bio } = req.body;
+  const fullName = req.body?.fullName?.trim();
+  const email = req.body?.email?.trim()?.toLowerCase();
+  const phone = req.body?.phone?.trim() || null;
+  const bio = req.body?.bio?.trim() || null;
+  const password = req.body?.password?.trim() || null;
 
   try {
     console.log(`📝 Attempting to add student: ${email}`);
@@ -211,6 +242,7 @@ export const addStudent = async (req, res) => {
     const firebaseUser = await admin.auth().createUser({
       email,
       displayName: fullName,
+      ...(password ? { password } : {}),
     });
 
     console.log(`✅ Firebase user created: ${firebaseUser.uid}`);
@@ -235,7 +267,12 @@ export const addStudent = async (req, res) => {
     // 🔵 5️⃣ SEND EMAIL (DO NOT BREAK API IF IT FAILS)
     try {
       console.log(`📧 Attempting to send email to: ${email}`);
-      await sendStudentInvite(email, fullName);
+      const invitePayload = await buildInvitePayload({
+        email,
+        fullName,
+        password,
+      });
+      await sendStudentInvite(invitePayload, fullName);
       console.log(`✅ Email sent successfully to: ${email}`);
     } catch (mailError) {
       console.error("SMTP failed:", mailError);
@@ -243,6 +280,25 @@ export const addStudent = async (req, res) => {
   } catch (error) {
     console.error("addStudent error:", error);
     console.error("Error stack:", error.stack);
+
+    if (error.code === "auth/email-already-exists" || error.code === "23505") {
+      return res.status(409).json({
+        message: "An account with this email already exists",
+      });
+    }
+
+    if (error.code === "auth/invalid-email") {
+      return res.status(400).json({
+        message: "Invalid email format",
+      });
+    }
+
+    if (error.code === "auth/invalid-password") {
+      return res.status(400).json({
+        message: "Invalid password. Password must be at least 6 characters",
+      });
+    }
+
     res.status(500).json({ message: "Failed to create student" });
   }
 };
@@ -253,6 +309,7 @@ export const addManager = async (req, res) => {
   const college = req.body?.college?.trim();
   const phone = req.body?.phone?.trim() || null;
   const bio = req.body?.bio?.trim() || null;
+  const password = req.body?.password?.trim() || null;
   let firebaseUid = null;
   const client = await pool.connect();
 
@@ -295,6 +352,7 @@ export const addManager = async (req, res) => {
     const firebaseUser = await admin.auth().createUser({
       email,
       displayName: fullName,
+      ...(password ? { password } : {}),
     });
     firebaseUid = firebaseUser.uid;
 
@@ -315,7 +373,12 @@ export const addManager = async (req, res) => {
     });
 
     try {
-      await sendManagerInvite(email, fullName);
+      const invitePayload = await buildInvitePayload({
+        email,
+        fullName,
+        password,
+      });
+      await sendManagerInvite(invitePayload, fullName);
     } catch (mailError) {
       console.error("SMTP failed:", mailError);
     }
@@ -343,6 +406,12 @@ export const addManager = async (req, res) => {
     if (error.code === "auth/invalid-email") {
       return res.status(400).json({
         message: "Invalid email format",
+      });
+    }
+
+    if (error.code === "auth/invalid-password") {
+      return res.status(400).json({
+        message: "Invalid password. Password must be at least 6 characters",
       });
     }
 
@@ -588,7 +657,11 @@ export const bulkUploadInstructors = async (req, res) => {
 
         // Send email (non-blocking, don't fail transaction if email fails)
         try {
-          await sendInstructorInvite(email, fullName);
+          const invitePayload = await buildInvitePayload({
+            email,
+            fullName,
+          });
+          await sendInstructorInvite(invitePayload, fullName);
           console.log(`  📧 Email sent to: ${email}`);
         } catch (emailError) {
           console.error(`  ⚠️ Email failed for ${email}:`, emailError.message);
@@ -825,7 +898,11 @@ export const bulkUploadStudents = async (req, res) => {
 
         // Send email (non-blocking)
         try {
-          await sendStudentInvite(email, fullName);
+          const invitePayload = await buildInvitePayload({
+            email,
+            fullName,
+          });
+          await sendStudentInvite(invitePayload, fullName);
           console.log(`  📧 Email sent to: ${email}`);
         } catch (emailError) {
           console.error(`  ⚠️ Email failed for ${email}:`, emailError.message);
@@ -1065,7 +1142,11 @@ export const bulkUploadManagers = async (req, res) => {
         });
 
         try {
-          await sendManagerInvite(manager.email, manager.fullName);
+          const invitePayload = await buildInvitePayload({
+            email: manager.email,
+            fullName: manager.fullName,
+          });
+          await sendManagerInvite(invitePayload, manager.fullName);
         } catch (emailError) {
           console.error(`Manager invite failed for ${manager.email}:`, emailError.message);
         }
