@@ -81,6 +81,12 @@ const StudentDashboardView = ({
         { label: 'Enrolled', value: enrolledCount, icon: BookOpen, color: '#10b981', spark: sparkData[3], sub: 'Active courses' },
     ];
 
+    const lastCourseProgress = Math.max(
+        0,
+        Math.min(100, Number(lastCourse?.progress || 0))
+    );
+    const lastModuleTitle = lastCourse?.last_module_title || 'Latest module';
+
     const CourseMiniList = ({ title, courses, tone = "indigo", emptyText }) => {
         const toneMap = {
             indigo: "bg-indigo-50 text-indigo-600",
@@ -296,11 +302,11 @@ const StudentDashboardView = ({
                                 <div className="flex-1">
                                     <h2 className="text-xl font-bold text-primary-900 mb-2">{lastCourse.title || "Untitled Course"}</h2>
                                     <div className="w-full bg-slate-100 rounded-full h-2 mb-3">
-                                        <div className="bg-indigo-600 h-2 rounded-full transition-all" style={{ width: '65%' }}></div>
+                                        <div className="bg-indigo-600 h-2 rounded-full transition-all" style={{ width: `${lastCourseProgress}%` }}></div>
                                     </div>
                                     <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-                                        <span>65% Complete</span>
-                                        <span>Module 4: Advanced Concepts</span>
+                                        <span>{lastCourseProgress}% Complete</span>
+                                        <span>{lastModuleTitle}</span>
                                     </div>
                                 </div>
                                 <button
@@ -348,7 +354,13 @@ const StudentDashboardView = ({
                                             </div>
                                             <div>
                                                 <div className="text-sm font-semibold text-primary-900">{activity.title}</div>
-                                                <div className="text-xs text-slate-400">Score: {activity.score}%</div>
+                                                <div className="text-xs text-slate-400">
+                                                    {activity.type === 'quiz'
+                                                        ? `Score: ${activity.score ?? '-'}%`
+                                                        : activity.type === 'module'
+                                                            ? 'Status: Completed'
+                                                            : 'Status: Enrolled'}
+                                                </div>
                                             </div>
                                         </div>
                                         <span className="text-xs font-medium text-slate-300">{new Date(activity.date).toLocaleDateString()}</span>

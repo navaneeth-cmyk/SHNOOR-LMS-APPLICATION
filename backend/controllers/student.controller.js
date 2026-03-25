@@ -64,19 +64,32 @@ export const getStudentDashboard = async (req, res) => {
     // 3️⃣ Fetch Recent Activity
     const activityResult = await pool.query(
       `
-      (SELECT 
-        'enrollment' AS type,
-        c.title AS title,
-        sc.created_at AS date,
-        NULL::float AS score,
-        sc.course_id::text AS id
-       FROM (
+      WITH enrollment_events AS (
+        SELECT
+          sc.student_id,
+          sc.course_id,
+          sc.created_at,
+          ROW_NUMBER() OVER (
+            PARTITION BY sc.student_id, sc.course_id
+            ORDER BY sc.created_at DESC
+          ) AS rn
+        FROM (
           SELECT student_id, course_id, enrolled_at AS created_at FROM student_courses
           UNION ALL
           SELECT student_id, course_id, assigned_at AS created_at FROM course_assignments
-       ) sc
-       JOIN courses c ON sc.course_id = c.courses_id
-       WHERE sc.student_id = $1)
+        ) sc
+        WHERE sc.student_id = $1
+      )
+
+      (SELECT 
+        'enrollment' AS type,
+        c.title AS title,
+        ee.created_at AS date,
+        NULL::float AS score,
+        ee.course_id::text AS id
+       FROM enrollment_events ee
+       JOIN courses c ON ee.course_id = c.courses_id
+       WHERE ee.rn = 1)
       
       UNION ALL
 
@@ -160,13 +173,23 @@ export const getStudentDashboard = async (req, res) => {
       [studentId]
     );
 
+    const dedupedRecentActivity = Array.from(
+      new Map(
+        activityResult.rows
+          .map((a) => ({
+            ...a,
+            id: `${a.type}-${a.id}`,
+            score: a.score === null || a.score === undefined ? null : Number(a.score),
+          }))
+          .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+          .map((a) => [a.id, a])
+      ).values()
+    ).slice(0, 10);
+
     return res.json({
       ...statsResult.rows[0],
       assignments_count: 0,
-      recent_activity: activityResult.rows.map(a => ({
-        ...a,
-        id: a.type + '-' + a.id
-      })),
+      recent_activity: dedupedRecentActivity,
       deadlines: deadlinesResult.rows,
       recent_videos: recentVideosResult.rows
     });
