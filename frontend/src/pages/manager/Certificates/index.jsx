@@ -24,7 +24,7 @@ const Certificates = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get("/api/users/manager/certificates");
+        const res = await api.get("/api/manager/certificates");
         setRows(Array.isArray(res.data) ? res.data : []);
       } catch (error) {
         console.error("Failed to fetch manager certificates:", error);

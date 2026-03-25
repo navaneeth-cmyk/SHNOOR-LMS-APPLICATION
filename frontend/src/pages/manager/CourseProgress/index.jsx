@@ -10,7 +10,7 @@ const CourseProgress = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get("/api/users/manager/course-progress");
+        const res = await api.get("/api/manager/course-progress");
         setRows(Array.isArray(res.data) ? res.data : []);
       } catch (error) {
         console.error("Failed to fetch manager course progress:", error);

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import jsPDF from "jspdf";
-import { Download } from "lucide-react";
+import { Download, Eye, EyeOff } from "lucide-react";
 import api from "../../../api/axios";
 
 const formatDate = (value) => {
@@ -17,14 +17,30 @@ const formatDate = (value) => {
   });
 };
 
+const formatViolationDateTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+};
+
 const ExamProgress = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedRowKey, setExpandedRowKey] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get("/api/users/manager/exam-progress");
+        const res = await api.get("/api/manager/exam-progress");
         setRows(Array.isArray(res.data) ? res.data : []);
       } catch (error) {
         console.error("Failed to fetch manager exam progress:", error);
@@ -41,12 +57,22 @@ const ExamProgress = () => {
     () =>
       rows.map((row, index) => ({
         srNo: index + 1,
+        rowKey: `${row.student_id || "-"}-${row.exam_id || "no-exam"}-${index}`,
         studentName: row.student_name || "-",
         studentEmail: row.student_email || "-",
         examName: row.exam_name || "-",
-        score: Number(row.score || 0),
+        score: row.score === null || row.score === undefined ? null : Number(row.score),
         status: row.status || "-",
         violations: Number(row.violations || 0),
+        violationDetails: Array.isArray(row.violation_details) ? row.violation_details : [],
+        violationLogText: Array.isArray(row.violation_details) && row.violation_details.length > 0
+          ? row.violation_details
+              .map(
+                (item) =>
+                  `${item?.violation_type || "Unknown"} (${formatViolationDateTime(item?.created_at)})`,
+              )
+              .join(" | ")
+          : "No violations",
         updatedAt: formatDate(row.updated_at),
       })),
     [rows],
@@ -61,6 +87,7 @@ const ExamProgress = () => {
       "Score",
       "Status",
       "Violations",
+      "Violation Log",
       "Updated At",
     ];
 
@@ -72,9 +99,10 @@ const ExamProgress = () => {
           row.studentName,
           row.studentEmail,
           row.examName,
-          row.score,
+          row.score === null ? "-" : row.score,
           row.status,
           row.violations,
+          row.violationLogText,
           row.updatedAt,
         ]
           .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
@@ -164,6 +192,51 @@ const ExamProgress = () => {
       drawRow(row);
     });
 
+    const rowsWithViolationLogs = exportRows.filter((row) => row.violationDetails.length > 0);
+
+    if (rowsWithViolationLogs.length > 0) {
+      if (y + 36 > doc.internal.pageSize.getHeight() - 30) {
+        doc.addPage();
+        y = 30;
+      } else {
+        y += 16;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("Violation Logs", 40, y);
+      y += 16;
+
+      rowsWithViolationLogs.forEach((row) => {
+        if (y + 40 > doc.internal.pageSize.getHeight() - 30) {
+          doc.addPage();
+          y = 30;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        const groupTitle = `${row.studentName} | ${row.examName}`;
+        doc.text(doc.splitTextToSize(groupTitle, 760), 40, y);
+        y += 14;
+
+        doc.setFont("helvetica", "normal");
+        row.violationDetails.forEach((item) => {
+          const line = `• ${item?.violation_type || "Unknown"} - ${formatViolationDateTime(item?.created_at)}`;
+          const wrapped = doc.splitTextToSize(line, 760);
+
+          if (y + wrapped.length * 12 > doc.internal.pageSize.getHeight() - 30) {
+            doc.addPage();
+            y = 30;
+          }
+
+          doc.text(wrapped, 52, y);
+          y += wrapped.length * 12 + 2;
+        });
+
+        y += 6;
+      });
+    }
+
     doc.save("manager_exam_progress.pdf");
   };
 
@@ -216,25 +289,74 @@ const ExamProgress = () => {
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold">Violations</th>
                   <th className="px-4 py-3 font-semibold">Updated At</th>
+                  <th className="px-4 py-3 font-semibold text-center">View</th>
                 </tr>
               </thead>
               <tbody>
                 {exportRows.length > 0 ? (
-                  exportRows.map((row) => (
-                    <tr key={`${row.studentEmail}-${row.examName}-${row.srNo}`} className="border-t border-slate-100 text-slate-700">
-                      <td className="px-4 py-3">{row.srNo}</td>
-                      <td className="px-4 py-3 font-medium text-slate-900">{row.studentName}</td>
-                      <td className="px-4 py-3">{row.studentEmail}</td>
-                      <td className="px-4 py-3">{row.examName}</td>
-                      <td className="px-4 py-3">{row.score.toFixed(1)}%</td>
-                      <td className="px-4 py-3">{row.status}</td>
-                      <td className="px-4 py-3">{row.violations}</td>
-                      <td className="px-4 py-3">{row.updatedAt}</td>
-                    </tr>
-                  ))
+                  exportRows.map((row) => {
+                    const isExpanded = expandedRowKey === row.rowKey;
+
+                    return (
+                      <Fragment key={row.rowKey}>
+                        <tr className="border-t border-slate-100 text-slate-700">
+                          <td className="px-4 py-3">{row.srNo}</td>
+                          <td className="px-4 py-3 font-medium text-slate-900">{row.studentName}</td>
+                          <td className="px-4 py-3">{row.studentEmail}</td>
+                          <td className="px-4 py-3">{row.examName}</td>
+                          <td className="px-4 py-3">{row.score === null ? "-" : `${row.score.toFixed(1)}%`}</td>
+                          <td className="px-4 py-3">{row.status}</td>
+                          <td className="px-4 py-3">{row.violations}</td>
+                          <td className="px-4 py-3">{row.updatedAt}</td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRowKey(isExpanded ? null : row.rowKey)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100"
+                              title={isExpanded ? "Hide violations" : "View violations"}
+                            >
+                              {isExpanded ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr className="border-t border-slate-100 bg-slate-50/60">
+                            <td colSpan={9} className="px-4 py-4">
+                              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                                  Violation Log
+                                </p>
+
+                                {row.violationDetails.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {row.violationDetails.map((item, itemIndex) => (
+                                      <div
+                                        key={`${row.rowKey}-violation-${itemIndex}`}
+                                        className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700"
+                                      >
+                                        <span className="font-medium text-slate-900 min-w-[180px]">
+                                          {item?.violation_type || "Unknown"}
+                                        </span>
+                                        <span className="text-slate-500">
+                                          {formatViolationDateTime(item?.created_at)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-slate-500">No violations found for this record.</p>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                       No exam progress data found.
                     </td>
                   </tr>

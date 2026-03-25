@@ -33,7 +33,7 @@ const ViewStudents = () => {
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        const res = await api.get("/api/users/manager/students");
+        const res = await api.get("/api/manager/students");
         setStudents(Array.isArray(res.data) ? res.data : []);
       } catch (error) {
         console.error("Failed to fetch manager students:", error);
