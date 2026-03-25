@@ -5,7 +5,12 @@ import api from "../../../api/axios";
 
 const formatDateIST = (value) => {
   if (!value) return "-";
-  const date = new Date(value);
+  // If no timezone info, treat as UTC (how DB stores it)
+  let normalizedValue = value;
+  if (typeof value === "string" && !value.includes("Z") && !value.includes("+")) {
+    normalizedValue = value + "Z";
+  }
+  const date = new Date(normalizedValue);
   if (Number.isNaN(date.getTime())) return "-";
   return `${date.toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",

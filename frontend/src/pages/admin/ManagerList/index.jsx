@@ -4,17 +4,23 @@ import api from "../../../api/axios";
 
 const formatDateTime = (value) => {
   if (!value) return "-";
-  const date = new Date(value);
+  // If no timezone info, treat as UTC (how DB stores it)
+  let normalizedValue = value;
+  if (typeof value === "string" && !value.includes("Z") && !value.includes("+")) {
+    normalizedValue = value + "Z";
+  }
+  const date = new Date(normalizedValue);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("en-IN", {
+  return `${date.toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
-    month: "short",
+    month: "numeric",
     day: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
+    second: "2-digit",
     hour12: true,
-  });
+  })} IST`;
 };
 
 const ManagerList = () => {
