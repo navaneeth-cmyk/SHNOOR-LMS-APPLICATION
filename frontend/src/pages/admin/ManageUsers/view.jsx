@@ -1,12 +1,13 @@
 import React from "react";
-import { Search, Ban, CheckCircle2, Shield, GraduationCap, Briefcase, Building, Users } from "lucide-react";
+import { Search, Ban, CheckCircle2, Shield, GraduationCap, Briefcase, Building, Users, Crown } from "lucide-react";
 
 const ManageUsersView = ({
   loading, searchInput, setSearchInput, handleSearch, filterRole, setFilterRole, filteredUsers, handleStatusChange,
 }) => {
   const getRoleIcon = (role) => {
     switch (role) {
-      case "admin": return <Shield className="text-indigo-500" size={16} />;
+      case "admin": return <Crown className="text-amber-500" size={16} />;
+      case "manager": return <Shield className="text-indigo-500" size={16} />;
       case "instructor": return <Briefcase className="text-violet-500" size={16} />;
       case "company": return <Building className="text-amber-500" size={16} />;
       default: return <GraduationCap className="text-emerald-500" size={16} />;
@@ -65,6 +66,7 @@ const ManageUsersView = ({
               className="px-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm text-white font-medium focus:ring-2 focus:ring-indigo-400/30 transition-all cursor-pointer [&>option]:text-slate-900 [&>option]:bg-white">
               <option value="all">All Roles</option>
               <option value="student">Students</option>
+              <option value="manager">Managers</option>
               <option value="instructor">Instructors</option>
               <option value="admin">Admins</option>
             </select>

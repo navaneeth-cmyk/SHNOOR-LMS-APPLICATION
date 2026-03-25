@@ -287,6 +287,28 @@ ORDER BY created_at DESC;
   }
 };
 
+export const getManagersList = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         user_id,
+         full_name,
+         email,
+         college,
+         created_at,
+         last_login
+       FROM users
+       WHERE role = 'manager'
+       ORDER BY created_at DESC`,
+    );
+
+    return res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Get managers list error:", error);
+    return res.status(500).json({ message: "Failed to fetch managers" });
+  }
+};
+
 
 
 export const assignCourses = async (req, res) => {

@@ -2,6 +2,7 @@ import express from "express";
 import {
   getDashboardStats,
   getAllStudents,
+  getManagersList,
   assignCourses,
   updateCourseStatus,
   getCoursesByStatus,
@@ -39,6 +40,14 @@ router.get(
   attachUser,
   roleGuard("admin"),
   getAllStudents
+);
+
+router.get(
+  "/managers",
+  firebaseAuth,
+  attachUser,
+  roleGuard("admin"),
+  getManagersList
 );
 
 router.post(

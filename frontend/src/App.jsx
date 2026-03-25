@@ -27,6 +27,7 @@ import AddInstructor from "./pages/admin/AddInstructor";
 import AdminLiveProctoring from "./pages/admin/AdminLiveProctoring";
 import AdminViolations from "./pages/admin/AdminViolations";
 import AddManager from "./pages/admin/AddManager";
+import ManagerList from "./pages/admin/ManagerList";
 import InstructorDashboard from "./pages/instructor/InstructorDashboard";
 import AddCourse from "./pages/instructor/AddCourse";
 import CourseList from "./pages/instructor/CourseList";
@@ -118,6 +119,7 @@ function App() {
               <Route path="add-instructor" element={<AddInstructor />} />
               <Route path="add-student" element={<AddStudent />} />
               <Route path="add-manager" element={<AddManager />} />
+              <Route path="manager-list" element={<ManagerList />} />
               <Route path="approve-users" element={<ApproveUsers />} />
               <Route path="approve-courses" element={<ApproveCourses />} />
               <Route path="assign-course" element={<AssignCourse />} />

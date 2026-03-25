@@ -67,7 +67,8 @@ const ManageUsers = () => {
       user.full_name?.toLowerCase().includes(appliedSearch.toLowerCase()) ||
       user.email?.toLowerCase().includes(appliedSearch.toLowerCase());
 
-    const matchesRole = filterRole === "all" || user.role === filterRole;
+    const userRole = String(user.role || "").toLowerCase();
+    const matchesRole = filterRole === "all" || userRole === String(filterRole).toLowerCase();
 
     return matchesSearch && matchesRole;
   });

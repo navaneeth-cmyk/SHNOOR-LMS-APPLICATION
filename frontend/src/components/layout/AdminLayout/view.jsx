@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Timer,
   Video,
+  List,
 } from "lucide-react";
 import markLogo from "../../../assets/just_logo.jpeg";
 import { useNavigate } from "react-router-dom";
@@ -175,9 +176,10 @@ const AdminLayoutView = ({
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             <NavItem path="approve-users" icon={UserCircle} label="Approve Users" />
             <NavItem path="manage-users" icon={Users} label="Manage Users" />
+            <NavItem path="manager-list" icon={List} label="Manager List" />
+            <NavItem path="groups" icon={Users} label="Groups" />
             <NavItem path="approve-courses" icon={CheckCircle} label="Approve Courses" />
             <NavItem path="assign-course" icon={UserPlus} label="Assign Courses" />
-            <NavItem path="groups" icon={Users} label="Groups" />
             <NavItem path="exam-timers" icon={Timer} label="Grace Timers" />
             <NavItem path="chat-students" icon={MessageSquare} label="Chat with Students" />
             <NavItem path="certificates" icon={Award} label="Certificates" />
