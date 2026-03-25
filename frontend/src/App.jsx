@@ -82,6 +82,9 @@ import AdminExamTimer from "./pages/admin/ExamTimer/AdminExamTimer";
 import ManagerLayout from "./components/layout/ManagerLayout";
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
 import ViewStudents from "./pages/manager/ViewStudents";
+import CourseProgress from "./pages/manager/CourseProgress";
+import ExamProgress from "./pages/manager/ExamProgress";
+import ManagerCertificates from "./pages/manager/Certificates";
 // import Leaderboard from './pages/student/Leaderboard';
 
 function App() {
@@ -174,6 +177,9 @@ function App() {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<ManagerDashboard />} />
               <Route path="students" element={<ViewStudents />} />
+              <Route path="course-progress" element={<CourseProgress />} />
+              <Route path="exam-progress" element={<ExamProgress />} />
+              <Route path="certificates" element={<ManagerCertificates />} />
               <Route path="settings" element={<ProfileSettings />} />
             </Route>
 

@@ -9,6 +9,9 @@ import {
   addStudent,
   addManager,
   getManagerCollegeStudents,
+  getManagerCourseProgress,
+  getManagerExamProgress,
+  getManagerCertificates,
   bulkUploadInstructors,
   bulkUploadStudents,
   bulkUploadManagers,
@@ -67,6 +70,30 @@ router.get(
   attachUser,
   roleGuard("manager"),
   getManagerCollegeStudents
+);
+
+router.get(
+  "/manager/course-progress",
+  firebaseAuth,
+  attachUser,
+  roleGuard("manager"),
+  getManagerCourseProgress
+);
+
+router.get(
+  "/manager/exam-progress",
+  firebaseAuth,
+  attachUser,
+  roleGuard("manager"),
+  getManagerExamProgress
+);
+
+router.get(
+  "/manager/certificates",
+  firebaseAuth,
+  attachUser,
+  roleGuard("manager"),
+  getManagerCertificates
 );
 
 router.post(

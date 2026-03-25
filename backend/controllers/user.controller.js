@@ -117,6 +117,236 @@ export const getManagerCollegeStudents = async (req, res) => {
   }
 };
 
+export const getManagerCourseProgress = async (req, res) => {
+  try {
+    const managerId = req.user.id;
+
+    const managerResult = await pool.query(
+      `SELECT college
+       FROM users
+       WHERE user_id = $1 AND role = 'manager'
+       LIMIT 1`,
+      [managerId],
+    );
+
+    if (managerResult.rows.length === 0) {
+      return res.status(404).json({ message: "Manager profile not found" });
+    }
+
+    const managerCollege = (managerResult.rows[0].college || "").trim();
+    if (!managerCollege) {
+      return res.status(200).json([]);
+    }
+
+    const result = await pool.query(
+      `WITH manager_students AS (
+         SELECT u.user_id, u.full_name, u.email
+         FROM users u
+         WHERE u.role = 'student'
+           AND u.status = 'active'
+           AND REGEXP_REPLACE(UPPER(TRIM(COALESCE(u.college, ''))), '[,.\\-_() ]+', ' ', 'g') =
+               REGEXP_REPLACE(UPPER(TRIM($1)), '[,.\\-_() ]+', ' ', 'g')
+       ), student_enrollments AS (
+         SELECT student_id, course_id FROM student_courses
+         UNION
+         SELECT student_id, course_id FROM course_assignments
+       ), course_totals AS (
+         SELECT m.course_id, COUNT(*)::int AS total_modules
+         FROM modules m
+         GROUP BY m.course_id
+       ), completed_modules AS (
+         SELECT mp.student_id, mp.course_id, COUNT(*)::int AS completed_modules
+         FROM module_progress mp
+         WHERE mp.completed_at IS NOT NULL
+         GROUP BY mp.student_id, mp.course_id
+       )
+       SELECT
+         ms.user_id AS student_id,
+         ms.full_name AS student_name,
+         ms.email AS student_email,
+         c.courses_id AS course_id,
+         c.title AS course_name,
+         COALESCE(ct.total_modules, 0) AS total_modules,
+         COALESCE(cm.completed_modules, 0) AS completed_modules,
+         CASE
+           WHEN COALESCE(ct.total_modules, 0) = 0 THEN 0
+           ELSE ROUND((COALESCE(cm.completed_modules, 0)::numeric / ct.total_modules::numeric) * 100, 1)
+         END AS progress_percent
+       FROM manager_students ms
+       JOIN student_enrollments se ON se.student_id = ms.user_id
+       JOIN courses c ON c.courses_id = se.course_id
+       LEFT JOIN course_totals ct ON ct.course_id = c.courses_id
+       LEFT JOIN completed_modules cm ON cm.student_id = ms.user_id AND cm.course_id = c.courses_id
+       ORDER BY ms.full_name ASC, c.title ASC`,
+      [managerCollege],
+    );
+
+    return res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("getManagerCourseProgress error:", error);
+    return res.status(500).json({ message: "Failed to fetch manager course progress" });
+  }
+};
+
+export const getManagerExamProgress = async (req, res) => {
+  try {
+    const managerId = req.user.id;
+
+    const managerResult = await pool.query(
+      `SELECT college
+       FROM users
+       WHERE user_id = $1 AND role = 'manager'
+       LIMIT 1`,
+      [managerId],
+    );
+
+    if (managerResult.rows.length === 0) {
+      return res.status(404).json({ message: "Manager profile not found" });
+    }
+
+    const managerCollege = (managerResult.rows[0].college || "").trim();
+    if (!managerCollege) {
+      return res.status(200).json([]);
+    }
+
+    try {
+      const result = await pool.query(
+        `WITH manager_students AS (
+           SELECT u.user_id, u.full_name, u.email
+           FROM users u
+           WHERE u.role = 'student'
+             AND u.status = 'active'
+             AND REGEXP_REPLACE(UPPER(TRIM(COALESCE(u.college, ''))), '[,.\\-_() ]+', ' ', 'g') =
+                 REGEXP_REPLACE(UPPER(TRIM($1)), '[,.\\-_() ]+', ' ', 'g')
+         ), violations AS (
+           SELECT student_id, exam_id, COUNT(*)::int AS violations_count
+           FROM exam_violations
+           GROUP BY student_id, exam_id
+         )
+         SELECT
+           ms.user_id AS student_id,
+           ms.full_name AS student_name,
+           ms.email AS student_email,
+           ea.exam_id,
+           COALESCE(e.title, ea.exam_id::text) AS exam_name,
+           COALESCE(er.percentage, 0) AS score,
+           COALESCE(
+             CASE
+               WHEN er.passed IS TRUE THEN 'Pass'
+               WHEN er.passed IS FALSE THEN 'Fail'
+               ELSE NULL
+             END,
+             ea.status,
+             'Not Attempted'
+           ) AS status,
+           COALESCE(v.violations_count, 0) AS violations,
+           COALESCE(er.evaluated_at, ea.submitted_at, ea.start_time) AS updated_at
+         FROM manager_students ms
+         JOIN exam_attempts ea ON ea.student_id = ms.user_id
+         LEFT JOIN exams e ON e.exam_id::text = ea.exam_id::text
+         LEFT JOIN exam_results er ON er.student_id = ms.user_id AND er.exam_id::text = ea.exam_id::text
+         LEFT JOIN violations v ON v.student_id = ms.user_id AND v.exam_id::text = ea.exam_id::text
+         ORDER BY ms.full_name ASC, updated_at DESC NULLS LAST`,
+        [managerCollege],
+      );
+
+      return res.status(200).json(result.rows);
+    } catch (error) {
+      if (error?.code !== "42P01") {
+        throw error;
+      }
+
+      const fallbackResult = await pool.query(
+        `WITH manager_students AS (
+           SELECT u.user_id, u.full_name, u.email
+           FROM users u
+           WHERE u.role = 'student'
+             AND u.status = 'active'
+             AND REGEXP_REPLACE(UPPER(TRIM(COALESCE(u.college, ''))), '[,.\\-_() ]+', ' ', 'g') =
+                 REGEXP_REPLACE(UPPER(TRIM($1)), '[,.\\-_() ]+', ' ', 'g')
+         )
+         SELECT
+           ms.user_id AS student_id,
+           ms.full_name AS student_name,
+           ms.email AS student_email,
+           ea.exam_id,
+           COALESCE(e.title, ea.exam_id::text) AS exam_name,
+           COALESCE(er.percentage, 0) AS score,
+           COALESCE(
+             CASE
+               WHEN er.passed IS TRUE THEN 'Pass'
+               WHEN er.passed IS FALSE THEN 'Fail'
+               ELSE NULL
+             END,
+             ea.status,
+             'Not Attempted'
+           ) AS status,
+           0::int AS violations,
+           COALESCE(er.evaluated_at, ea.submitted_at, ea.start_time) AS updated_at
+         FROM manager_students ms
+         JOIN exam_attempts ea ON ea.student_id = ms.user_id
+         LEFT JOIN exams e ON e.exam_id::text = ea.exam_id::text
+         LEFT JOIN exam_results er ON er.student_id = ms.user_id AND er.exam_id::text = ea.exam_id::text
+         ORDER BY ms.full_name ASC, updated_at DESC NULLS LAST`,
+        [managerCollege],
+      );
+
+      return res.status(200).json(fallbackResult.rows);
+    }
+  } catch (error) {
+    console.error("getManagerExamProgress error:", error);
+    return res.status(500).json({ message: "Failed to fetch manager exam progress" });
+  }
+};
+
+export const getManagerCertificates = async (req, res) => {
+  try {
+    const managerId = req.user.id;
+
+    const managerResult = await pool.query(
+      `SELECT college
+       FROM users
+       WHERE user_id = $1 AND role = 'manager'
+       LIMIT 1`,
+      [managerId],
+    );
+
+    if (managerResult.rows.length === 0) {
+      return res.status(404).json({ message: "Manager profile not found" });
+    }
+
+    const managerCollege = (managerResult.rows[0].college || "").trim();
+    if (!managerCollege) {
+      return res.status(200).json([]);
+    }
+
+    const result = await pool.query(
+      `SELECT
+         u.user_id AS student_id,
+         u.full_name AS student_name,
+         u.email AS student_email,
+         c.certificate_id,
+         COALESCE(course.title, c.exam_name, 'N/A') AS course_name,
+         c.issued_at
+       FROM certificates c
+       JOIN users u ON u.user_id = c.user_id
+       LEFT JOIN exams e ON e.exam_id::text = c.exam_id::text
+       LEFT JOIN courses course ON course.courses_id = e.course_id
+       WHERE u.role = 'student'
+         AND u.status = 'active'
+         AND REGEXP_REPLACE(UPPER(TRIM(COALESCE(u.college, ''))), '[,.\\-_() ]+', ' ', 'g') =
+             REGEXP_REPLACE(UPPER(TRIM($1)), '[,.\\-_() ]+', ' ', 'g')
+       ORDER BY c.issued_at DESC NULLS LAST`,
+      [managerCollege],
+    );
+
+    return res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("getManagerCertificates error:", error);
+    return res.status(500).json({ message: "Failed to fetch manager certificates" });
+  }
+};
+
 export const addInstructor = async (req, res) => {
   const fullName = req.body?.fullName?.trim();
   const email = req.body?.email?.trim()?.toLowerCase();

@@ -7,6 +7,9 @@ import {
   LogOut,
   Settings,
   Menu,
+  BookOpen,
+  ClipboardCheck,
+  Award,
 } from "lucide-react";
 import markLogo from "../../../assets/just_logo.jpeg";
 
@@ -160,6 +163,9 @@ const ManagerLayoutView = ({
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
             <NavItem path="dashboard" icon={LayoutGrid} label="Dashboard" />
             <NavItem path="students" icon={Users} label="View Students" />
+            <NavItem path="course-progress" icon={BookOpen} label="Course Progress" />
+            <NavItem path="exam-progress" icon={ClipboardCheck} label="Exam Progress" />
+            <NavItem path="certificates" icon={Award} label="Certificates" />
             <NavItem path="settings" icon={Settings} label="Settings" />
           </ul>
         </div>
