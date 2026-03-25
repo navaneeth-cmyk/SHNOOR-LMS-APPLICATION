@@ -7,6 +7,7 @@ const formatDateTime = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -66,6 +67,7 @@ const ManagerList = () => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-slate-50/80 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
+                  <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">#</th>
                   <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Name</th>
                   <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Email</th>
                   <th className="py-3.5 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">College</th>
@@ -75,8 +77,9 @@ const ManagerList = () => {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {rows.length > 0 ? (
-                  rows.map((manager) => (
+                  rows.map((manager, index) => (
                     <tr key={manager.user_id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-4 px-6 text-sm font-medium text-slate-500">{index + 1}</td>
                       <td className="py-4 px-6 text-sm font-semibold text-primary-900">{manager.full_name || "-"}</td>
                       <td className="py-4 px-6 text-sm text-slate-600">{manager.email || "-"}</td>
                       <td className="py-4 px-6 text-sm text-slate-600">{manager.college || "-"}</td>
@@ -86,7 +89,7 @@ const ManagerList = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="text-center py-16">
+                    <td colSpan={6} className="text-center py-16">
                       <p className="text-sm text-slate-400 font-medium">No managers found.</p>
                     </td>
                   </tr>
