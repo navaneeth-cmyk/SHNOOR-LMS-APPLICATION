@@ -19,6 +19,13 @@ const formatDateIST = (value) => {
   })} IST`;
 };
 
+const getStudentRankLabel = (xp) => {
+  const value = Number(xp || 0);
+  if (value >= 500) return "Expert";
+  if (value >= 200) return "Intermediate";
+  return "Novice";
+};
+
 const ViewStudents = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +58,7 @@ const ViewStudents = () => {
 
     return sortedStudents.map((student, index) => ({
       srNo: index + 1,
-      rank: index + 1,
+      rank: getStudentRankLabel(student.xp),
       name: student.full_name || "-",
       email: student.email || "-",
       xp: Number(student.xp || 0),
@@ -215,7 +222,7 @@ const ViewStudents = () => {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 lg:p-8">
         <div className="flex flex-wrap gap-3 justify-between items-center mb-5">
           <h2 className="text-lg font-bold text-slate-900">Student List</h2>
-          <div className="text-xs text-slate-500">All timestamps shown in IST</div>
+
         </div>
 
         {loading ? (
