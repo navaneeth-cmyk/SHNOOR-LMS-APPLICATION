@@ -26,6 +26,7 @@ import CertificateConfig from "./pages/admin/CertificateConfig";
 import AddInstructor from "./pages/admin/AddInstructor";
 import AdminLiveProctoring from "./pages/admin/AdminLiveProctoring";
 import AdminViolations from "./pages/admin/AdminViolations";
+import AddManager from "./pages/admin/AddManager";
 import InstructorDashboard from "./pages/instructor/InstructorDashboard";
 import AddCourse from "./pages/instructor/AddCourse";
 import CourseList from "./pages/instructor/CourseList";
@@ -78,6 +79,8 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import AddStudent from "./pages/admin/AddStudent";
 import AdminExamTimer from "./pages/admin/ExamTimer/AdminExamTimer";
+import ManagerLayout from "./components/layout/ManagerLayout";
+import ManagerDashboard from "./pages/manager/ManagerDashboard";
 // import Leaderboard from './pages/student/Leaderboard';
 
 function App() {
@@ -110,6 +113,7 @@ function App() {
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="add-instructor" element={<AddInstructor />} />
               <Route path="add-student" element={<AddStudent />} />
+              <Route path="add-manager" element={<AddManager />} />
               <Route path="approve-users" element={<ApproveUsers />} />
               <Route path="approve-courses" element={<ApproveCourses />} />
               <Route path="assign-course" element={<AssignCourse />} />
@@ -136,7 +140,7 @@ function App() {
             <Route
               path="/instructor"
               element={
-                <ProtectedRoute allowedRoles={["instructor", "company"]}>
+                <ProtectedRoute allowedRoles="instructor">
                   <InstructorLayout />
                 </ProtectedRoute>
               }
@@ -156,6 +160,19 @@ function App() {
               <Route path="chat" element={<InstructorChat />} />
               <Route path="groups" element={<InstructorGroups />} />
               <Route path="groups/:groupId" element={<InstructorGroupChat />} />
+            </Route>
+
+            <Route
+              path="/manager"
+              element={
+                <ProtectedRoute allowedRoles="manager">
+                  <ManagerLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<ManagerDashboard />} />
+              <Route path="settings" element={<ProfileSettings />} />
             </Route>
 
             <Route

@@ -89,3 +89,6 @@ export const sendInstructorInvite = async (emailOrObj, name) =>
 
 export const sendStudentInvite = async (emailOrObj, name) =>
   sendInvite(emailOrObj, name, "Student", "You have been invited as a Student");
+
+export const sendManagerInvite = async (emailOrObj, name) =>
+  sendInvite(emailOrObj, name, "Manager", "You have been invited as a Manager");

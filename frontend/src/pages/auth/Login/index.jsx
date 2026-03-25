@@ -32,6 +32,7 @@ const Login = () => {
       const role = userData.role.toLowerCase();
       if (role === "admin") navigate("/admin/dashboard");
       else if (role === "instructor") navigate("/instructor/dashboard");
+      else if (role === "manager") navigate("/manager/dashboard");
       else navigate("/student/dashboard");
     }
   }, [userData, authLoading, navigate]);

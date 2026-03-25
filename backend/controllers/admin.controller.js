@@ -30,10 +30,10 @@ export const getDashboardStats = async (req, res) => {
     // If no date filters provided, return all-time totals
     if (!startDate || !endDate) {
       const studentsResult = await pool.query(
-        `SELECT COUNT(*) FROM users WHERE role IN ('student', 'user', 'learner')`
+        `SELECT COUNT(*) FROM users WHERE role = 'student'`
       );
       const instructorsResult = await pool.query(
-        `SELECT COUNT(*) FROM users WHERE role IN ('instructor', 'company')`
+        `SELECT COUNT(*) FROM users WHERE role = 'instructor'`
       );
       const pendingCoursesResult = await pool.query(
         `SELECT COUNT(*) FROM courses WHERE status IN ('review', 'pending')`
@@ -54,7 +54,7 @@ export const getDashboardStats = async (req, res) => {
       const newStudents = await pool.query(`
           SELECT full_name as user, 'New student joined' as action, created_at, 'student' as type 
           FROM users 
-          WHERE role IN ('student', 'user', 'learner') 
+          WHERE role = 'student' 
           ORDER BY created_at DESC LIMIT 5
       `);
       
@@ -62,7 +62,7 @@ export const getDashboardStats = async (req, res) => {
       const newInstructors = await pool.query(`
           SELECT full_name as user, 'New instructor joined' as action, created_at, 'instructor' as type 
           FROM users 
-          WHERE role IN ('instructor', 'company') 
+          WHERE role = 'instructor' 
           ORDER BY created_at DESC LIMIT 5
       `);
       
@@ -139,23 +139,23 @@ export const getDashboardStats = async (req, res) => {
 
     // Current period - Students created in this period
     const studentsResult = await pool.query(
-      `SELECT COUNT(*) FROM users WHERE role IN ('student', 'user', 'learner') AND created_at::date BETWEEN $1 AND $2`,
+      `SELECT COUNT(*) FROM users WHERE role = 'student' AND created_at::date BETWEEN $1 AND $2`,
       [startDate, endDate]
     );
     // Previous period - Students created in previous period
     const prevStudentsResult = await pool.query(
-      `SELECT COUNT(*) FROM users WHERE role IN ('student', 'user', 'learner') AND created_at::date BETWEEN $1 AND $2`,
+      `SELECT COUNT(*) FROM users WHERE role = 'student' AND created_at::date BETWEEN $1 AND $2`,
       [prevStartDate, prevEndDate]
     );
 
     // Current period - Instructors created in this period
     const instructorsResult = await pool.query(
-      `SELECT COUNT(*) FROM users WHERE role IN ('instructor', 'company') AND created_at::date BETWEEN $1 AND $2`,
+      `SELECT COUNT(*) FROM users WHERE role = 'instructor' AND created_at::date BETWEEN $1 AND $2`,
       [startDate, endDate]
     );
     // Previous period - Instructors created in previous period
     const prevInstructorsResult = await pool.query(
-      `SELECT COUNT(*) FROM users WHERE role IN ('instructor', 'company') AND created_at::date BETWEEN $1 AND $2`,
+      `SELECT COUNT(*) FROM users WHERE role = 'instructor' AND created_at::date BETWEEN $1 AND $2`,
       [prevStartDate, prevEndDate]
     );
 
@@ -199,13 +199,13 @@ export const getDashboardStats = async (req, res) => {
     const newStudentsAct = await pool.query(`
         SELECT full_name as user, 'New student joined' as action, created_at, 'student' as type 
         FROM users 
-        WHERE role IN ('student', 'user', 'learner') 
+        WHERE role = 'student' 
         ORDER BY created_at DESC LIMIT 5
     `);
     const newInstructorsAct = await pool.query(`
         SELECT full_name as user, 'New instructor joined' as action, created_at, 'instructor' as type 
         FROM users 
-        WHERE role IN ('instructor', 'company') 
+        WHERE role = 'instructor' 
         ORDER BY created_at DESC LIMIT 5
     `);
     const pendingCoursesActFiltered = await pool.query(`
@@ -276,7 +276,7 @@ export const getAllStudents = async (req, res) => {
     const result = await pool.query(
       `SELECT user_id, full_name AS name, email
 FROM users
-WHERE role IN ('student', 'user') AND status = 'active'
+WHERE role = 'student' AND status = 'active'
 ORDER BY created_at DESC;
 `,
     );
@@ -323,7 +323,7 @@ export const assignCourses = async (req, res) => {
              FROM group_users gu
              JOIN users u ON gu.user_id = u.user_id
              WHERE gu.group_id = $1
-               AND u.role IN ('student', 'user', 'learner')
+               AND u.role = 'student'
                AND u.status = 'active'`,
             [group.group_id]
           );
@@ -333,7 +333,7 @@ export const assignCourses = async (req, res) => {
           const res = await pool.query(
             `SELECT user_id FROM users u
              WHERE u.created_at >= $1 AND u.created_at <= $2
-               AND u.role IN ('student', 'user', 'learner') AND u.status = 'active'`,
+               AND u.role = 'student' AND u.status = 'active'`,
             [group.start_date, group.end_date]
           );
           res.rows.forEach(r => allStudentIds.push(r.user_id));
@@ -344,7 +344,7 @@ export const assignCourses = async (req, res) => {
              WHERE u."college" IS NOT NULL
                AND REGEXP_REPLACE(UPPER(TRIM(u."college")), '[,.\\-_() ]+', ' ', 'g') = 
                    REGEXP_REPLACE(UPPER(TRIM($1)), '[,.\\-_() ]+', ' ', 'g')
-               AND u.role IN ('student', 'user', 'learner') AND u.status = 'active'`,
+               AND u.role = 'student' AND u.status = 'active'`,
              [group.group_name]
           );
           res.rows.forEach(r => allStudentIds.push(r.user_id));

@@ -22,6 +22,7 @@ const AdminDashboardView = ({
     onDownloadReport,
     showingAllTime,
     goToAddInstructor,
+    goToAddManager,
     goToApproveCourses,
     goToAssignCourse,
     goToProctoring,
@@ -81,6 +82,7 @@ const AdminDashboardView = ({
     // Quick actions
     const quickActions = [
         { label: 'Add Instructor', icon: UserPlus, onClick: goToAddInstructor, color: '#6366f1' },
+        { label: 'Add Manager', icon: Users, onClick: goToAddManager, color: '#0ea5e9' },
         { label: 'Approve Courses', icon: CheckCircle, onClick: goToApproveCourses, color: '#10b981' },
         { label: 'Live Proctoring', icon: Video, onClick: goToProctoring, color: '#8b5cf6' },
         { label: 'Assign Course', icon: BookMarked, onClick: goToAssignCourse, color: '#f59e0b' },

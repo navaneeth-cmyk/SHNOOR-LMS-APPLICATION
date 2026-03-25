@@ -43,6 +43,10 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
       console.log("[ProtectedRoute] Redirecting STUDENT to student/dashboard");
       return <Navigate to="/student/dashboard" replace />;
     }
+    if (userRole === "manager") {
+      console.log("[ProtectedRoute] Redirecting MANAGER to manager/dashboard");
+      return <Navigate to="/manager/dashboard" replace />;
+    }
     console.log("[ProtectedRoute] Redirecting to ROOT (No role match)");
     return <Navigate to="/" replace />;
   }

@@ -1,6 +1,6 @@
 import admin from "../services/firebaseAdmin.js";
 import pool from "../db/postgres.js";
-import { sendInstructorInvite, sendStudentInvite } from "../services/email.service.js";
+import { sendInstructorInvite, sendManagerInvite, sendStudentInvite } from "../services/email.service.js";
 import { validateBulkInstructors } from "../utils/csvValidator.js";
 import csvParser from "csv-parser";
 import { Readable } from "stream";
@@ -244,6 +244,114 @@ export const addStudent = async (req, res) => {
     console.error("addStudent error:", error);
     console.error("Error stack:", error.stack);
     res.status(500).json({ message: "Failed to create student" });
+  }
+};
+
+export const addManager = async (req, res) => {
+  const fullName = req.body?.fullName?.trim();
+  const email = req.body?.email?.trim()?.toLowerCase();
+  const college = req.body?.college?.trim();
+  const phone = req.body?.phone?.trim() || null;
+  const bio = req.body?.bio?.trim() || null;
+  let firebaseUid = null;
+  const client = await pool.connect();
+
+  try {
+    if (!fullName || !email || !college) {
+      return res.status(400).json({
+        message: "fullName, email, and college are required",
+      });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: "Invalid email format",
+      });
+    }
+
+    const existing = await client.query(
+      "SELECT 1 FROM users WHERE LOWER(email) = LOWER($1)",
+      [email],
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({
+        message: "An account with this email already exists",
+      });
+    }
+
+    try {
+      await admin.auth().getUserByEmail(email);
+      return res.status(409).json({
+        message: "An account with this email already exists",
+      });
+    } catch (firebaseCheckError) {
+      if (firebaseCheckError.code !== "auth/user-not-found") {
+        throw firebaseCheckError;
+      }
+    }
+
+    const firebaseUser = await admin.auth().createUser({
+      email,
+      displayName: fullName,
+    });
+    firebaseUid = firebaseUser.uid;
+
+    await client.query("BEGIN");
+
+    const userResult = await client.query(
+      `INSERT INTO users (firebase_uid, full_name, email, role, status, college, bio)
+       VALUES ($1, $2, $3, 'manager', 'active', $4, $5)
+       RETURNING user_id`,
+      [firebaseUser.uid, fullName, email, college, bio],
+    );
+
+    await client.query("COMMIT");
+
+    res.status(201).json({
+      message: "Manager created successfully",
+      userId: userResult.rows[0].user_id,
+    });
+
+    try {
+      await sendManagerInvite(email, fullName);
+    } catch (mailError) {
+      console.error("SMTP failed:", mailError);
+    }
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("addManager rollback error:", rollbackError);
+    }
+
+    if (firebaseUid) {
+      try {
+        await admin.auth().deleteUser(firebaseUid);
+      } catch (cleanupError) {
+        console.error("addManager Firebase cleanup failed:", cleanupError);
+      }
+    }
+
+    if (error.code === "auth/email-already-exists" || error.code === "23505") {
+      return res.status(409).json({
+        message: "An account with this email already exists",
+      });
+    }
+
+    if (error.code === "auth/invalid-email") {
+      return res.status(400).json({
+        message: "Invalid email format",
+      });
+    }
+
+    console.error("addManager error:", error);
+    res.status(500).json({
+      message: "Failed to create manager",
+    });
+  } finally {
+    client.release();
   }
 };
 
@@ -770,6 +878,224 @@ export const bulkUploadStudents = async (req, res) => {
 
     res.status(500).json({
       message: "Bulk student upload failed",
+      error: error.message,
+    });
+  } finally {
+    client.release();
+  }
+};
+
+export const bulkUploadManagers = async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        message: "No CSV file uploaded",
+      });
+    }
+
+    const managers = [];
+    const parsePromise = new Promise((resolve, reject) => {
+      const stream = Readable.from(req.file.buffer);
+
+      stream
+        .pipe(
+          csvParser({
+            skipEmptyLines: true,
+            trim: true,
+          }),
+        )
+        .on("data", (row) => {
+          managers.push(row);
+        })
+        .on("end", resolve)
+        .on("error", reject);
+    });
+
+    await parsePromise;
+
+    if (managers.length === 0) {
+      return res.status(400).json({
+        message: "CSV file is empty or contains only headers",
+      });
+    }
+
+    const validData = [];
+    const validationErrors = [];
+    const csvEmails = new Set();
+
+    managers.forEach((row, index) => {
+      const rowNumber = index + 2;
+      const fullName = (row.fullName || row.name || "").trim();
+      const email = (row.email || "").trim().toLowerCase();
+      const college = (row.college || row.collegeName || "").trim();
+      const phone = (row.phone || "").trim() || null;
+      const bio = (row.bio || "").trim() || null;
+
+      if (!fullName || !email || !college) {
+        validationErrors.push({
+          row: rowNumber,
+          message: "Missing required fields (fullName/name, email, college/collegeName)",
+        });
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        validationErrors.push({
+          row: rowNumber,
+          message: `Invalid email format: ${email}`,
+        });
+        return;
+      }
+
+      if (csvEmails.has(email)) {
+        validationErrors.push({
+          row: rowNumber,
+          message: `Duplicate email in CSV: ${email}`,
+        });
+        return;
+      }
+      csvEmails.add(email);
+
+      validData.push({
+        fullName,
+        email,
+        college,
+        phone,
+        bio,
+        rowNumber,
+      });
+    });
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        message: "CSV validation failed",
+        errors: validationErrors,
+      });
+    }
+
+    const emailsToCheck = validData.map((d) => d.email);
+
+    const duplicateCheck = await pool.query(
+      `SELECT email FROM users WHERE email = ANY($1::text[])`,
+      [emailsToCheck],
+    );
+
+    const existingDbEmails = new Set(duplicateCheck.rows.map((r) => r.email));
+    if (existingDbEmails.size > 0) {
+      return res.status(400).json({
+        message: "Duplicate emails found",
+        errors: validData
+          .filter((d) => existingDbEmails.has(d.email))
+          .map((d) => ({
+            row: d.rowNumber,
+            message: `Email already exists in database: ${d.email}`,
+          })),
+      });
+    }
+
+    const firebaseEmailChecks = await Promise.allSettled(
+      validData.map(async (manager) => {
+        try {
+          await admin.auth().getUserByEmail(manager.email);
+          return {
+            email: manager.email,
+            exists: true,
+            rowNumber: manager.rowNumber,
+          };
+        } catch (err) {
+          if (err.code === "auth/user-not-found") {
+            return { email: manager.email, exists: false };
+          }
+          throw err;
+        }
+      }),
+    );
+
+    const firebaseDuplicates = firebaseEmailChecks
+      .filter((result) => result.status === "fulfilled" && result.value.exists)
+      .map((result) => ({
+        row: result.value.rowNumber,
+        message: `Email already exists in Firebase Auth: ${result.value.email}`,
+      }));
+
+    if (firebaseDuplicates.length > 0) {
+      return res.status(400).json({
+        message: "Duplicate emails found in Firebase Auth",
+        errors: firebaseDuplicates,
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const successfulUploads = [];
+    const createdFirebaseUids = [];
+
+    for (let i = 0; i < validData.length; i++) {
+      const manager = validData[i];
+
+      try {
+        const firebaseUser = await admin.auth().createUser({
+          email: manager.email,
+          displayName: manager.fullName,
+        });
+
+        createdFirebaseUids.push(firebaseUser.uid);
+
+        const userResult = await client.query(
+          `INSERT INTO users (firebase_uid, full_name, email, role, status, college, bio)
+           VALUES ($1, $2, $3, 'manager', 'active', $4, $5)
+           RETURNING user_id`,
+          [
+            firebaseUser.uid,
+            manager.fullName,
+            manager.email,
+            manager.college,
+            manager.bio,
+          ],
+        );
+
+        successfulUploads.push({
+          row: manager.rowNumber,
+          fullName: manager.fullName,
+          email: manager.email,
+          userId: userResult.rows[0].user_id,
+        });
+
+        try {
+          await sendManagerInvite(manager.email, manager.fullName);
+        } catch (emailError) {
+          console.error(`Manager invite failed for ${manager.email}:`, emailError.message);
+        }
+
+        if (i < validData.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        throw error;
+      }
+    }
+
+    await client.query("COMMIT");
+
+    return res.status(201).json({
+      message: "Bulk manager upload completed successfully",
+      summary: {
+        total: validData.length,
+        successful: successfulUploads.length,
+        failed: 0,
+      },
+      successful: successfulUploads,
+      errors: [],
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("bulkUploadManagers error:", error);
+
+    return res.status(500).json({
+      message: "Bulk manager upload failed",
       error: error.message,
     });
   } finally {

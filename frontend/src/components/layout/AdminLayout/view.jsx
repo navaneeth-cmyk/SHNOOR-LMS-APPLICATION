@@ -160,6 +160,7 @@ const AdminLayoutView = ({
             <NavItem path="dashboard" icon={LayoutGrid} label="Dashboard" />
             <NavItem path="add-instructor" icon={GraduationCap} label="Add Instructor" />
             <NavItem path="add-student" icon={UserPlus} label="Add Student" />
+            <NavItem path="add-manager" icon={Users} label="Add Manager" />
           </ul>
 
           {/* Management */}

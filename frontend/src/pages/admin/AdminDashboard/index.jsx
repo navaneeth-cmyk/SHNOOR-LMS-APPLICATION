@@ -234,6 +234,7 @@ const AdminDashboard = () => {
      NAVIGATION HANDLERS
   ========================= */
   const goToAddInstructor = () => navigate("/admin/add-instructor");
+  const goToAddManager = () => navigate("/admin/add-manager");
   const goToApproveCourses = () => navigate("/admin/approve-courses");
   const goToAssignCourse = () => navigate("/admin/assign-course");
 
@@ -256,6 +257,7 @@ const AdminDashboard = () => {
       onDownloadReport={handleDownloadReport}
       showingAllTime={showingAllTime}
       goToAddInstructor={goToAddInstructor}
+      goToAddManager={goToAddManager}
       goToApproveCourses={goToApproveCourses}
       goToAssignCourse={goToAssignCourse}
       goToProctoring={() => navigate("/admin/proctoring")}
