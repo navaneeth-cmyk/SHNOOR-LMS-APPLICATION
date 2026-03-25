@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import {
   UserCircle,
   LayoutGrid,
+  Users,
   LogOut,
   Settings,
   Menu,
@@ -158,6 +159,7 @@ const ManagerLayoutView = ({
           </div>
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
             <NavItem path="dashboard" icon={LayoutGrid} label="Dashboard" />
+            <NavItem path="students" icon={Users} label="View Students" />
             <NavItem path="settings" icon={Settings} label="Settings" />
           </ul>
         </div>

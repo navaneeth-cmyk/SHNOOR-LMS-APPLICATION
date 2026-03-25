@@ -8,6 +8,7 @@ import {
   uploadProfilePicture,
   addStudent,
   addManager,
+  getManagerCollegeStudents,
   bulkUploadInstructors,
   bulkUploadStudents,
   bulkUploadManagers,
@@ -58,6 +59,14 @@ router.get(
   attachUser,
   roleGuard("admin"),
   getAllUsers
+);
+
+router.get(
+  "/manager/students",
+  firebaseAuth,
+  attachUser,
+  roleGuard("manager"),
+  getManagerCollegeStudents
 );
 
 router.post(

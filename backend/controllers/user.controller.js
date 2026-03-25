@@ -70,6 +70,53 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
+export const getManagerCollegeStudents = async (req, res) => {
+  try {
+    const managerId = req.user.id;
+
+    const managerResult = await pool.query(
+      `SELECT college
+       FROM users
+       WHERE user_id = $1 AND role = 'manager'
+       LIMIT 1`,
+      [managerId],
+    );
+
+    if (managerResult.rows.length === 0) {
+      return res.status(404).json({ message: "Manager profile not found" });
+    }
+
+    const managerCollege = (managerResult.rows[0].college || "").trim();
+
+    if (!managerCollege) {
+      return res.status(200).json([]);
+    }
+
+    const studentsResult = await pool.query(
+      `SELECT
+         user_id,
+         full_name,
+         email,
+         COALESCE(xp, 0) AS xp,
+         COALESCE(streak, 0) AS streak,
+         created_at,
+         last_login
+       FROM users
+       WHERE role = 'student'
+         AND status = 'active'
+         AND REGEXP_REPLACE(UPPER(TRIM(COALESCE(college, ''))), '[,.\\-_() ]+', ' ', 'g') =
+             REGEXP_REPLACE(UPPER(TRIM($1)), '[,.\\-_() ]+', ' ', 'g')
+       ORDER BY created_at DESC`,
+      [managerCollege],
+    );
+
+    return res.status(200).json(studentsResult.rows);
+  } catch (error) {
+    console.error("getManagerCollegeStudents error:", error);
+    return res.status(500).json({ message: "Failed to fetch students" });
+  }
+};
+
 export const addInstructor = async (req, res) => {
   const fullName = req.body?.fullName?.trim();
   const email = req.body?.email?.trim()?.toLowerCase();

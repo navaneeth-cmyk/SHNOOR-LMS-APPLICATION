@@ -81,6 +81,7 @@ import AddStudent from "./pages/admin/AddStudent";
 import AdminExamTimer from "./pages/admin/ExamTimer/AdminExamTimer";
 import ManagerLayout from "./components/layout/ManagerLayout";
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
+import ViewStudents from "./pages/manager/ViewStudents";
 // import Leaderboard from './pages/student/Leaderboard';
 
 function App() {
@@ -172,6 +173,7 @@ function App() {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<ManagerDashboard />} />
+              <Route path="students" element={<ViewStudents />} />
               <Route path="settings" element={<ProfileSettings />} />
             </Route>
 
