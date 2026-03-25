@@ -563,6 +563,7 @@ import { autoSubmitExam } from "./controllers/exams/exam.controller.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import usersRoutes from "./routes/users.routes.js";
+import managerRoutes from "./routes/manager.routes.js";
 import coursesRoutes from "./routes/courses.routes.js";
 import moduleRoutes from "./routes/module.routes.js";
 import assignmentsRoutes from "./routes/assignments.routes.js";
@@ -692,6 +693,7 @@ app.use((req, res, next) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/manager", managerRoutes);
 app.use("/api/courses", coursesRoutes);
 app.use("/api", moduleRoutes);
 app.use("/api/assignments", assignmentsRoutes);
