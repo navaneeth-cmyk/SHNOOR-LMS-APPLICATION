@@ -57,12 +57,20 @@ export const getMyProfile = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT user_id, full_name, email, role, status, created_at
-       FROM users
-       ORDER BY created_at DESC`,
-    );
-
+    const { role } = req.query;
+    
+    let query = `SELECT user_id, full_name, email, role, status, created_at
+                 FROM users`;
+    const params = [];
+    
+    if (role) {
+      query += ` WHERE LOWER(role) = LOWER($1)`;
+      params.push(role);
+    }
+    
+    query += ` ORDER BY created_at DESC`;
+    
+    const result = await pool.query(query, params);
     res.status(200).json(result.rows);
   } catch (error) {
     console.error(error);

@@ -79,26 +79,44 @@ const ManagerMessages = () => {
 
   // Select chat
   const handleSelectChat = async (chat) => {
-    setActiveChat(chat);
-    handleSetActiveChat(chat.id);
-    markChatRead(chat.id);
-    setShowSearchResults(false);
-
-    if (chat.exists) {
+    try {
       setLoadingMessages(true);
-      try {
-        const res = await api.get(`/api/chats/${chat.id}/messages`);
-        setMessages(res.data.map(m => ({
-          ...m,
-          isMyMessage: m.sender_id === dbUser?.id
-        })));
-      } catch (err) {
-        console.error('Failed to load messages:', err);
-      } finally {
-        setLoadingMessages(false);
+      
+      // Create or get chat
+      const chatRes = await api.post('/api/chats', {
+        recipientId: chat.recipientId
+      });
+      
+      const chatId = chatRes.data.chat_id;
+      
+      // Update chat with ID
+      const updatedChat = { ...chat, id: chatId };
+      setActiveChat(updatedChat);
+      
+      // Join chat socket room
+      if (socket) {
+        socket.emit('join_chat', chatId);
       }
-    } else {
+      
+      if (chatId) {
+        handleSetActiveChat(chatId);
+        markChatRead(chatId);
+      }
+      
+      setShowSearchResults(false);
+      
+      // Fetch existing messages
+      const messagesRes = await api.get(`/api/chats/messages/${chatId}`);
+      setMessages((messagesRes.data || []).map(m => ({
+        ...m,
+        isMyMessage: m.sender_id === dbUser?.id
+      })));
+      
+      setLoadingMessages(false);
+    } catch (err) {
+      console.error('Failed to select chat:', err);
       setMessages([]);
+      setLoadingMessages(false);
     }
   };
 
@@ -121,17 +139,31 @@ const ManagerMessages = () => {
 
   // Send message
   const handleSendMessage = async (text) => {
-    if (!activeChat || !text.trim()) return;
+    if (!activeChat || !text.trim() || !socket) return;
 
     try {
-      const res = await api.post('/api/chats/send', {
+      // Emit message via socket.io
+      socket.emit('send_message', {
+        chatId: activeChat.id,
         recipientId: activeChat.recipientId,
-        message: text
+        text: text,
+        senderId: dbUser?.id,
+        senderUid: dbUser?.firebase_uid,
+        senderName: dbUser?.full_name || 'You'
       });
 
+      // Create optimistic update for UI
+      const timestamp = new Date().toISOString();
       const newMsg = {
-        ...res.data,
-        isMyMessage: true
+        message_id: `temp_${Date.now()}`,
+        chat_id: activeChat.id,
+        sender_id: dbUser?.id,
+        receiver_id: activeChat.recipientId,
+        text: text,
+        isMyMessage: true,
+        created_at: timestamp,
+        sender_name: dbUser?.full_name || 'You',
+        sender_role: 'manager'
       };
 
       setMessages(prev => [...prev, newMsg]);
