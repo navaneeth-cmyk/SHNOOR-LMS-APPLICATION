@@ -283,14 +283,16 @@ const ManagerMessages = () => {
                   <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
                 </div>
               ) : displayChats.length > 0 ? (
-                displayChats.map(admin => (
+                displayChats.map(admin => {
+                  const isActive = activeChat?.id === admin.id;
+                  return (
                   <div
                     key={admin.recipientId}
                     onClick={() => {
                       handleSelectChat(admin);
                       setShowSearchResults(false);
                     }}
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors"
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors ${isActive ? 'bg-slate-100 border-l-4 border-purple-500' : ''}`}
                   >
                     <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
                       <span className="text-purple-600 font-bold text-sm">
@@ -305,7 +307,8 @@ const ManagerMessages = () => {
                       <div className="text-xs text-slate-500 mt-1 truncate">{admin.email}</div>
                     </div>
                   </div>
-                ))
+                );
+                })
               ) : (
                 <div className="p-8 text-center text-slate-500">No admins found</div>
               )}

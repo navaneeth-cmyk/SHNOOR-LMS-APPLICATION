@@ -260,7 +260,9 @@ const AdminMessages = () => {
                   <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
                 </div>
               ) : searchResults.length > 0 ? (
-                searchResults.map(manager => (
+                searchResults.map(manager => {
+                  const isActive = activeChat?.id === manager.user_id;
+                  return (
                   <div
                     key={manager.user_id}
                     onClick={() => {
@@ -276,7 +278,7 @@ const AdminMessages = () => {
                       });
                       setShowSearchResults(false);
                     }}
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors"
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors ${isActive ? 'bg-slate-100 border-l-4 border-indigo-500' : ''}`}
                   >
                     <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                       <span className="text-indigo-600 font-bold text-sm">
@@ -291,7 +293,8 @@ const AdminMessages = () => {
                       <div className="text-xs text-slate-500 mt-1 truncate">{manager.email}</div>
                     </div>
                   </div>
-                ))
+                );
+                })
               ) : (
                 <div className="p-8 text-center text-slate-500">No managers found</div>
               )}

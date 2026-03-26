@@ -224,15 +224,11 @@ export const createChat = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    let studentId, instructorId;
-    const role = me.rows[0].role.toLowerCase(); // standardize check
-    if (role === "student" || role === "learner") {
-      studentId = userId;
-      instructorId = recipientId;
-    } else {
-      studentId = recipientId;
-      instructorId = userId;
-    }
+    // For consistency, always assign the lower UUID as student_id and higher as instructor_id
+    // This ensures both sides of a conversation get the same chat_id regardless of who initiates
+    const [studentId, instructorId] = userId < recipientId 
+      ? [userId, recipientId]
+      : [recipientId, userId];
 
     console.log("🔵 Student:", studentId, "Instructor:", instructorId);
 
@@ -1490,65 +1486,6 @@ export const getMessages = async (req, res) => {
 };
 
 // POST /api/chats (Start a new conversation)
-export const createChat = async (req, res) => {
-  console.log("🔵 createChat endpoint hit");
-  console.log("🔵 User from req.user:", req.user);
-  console.log("🔵 Request body:", req.body);
-
-  try {
-    const { recipientId } = req.body;
-    const userId = req.user.id;
-
-    console.log("🔵 Creating chat between:", userId, "and", recipientId);
-
-    const me = await pool.query("SELECT role FROM users WHERE user_id = $1", [
-      userId,
-    ]);
-    const other = await pool.query(
-      "SELECT role FROM users WHERE user_id = $1",
-      [recipientId],
-    );
-
-    if (me.rows.length === 0 || other.rows.length === 0) {
-      console.log("❌ User not found");
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    let studentId, instructorId;
-    const role = me.rows[0].role.toLowerCase(); // standardize check
-    if (role === "student" || role === "learner") {
-      studentId = userId;
-      instructorId = recipientId;
-    } else {
-      studentId = recipientId;
-      instructorId = userId;
-    }
-
-    console.log("🔵 Student:", studentId, "Instructor:", instructorId);
-
-    // Check if exists
-    const check = await pool.query(
-      "SELECT chat_id FROM chats WHERE student_id = $1 AND instructor_id = $2",
-      [studentId, instructorId],
-    );
-
-    if (check.rows.length > 0) {
-      console.log("✅ Chat exists:", check.rows[0].chat_id);
-      return res.json({ chat_id: check.rows[0].chat_id, isNew: false });
-    }
-
-    const newChat = await pool.query(
-      "INSERT INTO chats (student_id, instructor_id) VALUES ($1, $2) RETURNING chat_id",
-      [studentId, instructorId],
-    );
-
-    console.log("✅ New chat created:", newChat.rows[0].chat_id);
-    res.json({ chat_id: newChat.rows[0].chat_id, isNew: true });
-  } catch (err) {
-    console.error("❌ Create Chat Error:", err);
-    res.status(500).json({ message: "Server Error", error: err.message });
-  }
-};
 
 // PUT /api/chats/read
 export const markRead = async (req, res) => {
