@@ -181,7 +181,8 @@ const AdminLayoutView = ({
             <NavItem path="approve-courses" icon={CheckCircle} label="Approve Courses" />
             <NavItem path="assign-course" icon={UserPlus} label="Assign Courses" />
             <NavItem path="exam-timers" icon={Timer} label="Grace Timers" />
-            <NavItem path="chat-students" icon={MessageSquare} label="Chat with Students" />
+            <NavItem path="group-messages" icon={MessageSquare} label="Group messages" />
+            <NavItem path="messages" icon={MessageSquare} label="Messages" />
             <NavItem path="certificates" icon={Award} label="Certificates" />
             <NavItem path="settings" icon={Settings} label="Settings" />
           </ul>

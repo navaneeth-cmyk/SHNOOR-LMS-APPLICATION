@@ -10,6 +10,7 @@ import {
   BookOpen,
   ClipboardCheck,
   Award,
+  MessageSquare,
 } from "lucide-react";
 import markLogo from "../../../assets/just_logo.jpeg";
 
@@ -166,6 +167,7 @@ const ManagerLayoutView = ({
             <NavItem path="course-progress" icon={BookOpen} label="Course Progress" />
             <NavItem path="exam-progress" icon={ClipboardCheck} label="Exam Progress" />
             <NavItem path="certificates" icon={Award} label="Certificates" />
+            <NavItem path="messages" icon={MessageSquare} label="Messages" />
             <NavItem path="settings" icon={Settings} label="Settings" />
           </ul>
         </div>

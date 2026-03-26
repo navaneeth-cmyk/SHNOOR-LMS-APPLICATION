@@ -86,6 +86,8 @@ import ViewStudents from "./pages/manager/ViewStudents";
 import CourseProgress from "./pages/manager/CourseProgress";
 import ExamProgress from "./pages/manager/ExamProgress";
 import ManagerCertificates from "./pages/manager/Certificates";
+import ManagerMessages from "./pages/manager/Messages";
+import AdminMessages from "./pages/admin/Messages";
 // import Leaderboard from './pages/student/Leaderboard';
 
 function App() {
@@ -130,7 +132,8 @@ function App() {
               <Route path="groups/edit/:groupId" element={<EditGroup />} />
               <Route path="groups/:groupId/users" element={<GroupUsers />} />
               <Route path="settings" element={<ProfileSettings />} />
-              <Route path="chat-students" element={<ChatWithStudents />} />
+              <Route path="group-messages" element={<ChatWithStudents />} />
+              <Route path="messages" element={<AdminMessages />} />
               <Route path="/admin/exam-timers" element={<AdminExamTimer />} />
 
 
@@ -182,6 +185,7 @@ function App() {
               <Route path="course-progress" element={<CourseProgress />} />
               <Route path="exam-progress" element={<ExamProgress />} />
               <Route path="certificates" element={<ManagerCertificates />} />
+              <Route path="messages" element={<ManagerMessages />} />
               <Route path="settings" element={<ProfileSettings />} />
             </Route>
 
