@@ -229,90 +229,117 @@ const ManagerMessages = () => {
     email: admin.email,
     lastMessage: 'Start a conversation',
     unread: 0,
-    exists: false
+    exists: false,
+    type: '1on1'
   })) : chats;
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-245px)]">
-      {/* Sidebar with contacts */}
-      <div className="w-96 bg-white rounded-lg shadow-sm overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">Messages</h2>
-          <p className="text-xs text-slate-500">Connect with admins</p>
+    <div className="student-chat-page p-6 bg-slate-50/20 min-h-full">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-5">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
+          <p className="text-gray-500 text-sm mt-1">Connect with admins</p>
         </div>
 
-        {/* Search bar */}
-        <div className="p-4 border-b border-slate-200">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search admins..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              onFocus={() => searchQuery && setShowSearchResults(true)}
-              className="w-full pl-9 pr-9 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setShowSearchResults(false);
-                  setSearchResults([]);
-                }}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-none border-none cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Chat list */}
-        <div className="flex-1 overflow-y-auto">
-          {loadingChats && !showSearchResults ? (
-            <div className="flex items-center justify-center h-full text-slate-400">
-              <Loader2 size={20} className="animate-spin" />
-            </div>
-          ) : showSearchResults && searchQuery ? (
-            // Search results
-            <>
-              {loadingSearch ? (
-                <div className="flex items-center justify-center h-full text-slate-400">
-                  <Loader2 size={20} className="animate-spin" />
-                </div>
-              ) : displayChats.length > 0 ? (
-                displayChats.map(chat => renderChatItem(chat))
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-                  No admins found
-                </div>
-              )}
-            </>
-          ) : displayChats.length > 0 ? (
-            displayChats.map(chat => renderChatItem(chat))
-          ) : (
-            <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-              No admins available
-            </div>
+        {/* Search Bar */}
+        <div className="relative w-72">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search admins..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            onFocus={() => searchQuery && setShowSearchResults(true)}
+            className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all shadow-sm"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(''); setShowSearchResults(false); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
           )}
         </div>
       </div>
 
-      {/* Chat window */}
-      <div className="flex-1 bg-white rounded-lg shadow-sm overflow-hidden">
+      {/* Main Chat Layout */}
+      <div className="flex flex-1 overflow-hidden h-[calc(100vh-245px)] bg-white border border-slate-200 rounded-lg shadow-sm">
+        {/* Chat Sidebar */}
+        <div className="chat-sidebar h-full flex flex-col min-w-0 border-r bg-white w-96">
+          {/* Chat List */}
+          {loadingChats ? (
+            <div className="flex-1 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+            </div>
+          ) : error ? (
+            <div className="flex-1 p-6 text-center text-red-600 text-sm">{error}</div>
+          ) : showSearchResults && searchQuery ? (
+            // Search Results
+            <div className="chat-contacts-list overflow-y-auto flex-1">
+              {loadingSearch ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+                </div>
+              ) : displayChats.length > 0 ? (
+                displayChats.map(admin => (
+                  <div
+                    key={admin.recipientId}
+                    onClick={() => {
+                      handleSelectChat(admin);
+                      setShowSearchResults(false);
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-purple-600 font-bold text-sm">
+                        {admin.recipientName?.charAt(0).toUpperCase() || 'A'}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-900 text-sm truncate">{admin.recipientName}</div>
+                      <div className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded uppercase font-bold w-fit mt-1">
+                        Admin
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 truncate">{admin.email}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-slate-500">No admins found</div>
+              )}
+            </div>
+          ) : displayChats.length === 0 ? (
+            <div className="flex-1 p-6 text-center">
+              <div className="text-slate-400">No admins available.</div>
+              <div className="text-sm text-slate-500 mt-1">Check back later!</div>
+            </div>
+          ) : (
+            <div className="chat-contacts-list overflow-y-auto flex-1">
+              {displayChats.map(renderChatItem)}
+            </div>
+          )}
+        </div>
+
+        {/* Chat Window */}
         {activeChat ? (
           <ChatWindow
-            chat={activeChat}
+            socket={socket}
+            activeChat={activeChat}
             messages={messages}
             onSendMessage={handleSendMessage}
+            loadingMessages={loadingMessages}
+            onClose={() => setActiveChat(null)}
+            isManager={true}
             currentUser={dbUser}
-            socket={socket}
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-            Select a chat to start messaging
+          <div className="flex-1 flex items-center justify-center text-slate-500">
+            <div className="text-center">
+              <p className="text-lg font-medium">Select an admin to start messaging</p>
+              <p className="text-sm mt-2">Choose from the list or search for a specific admin</p>
+            </div>
           </div>
         )}
       </div>
