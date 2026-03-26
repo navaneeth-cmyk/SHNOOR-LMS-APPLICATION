@@ -26,7 +26,7 @@ const ManagerLayoutView = ({
   const navigate = useNavigate();
 
   const NavItem = ({ path, icon: Icon, label }) => {
-    const isActive = location.pathname.includes(path);
+    const isActive = location.pathname === `/manager/${path}` || location.pathname.endsWith(`/${path}`);
     return (
       <li
         onClick={() => {

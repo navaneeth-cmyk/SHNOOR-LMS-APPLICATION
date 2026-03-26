@@ -23,53 +23,36 @@ const ManagerMessages = () => {
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  // Fetch manager contacts (admins only)
+  // Fetch admin contacts
   useEffect(() => {
-    const fetchManagers = async () => {
+    const fetchAdmins = async () => {
       try {
         setLoadingChats(true);
         
-        // Fetch existing chats with managers
-        const chatsRes = await api.get('/api/chats?role=admin');
-        const existing = (chatsRes.data || []).map(c => ({
-          id: c.chat_id,
-          recipientName: c.recipient_name,
-          recipientId: c.recipient_id,
-          lastMessage: c.last_message || 'No messages yet',
-          unread: c.unread_count,
-          exists: true
-        }));
+        // Fetch all available admins from users table
+        const adminsRes = await api.get('/api/admin/users?role=admin');
+        const allAdmins = (Array.isArray(adminsRes.data) ? adminsRes.data : []).filter(a => a.user_id !== dbUser?.id);
 
-        // Fetch all available admins
-        const adminsRes = await api.get('/api/users?role=admin');
-        const allAdmins = (adminsRes.data || []).filter(a => a.user_id !== dbUser?.id);
-
-        // Merge: existing chats + admins without chat yet
-        const merged = [...existing];
-        allAdmins.forEach(admin => {
-          if (!existing.some(c => c.recipientId === admin.user_id)) {
-            merged.push({
-              id: `new_${admin.user_id}`,
-              recipientName: admin.full_name,
-              recipientId: admin.user_id,
-              lastMessage: 'Start a conversation',
-              unread: 0,
-              exists: false
-            });
-          }
-        });
-
-        setChats(merged);
+        setChats(allAdmins.map(admin => ({
+          id: admin.user_id,
+          recipientName: admin.full_name || admin.name,
+          recipientId: admin.user_id,
+          email: admin.email,
+          lastMessage: 'Start a conversation',
+          unread: 0,
+          exists: false
+        })));
+        
         setLoadingChats(false);
       } catch (err) {
-        console.error('Failed to fetch managers:', err);
-        setError('Failed to load managers');
+        console.error('Failed to fetch admins:', err);
+        setError('Failed to load admins');
         setLoadingChats(false);
       }
     };
 
     if (dbUser?.id) {
-      fetchManagers();
+      fetchAdmins();
     }
   }, [dbUser?.id]);
 
@@ -83,11 +66,13 @@ const ManagerMessages = () => {
 
     setLoadingSearch(true);
     try {
-      const res = await api.get(`/api/users?role=admin&search=${query}`);
-      setSearchResults((res.data || []).filter(a => a.user_id !== dbUser?.id));
+      const res = await api.get(`/api/admin/users?role=admin&search=${query}`);
+      const results = Array.isArray(res.data) ? res.data : [];
+      setSearchResults(results.filter(a => a.user_id !== dbUser?.id));
       setShowSearchResults(true);
     } catch (err) {
       console.error('Search failed:', err);
+      setSearchResults([]);
     } finally {
       setLoadingSearch(false);
     }
@@ -187,7 +172,7 @@ const ManagerMessages = () => {
             }} />
             <input
               type="text"
-              placeholder="Search managers..."
+              placeholder="Search admins..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               style={{
@@ -248,9 +233,10 @@ const ManagerMessages = () => {
                     key={admin.user_id}
                     onClick={() => {
                       handleSelectChat({
-                        id: `new_${admin.user_id}`,
-                        recipientName: admin.full_name,
+                        id: admin.user_id,
+                        recipientName: admin.full_name || admin.name,
                         recipientId: admin.user_id,
+                        email: admin.email,
                         lastMessage: 'Start a conversation',
                         unread: 0,
                         exists: false
@@ -267,7 +253,7 @@ const ManagerMessages = () => {
                     onMouseLeave={(e) => e.currentTarget.style.background = activeChat?.recipientId === admin.user_id ? '#f1f5f9' : 'transparent'}
                   >
                     <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
-                      {admin.full_name}
+                      {admin.full_name || admin.name}
                     </div>
                     <div style={{ fontSize: '12px', color: '#94a3b8' }}>
                       {admin.email}
@@ -276,7 +262,7 @@ const ManagerMessages = () => {
                 ))
               ) : (
                 <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
-                  No managers found
+                  No admins found
                 </div>
               )}
             </div>
@@ -285,7 +271,7 @@ const ManagerMessages = () => {
             <div>
               {chats.length === 0 ? (
                 <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
-                  No messages yet
+                  No admins available
                 </div>
               ) : (
                 chats.map(chat => (
@@ -302,9 +288,14 @@ const ManagerMessages = () => {
                     onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
                     onMouseLeave={(e) => e.currentTarget.style.background = activeChat?.id === chat.id ? '#f1f5f9' : 'transparent'}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
-                        {chat.recipientName}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
+                          {chat.recipientName}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                          {chat.email}
+                        </div>
                       </div>
                       {chat.unread > 0 && (
                         <span style={{
@@ -322,9 +313,6 @@ const ManagerMessages = () => {
                           {chat.unread}
                         </span>
                       )}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-                      {chat.lastMessage}
                     </div>
                   </div>
                 ))
@@ -357,7 +345,7 @@ const ManagerMessages = () => {
           fontSize: '16px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         }}>
-          Select a manager to start messaging
+          Select an admin to start messaging
         </div>
       )}
     </div>

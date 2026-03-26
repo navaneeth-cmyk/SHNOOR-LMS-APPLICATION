@@ -29,37 +29,20 @@ const AdminMessages = () => {
       try {
         setLoadingChats(true);
         
-        // Fetch existing chats with managers
-        const chatsRes = await api.get('/api/chats?role=manager');
-        const existing = (chatsRes.data || []).map(c => ({
-          id: c.chat_id,
-          recipientName: c.recipient_name,
-          recipientId: c.recipient_id,
-          lastMessage: c.last_message || 'No messages yet',
-          unread: c.unread_count,
-          exists: true
-        }));
+        // Fetch all available managers from users table
+        const managersRes = await api.get('/api/admin/users?role=manager');
+        const allManagers = (Array.isArray(managersRes.data) ? managersRes.data : []).filter(m => m.user_id !== dbUser?.id);
 
-        // Fetch all available managers
-        const managersRes = await api.get('/api/users?role=manager');
-        const allManagers = (managersRes.data || []).filter(m => m.user_id !== dbUser?.id);
-
-        // Merge: existing chats + managers without chat yet
-        const merged = [...existing];
-        allManagers.forEach(manager => {
-          if (!existing.some(c => c.recipientId === manager.user_id)) {
-            merged.push({
-              id: `new_${manager.user_id}`,
-              recipientName: manager.full_name,
-              recipientId: manager.user_id,
-              lastMessage: 'Start a conversation',
-              unread: 0,
-              exists: false
-            });
-          }
-        });
-
-        setChats(merged);
+        setChats(allManagers.map(manager => ({
+          id: manager.user_id,
+          recipientName: manager.full_name || manager.name,
+          recipientId: manager.user_id,
+          email: manager.email,
+          lastMessage: 'Start a conversation',
+          unread: 0,
+          exists: false
+        })));
+        
         setLoadingChats(false);
       } catch (err) {
         console.error('Failed to fetch managers:', err);
@@ -83,11 +66,13 @@ const AdminMessages = () => {
 
     setLoadingSearch(true);
     try {
-      const res = await api.get(`/api/users?role=manager&search=${query}`);
-      setSearchResults((res.data || []).filter(m => m.user_id !== dbUser?.id));
+      const res = await api.get(`/api/admin/users?role=manager&search=${query}`);
+      const results = Array.isArray(res.data) ? res.data : [];
+      setSearchResults(results.filter(m => m.user_id !== dbUser?.id));
       setShowSearchResults(true);
     } catch (err) {
       console.error('Search failed:', err);
+      setSearchResults([]);
     } finally {
       setLoadingSearch(false);
     }
@@ -96,26 +81,12 @@ const AdminMessages = () => {
   // Select chat
   const handleSelectChat = async (chat) => {
     setActiveChat(chat);
-    handleSetActiveChat(chat.id);
-    markChatRead(chat.id);
-    setShowSearchResults(false);
-
-    if (chat.exists) {
-      setLoadingMessages(true);
-      try {
-        const res = await api.get(`/api/chats/${chat.id}/messages`);
-        setMessages(res.data.map(m => ({
-          ...m,
-          isMyMessage: m.sender_id === dbUser?.id
-        })));
-      } catch (err) {
-        console.error('Failed to load messages:', err);
-      } finally {
-        setLoadingMessages(false);
-      }
-    } else {
-      setMessages([]);
+    if (chat.id) {
+      handleSetActiveChat(chat.id);
+      markChatRead(chat.id);
     }
+    setShowSearchResults(false);
+    setMessages([]);
   };
 
   // Receive new messages
@@ -248,9 +219,10 @@ const AdminMessages = () => {
                     key={manager.user_id}
                     onClick={() => {
                       handleSelectChat({
-                        id: `new_${manager.user_id}`,
-                        recipientName: manager.full_name,
+                        id: manager.user_id,
+                        recipientName: manager.full_name || manager.name,
                         recipientId: manager.user_id,
+                        email: manager.email,
                         lastMessage: 'Start a conversation',
                         unread: 0,
                         exists: false
@@ -267,7 +239,7 @@ const AdminMessages = () => {
                     onMouseLeave={(e) => e.currentTarget.style.background = activeChat?.recipientId === manager.user_id ? '#f1f5f9' : 'transparent'}
                   >
                     <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
-                      {manager.full_name}
+                      {manager.full_name || manager.name}
                     </div>
                     <div style={{ fontSize: '12px', color: '#94a3b8' }}>
                       {manager.email}
@@ -285,7 +257,7 @@ const AdminMessages = () => {
             <div>
               {chats.length === 0 ? (
                 <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
-                  No messages yet
+                  No managers available
                 </div>
               ) : (
                 chats.map(chat => (
@@ -302,9 +274,14 @@ const AdminMessages = () => {
                     onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
                     onMouseLeave={(e) => e.currentTarget.style.background = activeChat?.id === chat.id ? '#f1f5f9' : 'transparent'}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
-                        {chat.recipientName}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
+                          {chat.recipientName}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                          {chat.email}
+                        </div>
                       </div>
                       {chat.unread > 0 && (
                         <span style={{
@@ -322,9 +299,6 @@ const AdminMessages = () => {
                           {chat.unread}
                         </span>
                       )}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-                      {chat.lastMessage}
                     </div>
                   </div>
                 ))
