@@ -4,7 +4,6 @@ import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../auth/useAuth';
 import ChatWindow from '../../components/chat/ChatWindow';
 import { Search, X, Loader2 } from 'lucide-react';
-import '../../styles/Chat.css';
 
 const ManagerMessages = () => {
   const { socket, dbUser, unreadCounts, markChatRead, handleSetActiveChat } = useSocket();
@@ -148,59 +147,89 @@ const ManagerMessages = () => {
     }
   };
 
+  // Render individual chat item
+  const renderChatItem = (chat) => {
+    const unreadCount = unreadCounts?.[chat.id] || 0;
+    const isActive = activeChat?.id === chat.id;
+    
+    return (
+      <div
+        key={chat.id}
+        onClick={() => handleSelectChat(chat)}
+        className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors ${
+          isActive ? 'bg-slate-100 border-l-4 border-purple-500' : ''
+        }`}
+      >
+        {/* Avatar */}
+        <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+          <span className="text-purple-600 font-bold text-sm">
+            {chat.recipientName?.charAt(0)?.toUpperCase() || 'A'}
+          </span>
+        </div>
+
+        {/* Chat info */}
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-slate-900 text-sm">
+            {chat.recipientName}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded font-medium">
+              Admin
+            </span>
+            <span className="text-xs text-slate-500">{chat.email}</span>
+          </div>
+        </div>
+
+        {/* Unread badge */}
+        {unreadCount > 0 && (
+          <div className="h-5 w-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const displayChats = showSearchResults && searchQuery ? searchResults.map(admin => ({
+    id: admin.user_id,
+    recipientName: admin.full_name || admin.name,
+    recipientId: admin.user_id,
+    email: admin.email,
+    lastMessage: 'Start a conversation',
+    unread: 0,
+    exists: false
+  })) : chats;
+
   return (
-    <div className="chat-container" style={{ display: 'flex', height: '100%', gap: '16px' }}>
-      {/* Chat list sidebar */}
-      <div style={{
-        width: '320px',
-        background: '#fff',
-        borderRadius: '12px',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
-      }}>
-        {/* Search box */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#94a3b8'
-            }} />
+    <div className="flex gap-4 h-[calc(100vh-245px)]">
+      {/* Sidebar with contacts */}
+      <div className="w-96 bg-white rounded-lg shadow-sm overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-slate-200">
+          <h2 className="text-lg font-semibold text-slate-900">Messages</h2>
+          <p className="text-xs text-slate-500">Connect with admins</p>
+        </div>
+
+        {/* Search bar */}
+        <div className="p-4 border-b border-slate-200">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search admins..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none'
-              }}
               onFocus={() => searchQuery && setShowSearchResults(true)}
+              className="w-full pl-9 pr-9 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200"
             />
             {searchQuery && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setShowSearchResults(false);
+                  setSearchResults([]);
                 }}
-                style={{
-                  position: 'absolute',
-                  right: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#94a3b8'
-                }}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-none border-none cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -208,146 +237,53 @@ const ManagerMessages = () => {
           </div>
         </div>
 
-        {/* Search results or chat list */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {loadingChats ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: '#94a3b8'
-            }}>
-              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+        {/* Chat list */}
+        <div className="flex-1 overflow-y-auto">
+          {loadingChats && !showSearchResults ? (
+            <div className="flex items-center justify-center h-full text-slate-400">
+              <Loader2 size={20} className="animate-spin" />
             </div>
           ) : showSearchResults && searchQuery ? (
-            // Show search results
-            <div>
+            // Search results
+            <>
               {loadingSearch ? (
-                <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', display: 'inline' }} />
+                <div className="flex items-center justify-center h-full text-slate-400">
+                  <Loader2 size={20} className="animate-spin" />
                 </div>
-              ) : searchResults.length > 0 ? (
-                searchResults.map(admin => (
-                  <div
-                    key={admin.user_id}
-                    onClick={() => {
-                      handleSelectChat({
-                        id: admin.user_id,
-                        recipientName: admin.full_name || admin.name,
-                        recipientId: admin.user_id,
-                        email: admin.email,
-                        lastMessage: 'Start a conversation',
-                        unread: 0,
-                        exists: false
-                      });
-                    }}
-                    style={{
-                      padding: '12px 16px',
-                      borderBottom: '1px solid #e2e8f0',
-                      cursor: 'pointer',
-                      background: activeChat?.recipientId === admin.user_id ? '#f1f5f9' : 'transparent',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = activeChat?.recipientId === admin.user_id ? '#f1f5f9' : 'transparent'}
-                  >
-                    <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
-                      {admin.full_name || admin.name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                      {admin.email}
-                    </div>
-                  </div>
-                ))
+              ) : displayChats.length > 0 ? (
+                displayChats.map(chat => renderChatItem(chat))
               ) : (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
+                <div className="flex items-center justify-center h-full text-slate-400 text-sm">
                   No admins found
                 </div>
               )}
-            </div>
+            </>
+          ) : displayChats.length > 0 ? (
+            displayChats.map(chat => renderChatItem(chat))
           ) : (
-            // Show chat list
-            <div>
-              {chats.length === 0 ? (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
-                  No admins available
-                </div>
-              ) : (
-                chats.map(chat => (
-                  <div
-                    key={chat.id}
-                    onClick={() => handleSelectChat(chat)}
-                    style={{
-                      padding: '12px 16px',
-                      borderBottom: '1px solid #e2e8f0',
-                      cursor: 'pointer',
-                      background: activeChat?.id === chat.id ? '#f1f5f9' : 'transparent',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = activeChat?.id === chat.id ? '#f1f5f9' : 'transparent'}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
-                          {chat.recipientName}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                          {chat.email}
-                        </div>
-                      </div>
-                      {chat.unread > 0 && (
-                        <span style={{
-                          background: '#818cf8',
-                          color: '#fff',
-                          borderRadius: '50%',
-                          width: '20px',
-                          height: '20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '11px',
-                          fontWeight: 600
-                        }}>
-                          {chat.unread}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
+            <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+              No admins available
             </div>
           )}
         </div>
       </div>
 
       {/* Chat window */}
-      {activeChat ? (
-        <div style={{ flex: 1 }}>
+      <div className="flex-1 bg-white rounded-lg shadow-sm overflow-hidden">
+        {activeChat ? (
           <ChatWindow
             chat={activeChat}
             messages={messages}
-            loading={loadingMessages}
-            onSend={handleSendMessage}
-            dbUser={dbUser}
+            onSendMessage={handleSendMessage}
+            currentUser={dbUser}
+            socket={socket}
           />
-        </div>
-      ) : (
-        <div style={{
-          flex: 1,
-          background: '#fff',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#94a3b8',
-          fontSize: '16px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          Select an admin to start messaging
-        </div>
-      )}
+        ) : (
+          <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+            Select a chat to start messaging
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -40,7 +40,8 @@ const AdminMessages = () => {
           email: manager.email,
           lastMessage: 'Start a conversation',
           unread: 0,
-          exists: false
+          exists: false,
+          type: '1on1'
         })));
         
         setLoadingChats(false);
@@ -134,84 +135,87 @@ const AdminMessages = () => {
     }
   };
 
-  return (
-    <div className="chat-container" style={{ display: 'flex', height: '100%', gap: '16px' }}>
-      {/* Chat list sidebar */}
-      <div style={{
-        width: '320px',
-        background: '#fff',
-        borderRadius: '12px',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
-      }}>
-        {/* Search box */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#94a3b8'
-            }} />
-            <input
-              type="text"
-              placeholder="Search managers..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none'
-              }}
-              onFocus={() => searchQuery && setShowSearchResults(true)}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setShowSearchResults(false);
-                }}
-                style={{
-                  position: 'absolute',
-                  right: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#94a3b8'
-                }}
-              >
-                <X size={16} />
-              </button>
+  const renderChatItem = (chat) => {
+    const unreadCount = unreadCounts?.[chat.id] || 0;
+    const isActive = activeChat?.id === chat.id;
+
+    return (
+      <div
+        key={chat.id}
+        onClick={() => handleSelectChat(chat)}
+        className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors ${isActive ? 'bg-slate-100 border-l-4 border-indigo-500' : ''}`}
+      >
+        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+          <span className="text-indigo-600 font-bold text-sm">
+            {chat.recipientName?.charAt(0).toUpperCase() || 'M'}
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-semibold text-slate-900 text-sm truncate">{chat.recipientName}</div>
+            {unreadCount > 0 && !isActive && (
+              <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">
+                {unreadCount}
+              </span>
             )}
           </div>
+          <div className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded uppercase font-bold w-fit mt-1">
+            Manager
+          </div>
+          <div className="text-xs text-slate-500 mt-1 truncate">{chat.email}</div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="student-chat-page p-6 bg-slate-50/20 min-h-full">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-5">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
+          <p className="text-gray-500 text-sm mt-1">Connect with managers</p>
         </div>
 
-        {/* Search results or chat list */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* Search Bar */}
+        <div className="relative w-72">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search managers..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            onFocus={() => searchQuery && setShowSearchResults(true)}
+            className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(''); setShowSearchResults(false); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Chat Layout */}
+      <div className="flex flex-1 overflow-hidden h-[calc(100vh-245px)] bg-white border border-slate-200 rounded-lg shadow-sm">
+        {/* Chat Sidebar */}
+        <div className="chat-sidebar h-full flex flex-col min-w-0 border-r bg-white w-96">
+          {/* Chat List */}
           {loadingChats ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: '#94a3b8'
-            }}>
-              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+            <div className="flex-1 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
             </div>
+          ) : error ? (
+            <div className="flex-1 p-6 text-center text-red-600 text-sm">{error}</div>
           ) : showSearchResults && searchQuery ? (
-            // Show search results
-            <div>
+            // Search Results
+            <div className="chat-contacts-list overflow-y-auto flex-1">
               {loadingSearch ? (
-                <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', display: 'inline' }} />
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
                 </div>
               ) : searchResults.length > 0 ? (
                 searchResults.map(manager => (
@@ -225,115 +229,64 @@ const AdminMessages = () => {
                         email: manager.email,
                         lastMessage: 'Start a conversation',
                         unread: 0,
-                        exists: false
+                        exists: false,
+                        type: '1on1'
                       });
+                      setShowSearchResults(false);
                     }}
-                    style={{
-                      padding: '12px 16px',
-                      borderBottom: '1px solid #e2e8f0',
-                      cursor: 'pointer',
-                      background: activeChat?.recipientId === manager.user_id ? '#f1f5f9' : 'transparent',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = activeChat?.recipientId === manager.user_id ? '#f1f5f9' : 'transparent'}
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-100 border-b transition-colors"
                   >
-                    <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
-                      {manager.full_name || manager.name}
+                    <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-indigo-600 font-bold text-sm">
+                        {manager.full_name?.charAt(0).toUpperCase() || manager.name?.charAt(0).toUpperCase() || 'M'}
+                      </span>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                      {manager.email}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-900 text-sm truncate">{manager.full_name || manager.name}</div>
+                      <div className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded uppercase font-bold w-fit mt-1">
+                        Manager
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 truncate">{manager.email}</div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
-                  No managers found
-                </div>
+                <div className="p-8 text-center text-slate-500">No managers found</div>
               )}
             </div>
+          ) : chats.length === 0 ? (
+            <div className="flex-1 p-6 text-center">
+              <div className="text-slate-400">No managers available.</div>
+              <div className="text-sm text-slate-500 mt-1">Check back later!</div>
+            </div>
           ) : (
-            // Show chat list
-            <div>
-              {chats.length === 0 ? (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
-                  No managers available
-                </div>
-              ) : (
-                chats.map(chat => (
-                  <div
-                    key={chat.id}
-                    onClick={() => handleSelectChat(chat)}
-                    style={{
-                      padding: '12px 16px',
-                      borderBottom: '1px solid #e2e8f0',
-                      cursor: 'pointer',
-                      background: activeChat?.id === chat.id ? '#f1f5f9' : 'transparent',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = activeChat?.id === chat.id ? '#f1f5f9' : 'transparent'}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
-                          {chat.recipientName}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                          {chat.email}
-                        </div>
-                      </div>
-                      {chat.unread > 0 && (
-                        <span style={{
-                          background: '#818cf8',
-                          color: '#fff',
-                          borderRadius: '50%',
-                          width: '20px',
-                          height: '20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '11px',
-                          fontWeight: 600
-                        }}>
-                          {chat.unread}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
+            <div className="chat-contacts-list overflow-y-auto flex-1">
+              {chats.map(renderChatItem)}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Chat window */}
-      {activeChat ? (
-        <div style={{ flex: 1 }}>
+        {/* Chat Window */}
+        {activeChat ? (
           <ChatWindow
-            chat={activeChat}
+            socket={socket}
+            activeChat={activeChat}
             messages={messages}
-            loading={loadingMessages}
-            onSend={handleSendMessage}
-            dbUser={dbUser}
+            onSendMessage={handleSendMessage}
+            loadingMessages={loadingMessages}
+            onClose={() => setActiveChat(null)}
+            isAdmin={true}
+            currentUser={dbUser}
           />
-        </div>
-      ) : (
-        <div style={{
-          flex: 1,
-          background: '#fff',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#94a3b8',
-          fontSize: '16px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          Select a manager to start messaging
-        </div>
-      )}
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-slate-500">
+            <div className="text-center">
+              <p className="text-lg font-medium">Select a manager to start messaging</p>
+              <p className="text-sm mt-2">Choose from the list or search for a specific manager</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
