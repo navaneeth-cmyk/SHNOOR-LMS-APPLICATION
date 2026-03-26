@@ -29,7 +29,7 @@ const ManagerMessages = () => {
         setLoadingChats(true);
         
         // Fetch all available admins from users table
-        const adminsRes = await api.get('/api/admin/users?role=admin');
+        const adminsRes = await api.get('/api/users/by-role?role=admin');
         const allAdmins = (Array.isArray(adminsRes.data) ? adminsRes.data : []).filter(a => a.user_id !== dbUser?.id);
 
         setChats(allAdmins.map(admin => ({
@@ -65,7 +65,7 @@ const ManagerMessages = () => {
 
     setLoadingSearch(true);
     try {
-      const res = await api.get(`/api/admin/users?role=admin&search=${query}`);
+      const res = await api.get(`/api/users/by-role?role=admin&search=${query}`);
       const results = Array.isArray(res.data) ? res.data : [];
       setSearchResults(results.filter(a => a.user_id !== dbUser?.id));
       setShowSearchResults(true);

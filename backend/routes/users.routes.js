@@ -53,6 +53,13 @@ router.get(
 );
 
 router.get(
+  "/by-role",
+  firebaseAuth,
+  attachUser,
+  getAllUsers
+);
+
+router.get(
   "/",
   firebaseAuth,
   attachUser,
