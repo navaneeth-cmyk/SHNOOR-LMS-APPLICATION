@@ -12,45 +12,65 @@ import TextStreamPlayer from "./TextStreamPlayer";
 import ReactPlayer from "react-player";
 import { getEmbedUrl } from "../../../utils/urlHelper";
 
-const isGoogleDriveUrl = (url) => url && url.includes("drive.google.com");
-const isLocalOrMp4Url = (url) => url && (url.includes("localhost") || url.includes("127.0.0.1") || url.match(/\.(mp4|webm|ogg)$/i));
-const isYouTubeUrl = (url) => Boolean(url && /(?:youtube\.com|youtu\.be)/i.test(url));
-const isGammaUrl = (url) => Boolean(url && url.includes("gamma.app"));
+const isGoogleDriveUrl = (url) => typeof url === "string" && url.includes("drive.google.com");
+const isLocalOrMp4Url = (url) => {
+  if (!url || typeof url !== "string") return false;
+  const lowerUrl = url.toLowerCase();
+  return (
+    lowerUrl.includes("localhost") ||
+    lowerUrl.includes("127.0.0.1") ||
+    lowerUrl.match(/\.(mp4|webm|ogg|mov|mkv|avi|flv|m4v)($|\?)/i) ||
+    lowerUrl.includes("/uploads/videos/") ||
+    lowerUrl.startsWith("/uploads/")
+  );
+};
+const isYouTubeUrl = (url) => Boolean(url && /(?:youtube\.com|youtu\.be|youtube-nocookie\.com)/i.test(url));
+const isGammaUrl = (url) => Boolean(url && typeof url === "string" && url.includes("gamma.app"));
 
 const normalizeGammaUrl = (url) => {
   if (!url) return "";
-  if (!url.includes("/embed/")) {
-    return url.replace(/gamma\.app\/[a-zA-Z0-9_-]+\//i, "gamma.app/embed/");
+  let finalUrl = url.trim();
+  if (finalUrl.startsWith("//")) finalUrl = `https:${finalUrl}`;
+  if (!finalUrl.startsWith("http")) finalUrl = `https://${finalUrl}`;
+  finalUrl = finalUrl.replace(/\/+$/, "");
+  if (!finalUrl.includes("/embed/")) {
+    finalUrl = finalUrl.replace(/gamma\.app\/(?:docs|public|view|present|p|d)\//i, "gamma.app/embed/");
+    if (!finalUrl.includes("/embed/")) {
+        finalUrl = finalUrl.replace(/gamma\.app\/([a-zA-Z0-9_-]+)$/i, "gamma.app/embed/$1");
+    }
   }
-  return url;
+  const urlObj = new URL(finalUrl);
+  if (!urlObj.searchParams.has("embed")) urlObj.searchParams.set("embed", "true");
+  if (!urlObj.searchParams.has("embedHost")) urlObj.searchParams.set("embedHost", window.location.hostname || "localhost");
+  return urlObj.toString();
 };
-
 const normalizeExternalUrl = (url) => {
   if (!url || typeof url !== "string") return "";
   const trimmed = url.trim();
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.startsWith("//")) return `https:${trimmed}`;
   if (/^(www\.|youtube\.com|youtu\.be|m\.youtube\.com)/i.test(trimmed)) return `https://${trimmed}`;
+  
+  if (trimmed.startsWith("/") || trimmed.startsWith("./")) {
+    const backendUrl = import.meta.env.VITE_API_URL || window.location.origin.replace(":5173", ":5000");
+    const cleanPath = trimmed.startsWith("./") ? trimmed.slice(1) : trimmed;
+    return `${backendUrl}${cleanPath}`;
+  }
+  
   return trimmed;
 };
 
 const buildPdfViewerUrl = (url, authToken) => {
   if (!url || typeof url !== "string") return "";
-  const withToken = authToken
-    ? `${url}${url.includes("?") ? "&" : "?"}token=${authToken}`
-    : url;
-    
-  // Google Docs Viewer cannot fetch local files. Let the browser render them natively.
-  if (url.includes("localhost") || url.includes("127.0.0.1") || url.startsWith("/")) {
-    return withToken;
+  let norm = url;
+  if (isGammaUrl(norm)) norm = normalizeGammaUrl(norm);
+  if (norm.startsWith("/api/") || norm.startsWith("/uploads/")) {
+    norm = window.location.origin.replace(":5173", ":5000") + norm;
   }
-  
-  // If a Gamma URL snuck into PDF type, normalize it and bypass Google Docs viewer
-  if (isGammaUrl(url)) {
-    return normalizeGammaUrl(url);
-  }
-  
-  return `https://docs.google.com/viewer?url=${encodeURIComponent(withToken)}&embedded=true`;
+  const withT = authToken ? `${norm}${norm.includes("?") ? "&" : "?"}token=${authToken}` : norm;
+  const isL = norm.includes("localhost") || norm.includes("127.0.0.1") || norm.startsWith("/");
+  if (isL || isGammaUrl(norm)) return withT;
+  return `https://docs.google.com/viewer?url=${encodeURIComponent(withT)}&embedded=true`;
 };
 
 const SEEK_TOLERANCE_SECONDS = 1;
@@ -75,6 +95,10 @@ const CoursePlayerView = ({
 }) => {
   const [isVideoFinished, setIsVideoFinished] = React.useState(false);
   const playerRef = React.useRef(null);
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const wasPlayingRef = React.useRef(false);
+  const isPlayingRef = React.useRef(false);
+
   const [maxPlayedSeconds, setMaxPlayedSeconds] = React.useState(currentModule?.last_position_seconds || 0);
   const maxPlayedRef = React.useRef(currentModule?.last_position_seconds || 0);
   const [videoDuration, setVideoDuration] = React.useState(0);
@@ -116,6 +140,79 @@ const CoursePlayerView = ({
     }
   }, [videoDuration]);
 
+  // Sync isPlayingRef with isPlaying state
+  React.useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  // Handle visibility change (tab switching/minimizing)
+  React.useEffect(() => {
+    const handleInvisibility = () => {
+      if (isPlayingRef.current) {
+        wasPlayingRef.current = true;
+        setIsPlaying(false);
+      }
+      
+      // Force pause all native video/audio elements (backup for non-state-tracked elements)
+      try {
+        document.querySelectorAll("video, audio").forEach((el) => {
+          if (!el.paused) el.pause();
+        });
+      } catch (e) {}
+
+      // Attempt to pause generic iframes (YouTube, Vimeo, etc.) via postMessage
+      try {
+        document.querySelectorAll("iframe").forEach((frame) => {
+          frame.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', "*");
+          frame.contentWindow.postMessage('{"method":"pause"}', "*");
+        });
+      } catch (e) {}
+    };
+
+    const handleVisibility = () => {
+      if (wasPlayingRef.current) {
+        setIsPlaying(true);
+        wasPlayingRef.current = false;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) handleInvisibility();
+      else handleVisibility();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleInvisibility);
+    window.addEventListener("focus", handleVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleInvisibility);
+      window.removeEventListener("focus", handleVisibility);
+    };
+  }, []);
+
+  // Sync playing state for native video element
+  React.useEffect(() => {
+    // Only apply pause/play sync if we're not just switching to a new module
+    // which starts at 0 and is already paused. This prevents issues with
+    // calling pause() too early on some players.
+    if (playerRef.current && isLocalOrMp4Url(normalizedModuleUrl) && playerRef.current.tagName === "VIDEO") {
+      if (isPlaying) {
+        playerRef.current.play().catch((err) => {
+          if (err.name !== "NotAllowedError") {
+            console.warn("Playback error:", err);
+          }
+        });
+      } else {
+        // If it was already playing, we pause it. If it was already paused, this is a no-op.
+        if (!playerRef.current.paused) {
+           playerRef.current.pause();
+        }
+      }
+    }
+  }, [isPlaying, normalizedModuleUrl]);
+
   React.useEffect(() => {
     maxPlayedRef.current = maxPlayedSeconds;
   }, [maxPlayedSeconds]);
@@ -126,6 +223,8 @@ const CoursePlayerView = ({
     setIsVideoFinished(false);
     setMaxPlayedSeconds(initialPosition);
     maxPlayedRef.current = initialPosition;
+    setIsPlaying(false);
+    wasPlayingRef.current = false;
     setVideoDuration(0);
     setVideoProgressPercent(0);
     lastSyncRef.current = initialPosition;
@@ -220,7 +319,7 @@ const CoursePlayerView = ({
 
   const getModuleTypeLabel = (type) => {
     if (type === "video") return "Video";
-    if (type === "pdf" || type === "text_stream" || type === "html" || type === "text" || type === "notes") {
+    if (type === "pdf" || type === "text_stream" || type === "html" || type === "text" || type === "notes" || type === "md" || type === "txt") {
       return "Notes";
     }
     return type || "Module";
@@ -342,89 +441,13 @@ const CoursePlayerView = ({
           {/* UPDATED: dynamic height based on currentModule?.notes */}
           <div className={`${currentModule?.notes ? "min-h-[70vh]" : "flex-1"} relative`}>
 
-            {/* VIDEO - Managed by ReactPlayer */}
-            {currentModule?.type === "video" ? (
-              <div className="absolute inset-0 w-full h-full bg-black">
-                {!currentModule?.url ? (
-                  <div className="flex flex-col items-center justify-center h-full text-white p-8">
-                    <div className="text-6xl mb-4">⚠️</div>
-                    <h3 className="text-2xl font-bold mb-2">Video Not Available</h3>
-                    <p className="text-slate-400 text-center max-w-md">
-                      The video URL for this module is missing or invalid. Please contact your instructor to fix this issue.
-                    </p>
-                  </div>
-                ) : isGoogleDriveUrl(normalizedModuleUrl) ? (
-                  <iframe
-                    src={normalizedModuleUrl}
-                    className="w-full h-full border-0 bg-black"
-                    title={currentModule.title || "Google Drive Video"}
-                    allow="fullscreen"
-                  />
-                ) : isGammaUrl(normalizedModuleUrl) ? (
-                  <iframe
-                    src={normalizeGammaUrl(normalizedModuleUrl)}
-                    className="w-full h-full border-0 bg-black"
-                    title={currentModule.title || "Gamma Presentation"}
-                    allow="fullscreen"
-                  />
-                ) : isYouTubeUrl(normalizedModuleUrl) ? (
-                  <iframe
-                    src={getEmbedUrl(normalizedModuleUrl)}
-                    className="w-full h-full border-0 bg-black"
-                    title={currentModule.title || "YouTube Video"}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                ) : !isLocalOrMp4Url(normalizedModuleUrl) ? (
-                  <div className="relative w-full h-full group">
-                    <ReactPlayer
-                      ref={playerRef}
-                      url={normalizedModuleUrl}
-                      className="react-player bg-black"
-                      width="100%"
-                      height="100%"
-                      controls={true}
-                      light={false}
-                      config={{
-                        youtube: {
-                          playerVars: { showinfo: 1 },
-                        },
-                      }}
-                      onDuration={handleVideoReady}
-                      onProgress={(state) => {
-                        handleProgress(state);
-                      }}
-                      onSeek={handleSeekAttempt}
-                      onEnded={handleVideoEnded}
-                      onError={(e) => {
-                        console.error('ReactPlayer error:', e);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="relative w-full h-full group bg-black">
-                    <video
-                      ref={playerRef}
-                      src={normalizedModuleUrl}
-                      className="w-full h-full object-contain"
-                      controls
-                      controlsList="nodownload"
-                      onLoadedMetadata={(e) => {
-                        handleVideoReady(e.target.duration);
-                      }}
-                      onTimeUpdate={(e) => {
-                        handleProgress({ playedSeconds: e.target.currentTime });
-                      }}
-                      onSeeking={(e) => {
-                        handleSeekAttempt(e.target.currentTime);
-                      }}
-                      onEnded={handleVideoEnded}
-                      onError={(e) => console.error('Native Video error:', e)}
-                    />
-                  </div>
-                )}
-              </div>
-            ) : currentModule?.type === "text_stream" ? (
+            {/* TEXT STREAM, HTML, TXT, MD */}
+            {currentModule?.type === "text_stream" || 
+             currentModule?.type === "html" || 
+             (currentModule?.url && currentModule.url.trim().toLowerCase().startsWith("<iframe")) ||
+             currentModule?.url?.toLowerCase()?.endsWith(".html") ||
+             currentModule?.url?.toLowerCase()?.endsWith(".txt") ||
+             currentModule?.url?.toLowerCase()?.endsWith(".md") ? (
               <div className="absolute inset-0 w-full h-full overflow-y-auto">
                 <TextStreamPlayer
                   moduleId={currentModule.id}
@@ -432,29 +455,76 @@ const CoursePlayerView = ({
                   onComplete={handleMarkComplete}
                 />
               </div>
+
+            ) : currentModule?.type === "video" ? (
+              /* VIDEO PLAYER */
+              <div className="absolute inset-0 w-full h-full bg-black">
+                {!currentModule?.url ? (
+                  <div className="flex flex-col items-center justify-center h-full text-white p-8">
+                    <div className="text-6xl mb-4">⚠️</div>
+                    <h3 className="text-2xl font-bold mb-2">Video Not Available</h3>
+                    <p className="text-slate-400 text-center max-w-md">The video URL for this module is missing or invalid.</p>
+                  </div>
+                ) : isGoogleDriveUrl(normalizedModuleUrl) ? (
+                  <iframe src={normalizedModuleUrl} className="w-full h-full border-0" allow="fullscreen" />
+                ) : isGammaUrl(normalizedModuleUrl) ? (
+                  <iframe src={normalizeGammaUrl(normalizedModuleUrl)} className="w-full h-full border-0" allow="fullscreen" />
+                ) : isYouTubeUrl(normalizedModuleUrl) || !isLocalOrMp4Url(normalizedModuleUrl) ? (
+                  <ReactPlayer
+                    ref={playerRef}
+                    url={normalizedModuleUrl}
+                    width="100%"
+                    height="100%"
+                    controls
+                    playing={isPlaying}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onDuration={handleVideoReady}
+                    onProgress={handleProgress}
+                    onSeek={handleSeekAttempt}
+                    onEnded={handleVideoEnded}
+                  />
+                ) : (
+                  <video
+                    ref={playerRef}
+                    src={normalizedModuleUrl}
+                    className="w-full h-full object-contain"
+                    controls
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onLoadedMetadata={(e) => handleVideoReady(e.target.duration)}
+                    onTimeUpdate={(e) => handleProgress({ playedSeconds: e.target.currentTime })}
+                    onSeeking={(e) => handleSeekAttempt(e.target.currentTime)}
+                    onEnded={handleVideoEnded}
+                  />
+                )}
+              </div>
+
             ) : currentModule?.type === "pdf" ||
-              currentModule?.url?.toLowerCase().includes(".pdf") ||
-              currentModule?.url?.toLowerCase().endsWith("/pdf") ? (
-              /* PDF */
-              <iframe
-                src={buildPdfViewerUrl(currentModule.url, authToken)}
-                className="absolute inset-0 w-full h-full border-0"
-                title={currentModule.title || "PDF Document"}
-                allow="fullscreen"
-              />
+              currentModule?.url?.toLowerCase().includes(".pdf") || 
+              isGammaUrl(currentModule?.url) ? (
+              /* PDF or GAMMA */
+              <div className="absolute inset-0 w-full h-full bg-slate-100">
+                <iframe
+                  src={isGammaUrl(currentModule.url) ? normalizeGammaUrl(currentModule.url) : buildPdfViewerUrl(currentModule.url, authToken)}
+                  className="w-full h-full border-0"
+                  title={currentModule.title || "Document"}
+                  allow="fullscreen"
+                />
+              </div>
+
             ) : (
+              /* FALLBACK View */
               <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-300 p-8">
                 <FileText size={64} className="text-slate-500 mb-6" />
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  Document Viewer
-                </h3>
+                <h3 className="text-2xl font-bold text-white mb-2">Document Viewer</h3>
                 <p className="text-lg mb-8">{currentModule?.title}</p>
                 {currentModule?.url && (
                   <a
                     href={currentModule.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-primary-900 hover:bg-slate-800 text-white font-bold py-3 px-8 rounded-xl transition-all hover:scale-105 flex items-center gap-2"
+                    className="bg-primary-900 hover:bg-slate-800 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center gap-2 hover:scale-105"
                   >
                     Open Document <ExternalLink size={14} />
                   </a>
