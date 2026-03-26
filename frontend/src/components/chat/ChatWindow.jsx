@@ -20,7 +20,9 @@ const ChatWindow = ({
     onDeleteGroup,
     onReact,
     onRemoveReaction,
-    onClose
+    onClose,
+    useRoleBasedPositioning,
+    currentUserRole
 }) => {
     const [text, setText] = useState("");
     const [file, setFile] = useState(null);
@@ -310,6 +312,8 @@ const ChatWindow = ({
                                 onRemoveReaction={onRemoveReaction}
                                 isAdmin={isAdmin}
                                 currentUser={currentUser}
+                                useRoleBasedPositioning={useRoleBasedPositioning}
+                                currentUserRole={currentUserRole}
                             />
                         );
                     })
@@ -432,8 +436,9 @@ const ChatWindow = ({
     );
 };
 
-const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onReact, onRemoveReaction, isAdmin, currentUser }) => {
-    const isMe = msg.isMyMessage;
+const MessageItem = ({ messageId, msg, showName, onEdit, onDelete, onReply, onReact, onRemoveReaction, isAdmin, currentUser, useRoleBasedPositioning, currentUserRole }) => {
+    // Position based on sender role if in admin mode, otherwise based on whether it's the user's message
+    const isMe = useRoleBasedPositioning ? (msg.sender_role === 'admin') : msg.isMyMessage;
     const isTemp = typeof messageId === 'string' && messageId.startsWith('temp-');
     const canEdit = isMe && !isTemp && typeof onEdit === 'function';
     const canDelete = (isMe || isAdmin) && !isTemp && typeof onDelete === 'function';

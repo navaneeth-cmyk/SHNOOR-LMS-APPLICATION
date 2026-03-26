@@ -381,6 +381,8 @@ const AdminChat = () => {
                     messages={messages}
                     onSendMessage={handleSendMessage}
                     loadingMessages={loadingMessages}
+                    useRoleBasedPositioning={true}
+                    currentUserRole={dbUser?.role}
                 />
             </div>
         </div>
