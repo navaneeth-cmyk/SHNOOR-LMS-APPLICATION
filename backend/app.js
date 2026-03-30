@@ -592,7 +592,7 @@ import learningPathRoutes from "./routes/LearningPath.routes.js";
 import mocktestRoutes from "./routes/mocktest.routes.js";
 import { initializeDatabase } from "./db/dbInit.js";
 
-const express = require('express');
+// const express = require('express');
 const cors = require('cors');  // 👈 Step 1: import cors
 
 const app = express();
