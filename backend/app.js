@@ -598,12 +598,19 @@ const cors = require('cors');  // 👈 Step 1: import cors
 const app = express();
 
 // 👇 Step 2: Add this BEFORE all your routes
-app.use(cors({
-  origin: 'http://vanshika-project-frontend.s3-website.eu-north-1.amazonaws.com',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      const s3Origin = 'http://vanshika-project-frontend.s3-website.eu-north-1.amazonaws.com';
+      if (!origin || allowedOrigins.includes(origin) || origin === s3Origin) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  }),
+);
 
 
 
@@ -614,7 +621,11 @@ const __dirname = path.dirname(__filename);
 app.set("trust proxy", 1);
 const server = http.createServer(app);
 const baseUrl = process.env.BACKEND_URL;
-const allowedOrigins = ["http://localhost:5173", process.env.FRONTEND_URL];
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL,
+  "http://vanshika-project-frontend.s3-website.eu-north-1.amazonaws.com"
+];
 
 const io = new Server(server, {
   cors: {
