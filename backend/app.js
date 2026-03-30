@@ -39,7 +39,7 @@ import mocktestRoutes from "./routes/mocktest.routes.js";
 import { initializeDatabase } from "./db/dbInit.js";
 
 // const express = require('express');
-const cors = require('cors');  // 👈 Step 1: import cors
+// const cors = require('cors');  // 👈 Step 1: import cors
 
 const app = express();
 
