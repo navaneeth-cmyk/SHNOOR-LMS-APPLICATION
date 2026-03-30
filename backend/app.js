@@ -592,8 +592,22 @@ import learningPathRoutes from "./routes/LearningPath.routes.js";
 import mocktestRoutes from "./routes/mocktest.routes.js";
 import { initializeDatabase } from "./db/dbInit.js";
 
+const express = require('express');
+const cors = require('cors');  // 👈 Step 1: import cors
 
 const app = express();
+
+// 👇 Step 2: Add this BEFORE all your routes
+app.use(cors({
+  origin: 'http://vanshika-project-frontend.s3-website.eu-north-1.amazonaws.com',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+
+
+//const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
