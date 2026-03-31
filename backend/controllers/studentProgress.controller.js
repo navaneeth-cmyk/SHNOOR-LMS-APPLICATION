@@ -84,7 +84,7 @@ export const markModuleCompleted = async (req, res) => {
       `
       INSERT INTO module_progress (student_id, course_id, module_id, completed_at, last_accessed_at)
       VALUES ($1, $2, $3, NOW(), NOW())
-      ON CONFLICT (student_id, module_id)
+      ON CONFLICT (student_id,course_id, module_id)
       DO UPDATE SET completed_at = NOW(), last_accessed_at = NOW()
       `,
       [studentId, courseId, moduleId]
@@ -188,7 +188,7 @@ export const updateModuleProgress = async (req, res) => {
       `
       INSERT INTO module_progress (student_id, course_id, module_id, time_spent_seconds, last_position_seconds, last_accessed_at)
       VALUES ($1, $2, $3, $4, $5, NOW())
-      ON CONFLICT (student_id, module_id)
+      ON CONFLICT (student_id,course_id, module_id)
       DO UPDATE SET
         time_spent_seconds = COALESCE(module_progress.time_spent_seconds, 0) + $4,
         last_position_seconds = $5,
