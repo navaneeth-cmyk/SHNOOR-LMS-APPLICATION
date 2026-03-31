@@ -8,6 +8,11 @@ import {
   resolveModuleStorageFolder,
   removeLocalFileSafe,
 } from "../services/supabaseStorage.service.js";
+import {
+  uploadLocalFileToS3,
+  resolveS3StorageFolder,
+  removeLocalFileSafe: removeLocalFileSafeS3,
+} from "../services/s3Storage.service.js";
 
 const baseUrl = process.env.BACKEND_URL;
 
@@ -1152,7 +1157,7 @@ export const editModule = async (req, res) => {
       const ext = req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase();
       if (ext.toLowerCase() === ".pdf" || req.file.mimetype === "application/pdf") {
         try {
-          const { url, objectPath } = await uploadLocalFileToSupabase(
+          const { url, objectPath } = await uploadLocalFileToS3(
             req.file.path,
             {
               originalName: req.file.originalname,
@@ -1161,9 +1166,9 @@ export const editModule = async (req, res) => {
             }
           );
           finalContentUrl = url;
-          await removeLocalFileSafe(req.file.path);
+          await removeLocalFileSafeS3(req.file.path);
         } catch (uploadErr) {
-          console.error("Error uploading PDF to Supabase:", uploadErr.message);
+          console.error("Error uploading PDF to S3:", uploadErr.message);
           throw uploadErr;
         }
       } else {
@@ -1279,7 +1284,7 @@ export const addModule = async (req, res) => {
       const ext = req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase();
       if (ext.toLowerCase() === ".pdf" || req.file.mimetype === "application/pdf") {
         try {
-          const { url, objectPath } = await uploadLocalFileToSupabase(
+          const { url, objectPath } = await uploadLocalFileToS3(
             req.file.path,
             {
               originalName: req.file.originalname,
@@ -1288,9 +1293,9 @@ export const addModule = async (req, res) => {
             }
           );
           finalContentUrl = url;
-          await removeLocalFileSafe(req.file.path);
+          await removeLocalFileSafeS3(req.file.path);
         } catch (uploadErr) {
-          console.error("Error uploading PDF to Supabase:", uploadErr.message);
+          console.error("Error uploading PDF to S3:", uploadErr.message);
           throw uploadErr;
         }
       } else {

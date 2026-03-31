@@ -6,6 +6,11 @@ import {
   resolveModuleStorageFolder,
   removeLocalFileSafe,
 } from "../services/supabaseStorage.service.js";
+import {
+  uploadLocalFileToS3,
+  resolveS3StorageFolder,
+  removeLocalFileSafe: removeLocalFileSafeS3,
+} from "../services/s3Storage.service.js";
 
 export const addModules = async (req, res) => {
   try {
@@ -39,11 +44,11 @@ export const addModules = async (req, res) => {
       let uploadProvider = null;
 
       if (pdf) {
-        // ✅ Upload PDF to Supabase instead of local storage
+        // ✅ Upload PDF to S3 instead of local storage
         const ext = pdf.originalname.slice(pdf.originalname.lastIndexOf('.')).toLowerCase();
         if (ext.toLowerCase() === ".pdf" || pdf.mimetype === "application/pdf") {
           try {
-            const { url, objectPath } = await uploadLocalFileToSupabase(
+            const { url, objectPath } = await uploadLocalFileToS3(
               pdf.path,
               {
                 originalName: pdf.originalname,
@@ -52,9 +57,9 @@ export const addModules = async (req, res) => {
               }
             );
             finalContentUrl = url;
-            uploadProvider = "supabase";
+            uploadProvider = "s3";
           } catch (uploadErr) {
-            console.error("Error uploading PDF to Supabase:", uploadErr.message);
+            console.error("Error uploading PDF to S3:", uploadErr.message);
             throw uploadErr;
           }
         } else {
