@@ -70,7 +70,7 @@ const getSignedUrlForObject = async (objectPath) => {
   });
 
   try {
-    const url = await getSignedUrl(client, command, { expiresIn: 30 * 24 * 60 * 60 }); // 30 days
+    const url = await getSignedUrl(client, command, { expiresIn: 7 * 24 * 60 * 60 }); // 7 days max
     return url;
   } catch (error) {
     throw new Error(`Failed to create signed URL for S3 object: ${error.message}`);
