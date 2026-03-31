@@ -271,7 +271,8 @@ export const getInstructorCourses = async (req, res) => {
   FROM courses c
   LEFT JOIN modules m ON m.course_id = c.courses_id
   WHERE c.instructor_id = $1
-  GROUP BY c.courses_id
+  GROUP BY c.courses_id, c.title, c.description, c.category, 
+         c.status, c.difficulty, c.created_at
   ORDER BY c.created_at DESC
   `,
       [req.user.id],
