@@ -1,3 +1,5 @@
+import https from "https";
+import fs from "fs";
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -582,8 +584,20 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-const PORT = process.env.PORT || 5000;
+// REPLACE WITH:
+const PORT = process.env.PORT || 443;
 const HOST = process.env.HOST || "0.0.0.0";
+
+const sslOptions = {
+  key: fs.readFileSync(new URL('./privkey.pem', import.meta.url)),
+  cert: fs.readFileSync(new URL('./fullchain.pem', import.meta.url)),
+};
+
+// Redirect HTTP (port 80) → HTTPS
+http.createServer((req, res) => {
+  res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` });
+  res.end();
+}).listen(80, () => console.log("🔁 HTTP redirect on port 80"));
 
 pool
   .query("SELECT NOW()")
@@ -591,8 +605,12 @@ pool
     console.log("✅ Database connected successfully");
     await initializeDatabase();
     await initChatTables();
-    server.listen(PORT, () => {
-      console.log(`✅ Server running on port ${PORT}`);
+    // Replace http server with https
+    const httpsServer = https.createServer(sslOptions, app);
+    // Reattach socket.io to the https server
+    io.attach(httpsServer);
+    httpsServer.listen(PORT, HOST, () => {
+      console.log(`✅ HTTPS Server running on port ${PORT}`);
     });
   })
   .catch((err) => {
