@@ -62,7 +62,7 @@ export const getStudentCourseById = async (req, res) => {
       await pool.query(
         `INSERT INTO module_progress (student_id, course_id, module_id, last_accessed_at)
      VALUES ($1, $2, $3, NOW())
-     ON CONFLICT (student_id, module_id)
+     ON CONFLICT (student_id, course_id, module_id)
      DO UPDATE SET last_accessed_at = NOW()`,
         [studentId, courseId, firstModuleId],
       );
