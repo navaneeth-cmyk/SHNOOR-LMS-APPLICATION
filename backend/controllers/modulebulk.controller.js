@@ -2,14 +2,9 @@ import pool from "../db/postgres.js";
 import csv from "csv-parser";
 import fs from "fs";
 import {
-    uploadLocalFileToSupabase,
-    resolveModuleStorageFolder,
-    removeLocalFileSafe,
-} from "../services/supabaseStorage.service.js";
-import {
     uploadLocalFileToS3,
     resolveS3StorageFolder,
-    removeLocalFileSafe: removeLocalFileSafeS3,
+    removeLocalFileSafe,
 } from "../services/s3Storage.service.js";
 
 export const bulkUploadModules = async (req, res) => {
@@ -141,36 +136,18 @@ export const bulkUploadModules = async (req, res) => {
             if (contentUrl && !contentUrl.startsWith('http') && fileMap[contentUrl]) {
                 const f = fileMap[contentUrl];
                 if (!uploadedResourceUrlByName[f.originalname]) {
-                    // Use S3 for videos and PDFs, Supabase for others
-                    const ext = f.originalname.slice(f.originalname.lastIndexOf('.')).toLowerCase();
-                    const isVideo = f.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext);
-                    const isPdf = f.mimetype === "application/pdf" || ext === ".pdf";
-                    
-                    if (isVideo || isPdf) {
-                        const uploaded = await uploadLocalFileToS3(f.path, {
-                            originalName: f.originalname,
+                    // Use S3 for all file uploads
+                    const uploaded = await uploadLocalFileToS3(f.path, {
+                        originalName: f.originalname,
+                        mimeType: f.mimetype,
+                        folder: `modules/${resolveS3StorageFolder({
+                            type: normalizedType,
                             mimeType: f.mimetype,
-                            folder: `modules/${resolveS3StorageFolder({
-                                type: normalizedType,
-                                mimeType: f.mimetype,
-                                originalName: f.originalname,
-                            })}`,
-                        });
-                        uploadedResourceUrlByName[f.originalname] = uploaded.url;
-                        uploadedProviderByName[f.originalname] = "s3";
-                    } else {
-                        const uploaded = await uploadLocalFileToSupabase(f.path, {
                             originalName: f.originalname,
-                            mimeType: f.mimetype,
-                            folder: `modules/${resolveModuleStorageFolder({
-                                type: normalizedType,
-                                mimeType: f.mimetype,
-                                originalName: f.originalname,
-                            })}`,
-                        });
-                        uploadedResourceUrlByName[f.originalname] = uploaded.url;
-                        uploadedProviderByName[f.originalname] = "supabase";
-                    }
+                        })}`,
+                    });
+                    uploadedResourceUrlByName[f.originalname] = uploaded.url;
+                    uploadedProviderByName[f.originalname] = "s3";
                 }
                 contentUrl = uploadedResourceUrlByName[f.originalname];
                 uploadedFile = f;

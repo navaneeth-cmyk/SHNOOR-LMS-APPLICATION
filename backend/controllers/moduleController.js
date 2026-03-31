@@ -2,14 +2,9 @@ import pool from "../db/postgres.js";
 import axios from "axios";
 import fs from "fs";
 import {
-  uploadLocalFileToSupabase,
-  resolveModuleStorageFolder,
-  removeLocalFileSafe,
-} from "../services/supabaseStorage.service.js";
-import {
   uploadLocalFileToS3,
   resolveS3StorageFolder,
-  removeLocalFileSafe: removeLocalFileSafeS3,
+  removeLocalFileSafe,
 } from "../services/s3Storage.service.js";
 
 export const addModules = async (req, res) => {
@@ -44,7 +39,7 @@ export const addModules = async (req, res) => {
       let uploadProvider = null;
 
       if (pdf) {
-        // ✅ Upload PDF to S3 instead of local storage
+        // ✅ Upload PDF to S3
         const ext = pdf.originalname.slice(pdf.originalname.lastIndexOf('.')).toLowerCase();
         if (ext.toLowerCase() === ".pdf" || pdf.mimetype === "application/pdf") {
           try {

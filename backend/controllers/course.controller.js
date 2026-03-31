@@ -4,14 +4,9 @@ import { Readable } from "stream";
 import axios from "axios";
 import fs from "fs";
 import {
-  uploadLocalFileToSupabase,
-  resolveModuleStorageFolder,
-  removeLocalFileSafe,
-} from "../services/supabaseStorage.service.js";
-import {
   uploadLocalFileToS3,
   resolveS3StorageFolder,
-  removeLocalFileSafe: removeLocalFileSafeS3,
+  removeLocalFileSafe,
 } from "../services/s3Storage.service.js";
 
 const baseUrl = process.env.BACKEND_URL;
@@ -1166,7 +1161,7 @@ export const editModule = async (req, res) => {
             }
           );
           finalContentUrl = url;
-          await removeLocalFileSafeS3(req.file.path);
+          await removeLocalFileSafe(req.file.path);
         } catch (uploadErr) {
           console.error("Error uploading PDF to S3:", uploadErr.message);
           throw uploadErr;
@@ -1293,7 +1288,7 @@ export const addModule = async (req, res) => {
             }
           );
           finalContentUrl = url;
-          await removeLocalFileSafeS3(req.file.path);
+          await removeLocalFileSafe(req.file.path);
         } catch (uploadErr) {
           console.error("Error uploading PDF to S3:", uploadErr.message);
           throw uploadErr;

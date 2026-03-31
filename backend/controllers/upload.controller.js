@@ -3,14 +3,9 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import {
-    uploadLocalFileToSupabase,
-    resolveModuleStorageFolder,
-    removeLocalFileSafe,
-} from "../services/supabaseStorage.service.js";
-import {
     uploadLocalFileToS3,
     resolveS3StorageFolder,
-    removeLocalFileSafe: removeLocalFileSafeS3,
+    removeLocalFileSafe,
 } from "../services/s3Storage.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -97,51 +92,29 @@ export const handleUpload = async (req, res) => {
             folder = "docs";
         }
         
-        // Upload videos and PDFs to S3, others to Supabase
-        if (isVideo || isPdf) {
-            console.log(`[Upload] Uploading ${req.file.originalname} to S3 folder: ${folder}`);
-            const { objectPath, url } = await uploadLocalFileToS3(req.file.path, {
-                originalName: req.file.originalname,
-                mimeType: req.file.mimetype,
-                folder: folder,
-            });
+        // Upload all files to S3
+        console.log(`[Upload] Uploading ${req.file.originalname} to S3 folder: ${folder}`);
+        const { objectPath, url } = await uploadLocalFileToS3(req.file.path, {
+            originalName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            folder: folder,
+        });
 
-            // Delete local file after successful upload
-            await removeLocalFileSafeS3(req.file.path);
+        // Delete local file after successful upload
+        await removeLocalFileSafe(req.file.path);
 
-            console.log(`[Upload] File uploaded to S3: ${url}`);
-            res.status(200).json({
-                message: "File uploaded successfully to S3",
-                url: url,
-                objectPath: objectPath,
-                filename: req.file.originalname,
-                mimetype: req.file.mimetype,
-                storage: "s3",
-            });
-        } else {
-            console.log(`[Upload] Uploading ${req.file.originalname} to Supabase folder: ${folder}`);
-            const { objectPath, url } = await uploadLocalFileToSupabase(req.file.path, {
-                originalName: req.file.originalname,
-                mimeType: req.file.mimetype,
-                folder: folder,
-            });
-
-            // Delete local file after successful upload
-            await removeLocalFileSafe(req.file.path);
-
-            console.log(`[Upload] File uploaded to Supabase: ${url}`);
-            res.status(200).json({
-                message: "File uploaded successfully to Supabase",
-                url: url,
-                objectPath: objectPath,
-                filename: req.file.originalname,
-                mimetype: req.file.mimetype,
-                storage: "supabase",
-            });
-        }
+        console.log(`[Upload] File uploaded to S3: ${url}`);
+        res.status(200).json({
+            message: "File uploaded successfully to S3",
+            url: url,
+            objectPath: objectPath,
+            filename: req.file.originalname,
+            mimetype: req.file.mimetype,
+            storage: "s3",
+        });
     } catch (error) {
         console.error(`[Upload] Error uploading file:`, error.message);
-        await removeLocalFileSafeS3(req.file.path);
+        await removeLocalFileSafe(req.file.path);
         return res.status(500).json({ message: error.message || "File upload failed" });
     }
 };
