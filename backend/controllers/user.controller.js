@@ -57,15 +57,26 @@ export const getMyProfile = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const { role } = req.query;
+    const { role, search } = req.query;
     
     let query = `SELECT user_id, full_name, email, role, status, created_at
                  FROM users`;
     const params = [];
+    const conditions = [];
     
     if (role) {
-      query += ` WHERE LOWER(role) = LOWER($1)`;
+      conditions.push(`LOWER(role) = LOWER($${params.length + 1})`);
       params.push(role);
+    }
+    
+    if (search) {
+      const searchTerm = `%${search.trim()}%`;
+      conditions.push(`(full_name ILIKE $${params.length + 1} OR email ILIKE $${params.length + 1})`);
+      params.push(searchTerm);
+    }
+    
+    if (conditions.length > 0) {
+      query += ` WHERE ${conditions.join(' AND ')}`;
     }
     
     query += ` ORDER BY created_at DESC`;

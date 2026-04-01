@@ -597,7 +597,11 @@ const sslOptions = {
 http.createServer((req, res) => {
   res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` });
   res.end();
-}).listen(8080, () => console.log("🔁 HTTP redirect on port 8080"));
+}).listen(process.env.HTTP_PORT || 80, () => {
+  console.log(`🔁 HTTP redirect on port ${process.env.HTTP_PORT || 80}`);
+}).on('error', (err) => {
+  console.error("❌ HTTP redirect error:", err.message);
+});
 
 pool
   .query("SELECT NOW()")

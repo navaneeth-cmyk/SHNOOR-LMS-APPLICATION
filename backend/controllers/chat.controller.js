@@ -1442,6 +1442,7 @@ export const searchContacts = async (req, res) => {
     const { role, college } = userRes.rows[0];
     const isAdmin = role?.toLowerCase() === 'admin';
     const isStudent = role?.toLowerCase() === 'student';
+    const isManager = role?.toLowerCase() === 'manager';
 
     console.log("🔍 role:", role, "| college:", college);
 
@@ -1449,7 +1450,16 @@ export const searchContacts = async (req, res) => {
     let usersResult = { rows: [] };
 
     if (!isAdmin) {
-      const targetRoles = isStudent ? ['instructor'] : ['student'];
+      // For managers, search for admins
+      // For students, search for instructors
+      // For others, search for students
+      let targetRoles = ['student'];
+      
+      if (isStudent) {
+        targetRoles = ['instructor'];
+      } else if (isManager) {
+        targetRoles = ['admin'];
+      }
 
       usersResult = await pool.query(
         `
