@@ -101,6 +101,21 @@ export const getExamForAttempt = async (req, res) => {
     ----------------------------------------------------------------------- */
     if (examId && examId.startsWith("final_")) {
       const courseId = examId.replace("final_", "");
+      
+      // First check if the course exists
+      const courseCheck = await pool.query(
+        `SELECT courses_id FROM courses WHERE courses_id = $1`,
+        [courseId],
+      );
+      
+      if (courseCheck.rowCount === 0) {
+        return res.status(404).json({ 
+          message: "Course not found",
+          debug: { courseId, attemptedLookup: "final_exam" }
+        });
+      }
+      
+      // Now find exams linked to this course
       const { rows: resolvedExams } = await pool.query(
         `
         SELECT e.exam_id
@@ -120,7 +135,20 @@ export const getExamForAttempt = async (req, res) => {
         );
         examId = resolvedExams[0].exam_id;
       } else {
-        examId = courseId;
+        // No exam linked to this course
+        console.warn(
+          `⚠️ No exam found for course ${courseId}. Exams linked to this course:`,
+        );
+        const allCourseExams = await pool.query(
+          `SELECT exam_id, title FROM exams WHERE course_id = $1`,
+          [courseId],
+        );
+        console.warn("Available exams for this course:", allCourseExams.rows);
+        
+        return res.status(404).json({ 
+          message: "No exam attached to this course",
+          debug: { courseId, availableExams: allCourseExams.rows }
+        });
       }
       isFinalExamLookup = true;
     }
