@@ -7,6 +7,7 @@ import {
   generatePasswordResetLink,
 } from "../services/email.service.js";
 import { validateBulkInstructors } from "../utils/csvValidator.js";
+import { uploadBufferToS3, removeLocalFileSafe } from "../services/s3Storage.service.js";
 import csvParser from "csv-parser";
 import { Readable } from "stream";
 
@@ -239,14 +240,16 @@ export const addStudent = async (req, res) => {
   const fullName = req.body?.fullName?.trim();
   const email = req.body?.email?.trim()?.toLowerCase();
   const phone = req.body?.phone?.trim() || null;
-  const bio = req.body?.bio?.trim() || null;
+  const college = req.body?.college?.trim() || null;
   const password = req.body?.password?.trim() || null;
+  let firebaseUid = null;
+  const client = await pool.connect();
 
   try {
     console.log(`📝 Attempting to add student: ${email}`);
     
     // 1️⃣ Check duplicate email
-    const existing = await pool.query("SELECT 1 FROM users WHERE email = $1", [
+    const existing = await client.query("SELECT 1 FROM users WHERE email = $1", [
       email,
     ]);
 
@@ -263,16 +266,21 @@ export const addStudent = async (req, res) => {
       displayName: fullName,
       ...(password ? { password } : {}),
     });
+    firebaseUid = firebaseUser.uid;
 
     console.log(`✅ Firebase user created: ${firebaseUser.uid}`);
 
-    // 3️⃣ Insert user
-    const userResult = await pool.query(
-      `INSERT INTO users (firebase_uid, full_name, email, role, status)
-       VALUES ($1, $2, $3, 'student', 'active')
+    // 3️⃣ Insert user with transaction
+    await client.query("BEGIN");
+
+    const userResult = await client.query(
+      `INSERT INTO users (firebase_uid, full_name, email, role, status, phone, college)
+       VALUES ($1, $2, $3, 'student', 'active', $4, $5)
        RETURNING user_id`,
-      [firebaseUser.uid, fullName, email],
+      [firebaseUser.uid, fullName, email, phone, college],
     );
+
+    await client.query("COMMIT");
 
     const studentId = userResult.rows[0].user_id;
 
@@ -297,6 +305,20 @@ export const addStudent = async (req, res) => {
       console.error("SMTP failed:", mailError);
     }
   } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("addStudent rollback error:", rollbackError);
+    }
+
+    if (firebaseUid) {
+      try {
+        await admin.auth().deleteUser(firebaseUid);
+      } catch (cleanupError) {
+        console.error("addStudent Firebase cleanup failed:", cleanupError);
+      }
+    }
+
     console.error("addStudent error:", error);
     console.error("Error stack:", error.stack);
 
@@ -319,6 +341,8 @@ export const addStudent = async (req, res) => {
     }
 
     res.status(500).json({ message: "Failed to create student" });
+  } finally {
+    client.release();
   }
 };
 
@@ -378,10 +402,10 @@ export const addManager = async (req, res) => {
     await client.query("BEGIN");
 
     const userResult = await client.query(
-      `INSERT INTO users (firebase_uid, full_name, email, role, status, college, bio)
-       VALUES ($1, $2, $3, 'manager', 'active', $4, $5)
+      `INSERT INTO users (firebase_uid, full_name, email, role, status, college, phone, bio)
+       VALUES ($1, $2, $3, 'manager', 'active', $4, $5, $6)
        RETURNING user_id`,
-      [firebaseUser.uid, fullName, email, college, bio],
+      [firebaseUser.uid, fullName, email, college, phone, bio],
     );
 
     await client.query("COMMIT");
@@ -499,20 +523,27 @@ export const uploadProfilePicture = async (req, res) => {
   }
 
   try {
-    const fileUrl = `${process.env.BACKEND_URL || ""}/uploads/profile_pictures/${req.file.filename}`;
+    // Upload buffer to S3 in profile-pictures folder
+    const { url, objectPath } = await uploadBufferToS3(req.file.buffer, {
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype || "image/jpeg",
+      folder: "profile-pictures",
+    });
 
+    // Store the S3 URL in database
     await pool.query(
       "UPDATE users SET photo_url = $1 WHERE user_id = $2",
-      [fileUrl, req.user.id]
+      [url, req.user.id]
     );
 
     res.status(200).json({
-      message: "Image uploaded and profile updated successfully",
-      url: fileUrl,
+      message: "Image uploaded to S3 and profile updated successfully",
+      url: url,
+      objectPath: objectPath,
     });
   } catch (error) {
     console.error("uploadProfilePicture error:", error);
-    res.status(500).json({ message: "Failed to save to database" });
+    res.status(500).json({ message: "Failed to upload profile picture" });
   }
 };
 

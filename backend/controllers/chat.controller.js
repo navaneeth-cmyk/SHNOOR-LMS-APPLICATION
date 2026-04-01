@@ -1,6 +1,7 @@
 
 
 import pool from "../db/postgres.js";
+import { uploadBufferToS3, removeLocalFileSafe } from "../services/s3Storage.service.js";
 
 // Initialize Tables
 export const initChatTables = async () => {
@@ -91,6 +92,11 @@ export const initChatTables = async () => {
       "ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS is_edited BOOLEAN DEFAULT FALSE", 
       "ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
       "ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS attachment_file_id INT REFERENCES files(file_id)",
+      // S3 storage columns for files table
+      "ALTER TABLE files ADD COLUMN IF NOT EXISTS s3_url TEXT",
+      "ALTER TABLE files ADD COLUMN IF NOT EXISTS s3_object_path TEXT",
+      "ALTER TABLE files ADD COLUMN IF NOT EXISTS file_size BIGINT",
+      "ALTER TABLE files ALTER COLUMN data DROP NOT NULL",
     ];
 
     // Reactions Table
@@ -312,14 +318,44 @@ export const markRead = async (req, res) => {
 export const uploadFile = async (req, res) => {
   try {
     if (!req.file) return res.status(400).send("No file uploaded");
-    const { originalname, mimetype, buffer } = req.file;
+    
+    const { originalname, mimetype, buffer, size } = req.file;
 
+    // Determine folder based on file type
+    const ext = originalname.split('.').pop().toLowerCase();
+    let folder = "chat-files";
+    
+    if (mimetype?.startsWith('image/')) {
+      folder = "chat-images";
+    } else if (mimetype === "application/pdf" || ext === "pdf") {
+      folder = "chat-pdfs";
+    } else if (mimetype?.startsWith('video/')) {
+      folder = "chat-videos";
+    }
+
+    // Upload to S3
+    const { url, objectPath } = await uploadBufferToS3(buffer, {
+      originalName: originalname,
+      mimeType: mimetype || "application/octet-stream",
+      folder: folder,
+    });
+
+    // Store file metadata in database with S3 URL
     const newFile = await pool.query(
-      "INSERT INTO files (filename, mime_type, data) VALUES ($1, $2, $3) RETURNING file_id",
-      [originalname, mimetype, buffer],
+      `INSERT INTO files (filename, mime_type, s3_url, s3_object_path, file_size)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING file_id`,
+      [originalname, mimetype, url, objectPath, size]
     );
 
-    res.json({ file_id: newFile.rows[0].file_id });
+    res.json({ 
+      file_id: newFile.rows[0].file_id,
+      url: url,
+      objectPath: objectPath,
+      filename: originalname,
+      mimetype: mimetype,
+      size: size
+    });
   } catch (err) {
     console.error("Upload Error:", err);
     res.status(500).send("File upload failed");
@@ -330,16 +366,33 @@ export const uploadFile = async (req, res) => {
 export const serveFile = async (req, res) => {
   try {
     const { id } = req.params;
-    const file = await pool.query("SELECT * FROM files WHERE file_id = $1", [
-      id,
-    ]);
+    const file = await pool.query(
+      "SELECT file_id, filename, mime_type, s3_url FROM files WHERE file_id = $1", 
+      [id]
+    );
 
     if (file.rows.length === 0) return res.status(404).send("File not found");
 
-    const { mime_type, data, filename } = file.rows[0];
-    res.setHeader("Content-Type", mime_type);
-    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-    res.send(data);
+    const { s3_url, filename, mime_type } = file.rows[0];
+
+    // If S3 URL exists, redirect to S3 signed URL
+    if (s3_url) {
+      return res.redirect(s3_url);
+    }
+
+    // Fallback for legacy files stored in DB (if any)
+    const legacyFile = await pool.query(
+      "SELECT data FROM files WHERE file_id = $1", 
+      [id]
+    );
+
+    if (legacyFile.rows[0]?.data) {
+      res.setHeader("Content-Type", mime_type);
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      return res.send(legacyFile.rows[0].data);
+    }
+
+    res.status(404).send("File not found");
   } catch (err) {
     console.error("File Serve Error:", err);
     res.status(500).send("Error serving file");

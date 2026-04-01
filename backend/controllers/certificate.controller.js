@@ -3,9 +3,9 @@ import generatePDF from "../utils/generateCertificate.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
-  uploadCertificatePdfFileToSupabase,
+  uploadPdfFileToS3,
   removeLocalFileSafe,
-} from "../services/supabaseStorage.service.js";
+} from "../services/s3Storage.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -281,12 +281,12 @@ const issueExamCertificate = async ({ userId, examId, score }) => {
 
   try {
     if (pdfResult?.filePath) {
-      await uploadCertificatePdfFileToSupabase(pdfResult.filePath, certificateId);
+      await uploadPdfFileToS3(pdfResult.filePath, certificateId, "certificates");
       await removeLocalFileSafe(pdfResult.filePath);
     }
   } catch (uploadError) {
     await pool.query(`DELETE FROM certificates WHERE id = $1`, [insertRes.rows[0].id]).catch(() => {});
-    console.error("Certificate Supabase upload failed:", uploadError.message);
+    console.error("Certificate S3 upload failed:", uploadError.message);
     return { issued: false, reason: "pdf_upload_failed" };
   }
 

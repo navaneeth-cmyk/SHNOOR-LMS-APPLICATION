@@ -23,18 +23,11 @@ import roleGuard from "../middlewares/roleGuard.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const profilePicsDir = path.join(__dirname, "..", "uploads", "profile_pictures");
-if (!fs.existsSync(profilePicsDir)) fs.mkdirSync(profilePicsDir, { recursive: true });
-
 const router = express.Router();
+
+// Profile picture upload using memory storage for S3
 const uploadProfilePictureFile = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, profilePicsDir),
-    filename: (req, file, cb) => {
-      const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      cb(null, unique + path.extname(file.originalname));
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if ((file.mimetype || "").startsWith("image/")) {
@@ -43,6 +36,7 @@ const uploadProfilePictureFile = multer({
     cb(new Error("Only image files are allowed"), false);
   },
 });
+
 const uploadCsv = multer({ storage: multer.memoryStorage() });
 
 router.get(
@@ -137,14 +131,7 @@ router.post(
   "/upload-profile-picture",
   firebaseAuth,
   attachUser,
-  (req, res, next) => {
-    uploadProfilePictureFile.single("file")(req, res, (err) => {
-      if (err) {
-        return res.status(400).json({ message: err.message });
-      }
-      next();
-    });
-  },
+  uploadProfilePictureFile.single("file"),
   uploadProfilePicture
 );
 export default router;
