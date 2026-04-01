@@ -157,11 +157,8 @@ export const getExamForAttempt = async (req, res) => {
        STEP 1 — Fetch exam metadata
     ----------------------------------------------------------------------- */
     const examRes = await pool.query(
-      isFinalExamLookup
-        ? `SELECT exam_id, title, duration, pass_percentage, course_id
-           FROM exams WHERE course_id = $1 LIMIT 1`
-        : `SELECT exam_id, title, duration, pass_percentage, course_id
-           FROM exams WHERE exam_id = $1`,
+      `SELECT exam_id, title, duration, pass_percentage, course_id
+       FROM exams WHERE exam_id = $1`,
       [examId],
     );
 
