@@ -45,10 +45,17 @@ const fileFilter = (req, file, cb) => {
         "video/x-matroska", "video/x-msvideo", "video/ogg",
         "application/pdf", "application/x-pdf",
         "text/html", "application/xhtml+xml", "text/plain",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/csv"
     ];
 
     const ext = path.extname(file.originalname || "").toLowerCase();
-    const allowedExts = [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg", ".pdf", ".html", ".htm", ".txt", ".md"];
+    const allowedExts = [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg", ".pdf", ".html", ".htm", ".txt", ".md", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".csv"];
 
     const isAllowedMime = allowedTypes.includes(file.mimetype);
     const isAllowedByExt =
@@ -61,7 +68,7 @@ const fileFilter = (req, file, cb) => {
         cb(null, true);
     } else {
         console.error(`[Upload Debug] Rejected file: ${file.originalname} (${file.mimetype})`);
-        cb(new Error(`Invalid file type (${file.mimetype}). Only video, PDF, HTML, and Text files are allowed.`), false);
+        cb(new Error(`Invalid file type (${file.mimetype}). Allowed: Video, PDF, DOCX, PPTX, XLS, XLSX, CSV, HTML, TXT`), false);
     }
 };
 

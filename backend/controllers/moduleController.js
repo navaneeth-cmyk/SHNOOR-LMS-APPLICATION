@@ -39,9 +39,22 @@ export const addModules = async (req, res) => {
       let uploadProvider = null;
 
       if (pdf) {
-        // ✅ Upload PDF to S3
+        // ✅ Upload document (PDF, DOCX, PPTX, TXT, etc.) to S3
         const ext = pdf.originalname.slice(pdf.originalname.lastIndexOf('.')).toLowerCase();
-        if (ext.toLowerCase() === ".pdf" || pdf.mimetype === "application/pdf") {
+        
+        // Allowed document extensions
+        const allowedDocExts = [".pdf", ".txt", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".csv", ".html"];
+        const allowedMimeTypes = [
+          "application/pdf", "text/plain", "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.ms-powerpoint",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "text/csv", "text/html"
+        ];
+
+        if (allowedDocExts.includes(ext) || allowedMimeTypes.includes(pdf.mimetype)) {
           try {
             const { url, objectPath } = await uploadLocalFileToS3(
               pdf.path,
@@ -54,19 +67,11 @@ export const addModules = async (req, res) => {
             finalContentUrl = url;
             uploadProvider = "s3";
           } catch (uploadErr) {
-            console.error("Error uploading PDF to S3:", uploadErr.message);
+            console.error("Error uploading document to S3:", uploadErr.message);
             throw uploadErr;
           }
         } else {
-          // 🚫 COMMENTED OUT: Only PDFs are supported now
-          // const ext = pdf.originalname.slice(pdf.originalname.lastIndexOf('.')).toLowerCase();
-          // let subFolder = "docs";
-          // if (pdf.mimetype.startsWith("video/") || [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"].includes(ext)) {
-          //     subFolder = "videos";
-          // } else if (pdf.mimetype === "application/pdf" || ext === ".pdf") {
-          //     subFolder = "pdfs";
-          // }
-          throw new Error("Only PDF files are supported for module content.");
+          throw new Error(`Unsupported file type: ${ext}. Allowed types: PDF, TXT, DOCX, PPTX, XLS, XLSX, CSV, HTML`);
         }
       }
 
