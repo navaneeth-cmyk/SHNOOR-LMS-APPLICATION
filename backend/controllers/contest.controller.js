@@ -323,12 +323,19 @@ export const getContestQuestionsForStudent = async (req, res) => {
             )
           ) FILTER (WHERE o.option_id IS NOT NULL),
           '[]'
-        ) AS options
+        ) AS options,
+        cq.coding_id,
+        cq.title AS coding_title,
+        cq.description AS coding_description,
+        cq.language,
+        cq.starter_code
       FROM contest_questions q
       LEFT JOIN contest_options o
         ON o.question_id = q.question_id
+      LEFT JOIN contest_coding_questions cq
+        ON cq.question_id = q.question_id
       WHERE q.exam_id = $1
-      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords
+      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords, cq.coding_id, cq.title, cq.description, cq.language, cq.starter_code
       ORDER BY q.created_at
       `,
       [contestId]
