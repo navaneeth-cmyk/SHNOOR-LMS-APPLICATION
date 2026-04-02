@@ -319,18 +319,16 @@ export const getContestQuestionsForStudent = async (req, res) => {
         q.question_type,
         q.marks,
         q.keywords,
-        CASE 
-          WHEN q.question_type = 'mcq' THEN COALESCE(
-            json_agg(
-              json_build_object(
-                'option_id', o.option_id,
-                'option_text', o.option_text
-              )
-            ) FILTER (WHERE o.option_id IS NOT NULL),
-            '[]'::json
-          )
-          ELSE '[]'::json
-        END AS options,
+        q.created_at,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'option_id', o.option_id,
+              'option_text', o.option_text
+            )
+          ) FILTER (WHERE o.option_id IS NOT NULL AND q.question_type = 'mcq'),
+          '[]'::json
+        ) AS options,
         cq.coding_id,
         cq.title AS coding_title,
         cq.description AS coding_description,
@@ -338,12 +336,12 @@ export const getContestQuestionsForStudent = async (req, res) => {
         cq.starter_code
       FROM contest_questions q
       LEFT JOIN contest_options o
-        ON o.question_id = q.question_id AND q.question_type = 'mcq'
+        ON o.question_id = q.question_id
       LEFT JOIN contest_coding_questions cq
-        ON cq.question_id = q.question_id AND q.question_type = 'coding'
+        ON cq.question_id = q.question_id
       WHERE q.exam_id = $1
       GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords, q.created_at, cq.coding_id, cq.title, cq.description, cq.language, cq.starter_code
-      ORDER BY q.created_at
+      ORDER BY q.created_at ASC
       `,
       [contestId]
     );
