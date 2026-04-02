@@ -189,7 +189,7 @@ const ContestList = () => {
                     <td className="px-6 py-4 text-slate-600">
                       <div className="flex items-center gap-2">
                         <Trophy className="w-4 h-4 text-slate-400" />
-                        <span>—</span>
+                        <span>{contest.participants_count || 0}</span>
                       </div>
                     </td>
 
