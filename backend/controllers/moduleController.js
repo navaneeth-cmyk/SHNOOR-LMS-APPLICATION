@@ -243,7 +243,7 @@ export const getModuleView = async (req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT pdf_data, pdf_filename, pdf_mime, content_url, type
+      SELECT content_url, type
       FROM modules
       WHERE module_id = $1
       `,
@@ -262,42 +262,53 @@ export const getModuleView = async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
+    
+    // ✅ Set caching headers for faster loading
+    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+    res.setHeader("ETag", `"${moduleId}"`);
 
-    // 1️⃣ Priority: Binary data in DB
-    if (moduleData.pdf_data) {
-      res.setHeader("Content-Type", moduleData.pdf_mime || "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        `inline; filename="${moduleData.pdf_filename || "document.pdf"}"`
-      );
-      return res.send(moduleData.pdf_data);
-    }
-
-    // 2️⃣ URL — proxy the content to maintain our security headers
+    // URL — stream the content directly (faster than proxy)
     if (moduleData.content_url) {
       try {
         const urlObj = new URL(moduleData.content_url);
         const fileName = urlObj.pathname.split("/").pop() || "document";
         const isHtml = queryType === 'html' || fileName.match(/\.html?($|\?)/i) || moduleData.type === 'html';
         const isPdf = queryType === 'pdf' || fileName.match(/\.pdf($|\?)/i) || moduleData.type === 'pdf';
+        const isVideo = fileName.match(/\.(mp4|webm|ogg|mov|avi|mkv)($|\?)/i) || moduleData.type === 'video';
 
         if (isHtml) {
           res.setHeader("Content-Type", "text/html");
         } else if (isPdf) {
           res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", "inline");
+        } else if (isVideo) {
+          res.setHeader("Content-Type", "video/mp4");
+          res.setHeader("Accept-Ranges", "bytes");
         }
 
-        const response = await axios.get(moduleData.content_url, { responseType: "stream" });
+        const response = await axios.get(moduleData.content_url, { 
+          responseType: "stream",
+          timeout: 30000 
+        });
+        
+        // Forward important headers from source
+        if (response.headers['content-length']) {
+          res.setHeader('Content-Length', response.headers['content-length']);
+        }
+        if (response.headers['content-type'] && !isPdf && !isVideo) {
+          res.setHeader('Content-Type', response.headers['content-type']);
+        }
+        
         return response.data.pipe(res);
       } catch (proxyErr) {
-        console.warn("Proxy fallback failed, redirecting:", proxyErr.message);
-        return res.redirect(moduleData.content_url);
+        console.warn("Stream failed, returning error:", proxyErr.message);
+        return res.status(500).json({ message: "Failed to load content" });
       }
     }
 
     res.status(404).json({ message: "Content not found" });
   } catch (error) {
-    console.error("getModulePdf error:", error);
+    console.error("getModuleView error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };

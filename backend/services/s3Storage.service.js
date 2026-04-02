@@ -92,6 +92,11 @@ export const uploadBufferToS3 = async (
     Key: objectPath,
     Body: buffer,
     ContentType: mimeType || "application/octet-stream",
+    // Add caching metadata for faster downloads
+    Metadata: {
+      "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+    },
+    CacheControl: "public, max-age=31536000", // Cache for 1 year
   });
 
   try {

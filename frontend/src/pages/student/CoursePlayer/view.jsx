@@ -63,14 +63,23 @@ const normalizeExternalUrl = (url) => {
 const buildPdfViewerUrl = (url, authToken) => {
   if (!url || typeof url !== "string") return "";
   let norm = url;
+  
+  // Handle Gamma URLs
   if (isGammaUrl(norm)) norm = normalizeGammaUrl(norm);
+  
+  // For API and uploads paths
   if (norm.startsWith("/api/") || norm.startsWith("/uploads/")) {
     norm = window.location.origin.replace(":5173", ":5000") + norm;
   }
+  
   const withT = authToken ? `${norm}${norm.includes("?") ? "&" : "?"}token=${authToken}` : norm;
-  const isL = norm.includes("localhost") || norm.includes("127.0.0.1") || norm.startsWith("/");
-  if (isL || isGammaUrl(norm)) return withT;
-  return `https://docs.google.com/viewer?url=${encodeURIComponent(withT)}&embedded=true`;
+  
+  // For S3 and local URLs, use direct access (fastest)
+  const isS3 = norm.includes('.amazonaws.com') || norm.includes('s3');
+  const isLocal = norm.includes("localhost") || norm.includes("127.0.0.1") || norm.startsWith("/");
+  
+  // Always use direct URL for fastest loading in iframe
+  return withT;
 };
 
 const SEEK_TOLERANCE_SECONDS = 1;
