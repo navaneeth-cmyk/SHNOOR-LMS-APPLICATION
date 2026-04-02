@@ -307,7 +307,8 @@ export const getContestQuestionsForStudent = async (req, res) => {
   try {
     const { contestId } = req.params;
 
-    const result = await pool.query(
+    // Fetch MCQ questions with their options
+    const mcqResult = await pool.query(
       `
       SELECT
         q.question_id,
@@ -323,25 +324,66 @@ export const getContestQuestionsForStudent = async (req, res) => {
             )
           ) FILTER (WHERE o.option_id IS NOT NULL),
           '[]'
-        ) AS options,
+        ) AS options
+      FROM contest_questions q
+      LEFT JOIN contest_options o
+        ON o.question_id = q.question_id
+      WHERE q.exam_id = $1 AND q.question_type = 'mcq'
+      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords
+      ORDER BY q.created_at
+      `,
+      [contestId]
+    );
+
+    // Fetch Descriptive questions
+    const descriptiveResult = await pool.query(
+      `
+      SELECT
+        q.question_id,
+        q.question_text,
+        q.question_type,
+        q.marks,
+        q.keywords,
+        '[]'::json AS options
+      FROM contest_questions q
+      WHERE q.exam_id = $1 AND q.question_type = 'descriptive'
+      ORDER BY q.created_at
+      `,
+      [contestId]
+    );
+
+    // Fetch Coding questions with their details
+    const codingResult = await pool.query(
+      `
+      SELECT
+        q.question_id,
+        q.question_text,
+        q.question_type,
+        q.marks,
+        q.keywords,
+        '[]'::json AS options,
         cq.coding_id,
         cq.title AS coding_title,
         cq.description AS coding_description,
         cq.language,
         cq.starter_code
       FROM contest_questions q
-      LEFT JOIN contest_options o
-        ON o.question_id = q.question_id
       LEFT JOIN contest_coding_questions cq
         ON cq.question_id = q.question_id
-      WHERE q.exam_id = $1
-      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords, cq.coding_id, cq.title, cq.description, cq.language, cq.starter_code
+      WHERE q.exam_id = $1 AND q.question_type = 'coding'
       ORDER BY q.created_at
       `,
       [contestId]
     );
 
-    res.json(result.rows);
+    // Combine all results
+    const allQuestions = [
+      ...mcqResult.rows,
+      ...descriptiveResult.rows,
+      ...codingResult.rows
+    ];
+
+    res.json(allQuestions);
   } catch (error) {
     console.error("getContestQuestionsForStudent error:", error.message);
     res.status(500).json({ message: error.message });

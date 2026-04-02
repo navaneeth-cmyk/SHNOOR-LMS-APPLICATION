@@ -37,7 +37,7 @@ export const getCourseComments = async (req, res) => {
       JOIN users u ON cc.user_id = u.user_id
       LEFT JOIN comment_votes cv ON cc.comment_id = cv.comment_id
       WHERE cc.course_id = $1
-      GROUP BY cc.comment_id, u.full_name, u.role
+      GROUP BY cc.comment_id, cc.comment_text, cc.created_at, cc.updated_at, cc.user_id, cc.parent_comment_id, u.full_name, u.role
       ORDER BY cc.created_at DESC
       `,
       [courseId, userId]
