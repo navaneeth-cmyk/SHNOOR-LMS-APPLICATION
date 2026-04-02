@@ -39,6 +39,11 @@ router.post(
   createContest
 );
 
+/* =========================
+   SPECIFIC ROUTES FIRST (avoid being caught by /:id)
+========================= */
+
+/* Instructor special routes */
 router.get(
   "/mine",
   firebaseAuth,
@@ -47,20 +52,13 @@ router.get(
   getMyContests
 );
 
-router.delete(
-  "/:id",
+/* Student available route */
+router.get(
+  "/available",
   firebaseAuth,
   attachUser,
-  roleGuard("instructor"),
-  deleteContest
-);
-
-router.put(
-  "/:id",
-  firebaseAuth,
-  attachUser,
-  roleGuard("instructor"),
-  updateContest
+  roleGuard("student"),
+  getAvailableContests
 );
 
 /* =========================
@@ -100,6 +98,30 @@ router.post(
 );
 
 /* =========================
+   Questions (GET)
+========================= */
+
+router.get(
+  "/:contestId/questions",
+  firebaseAuth,
+  attachUser,
+  roleGuard("student", "instructor"),
+  getContestQuestionsForStudent
+);
+
+/* =========================
+   Coding meta
+========================= */
+
+router.get(
+  "/:contestId/questions/coding/:questionId/meta",
+  firebaseAuth,
+  attachUser,
+  roleGuard("student"),
+  getCodingQuestionMetaForStudent
+);
+
+/* =========================
    Student – run coding
 ========================= */
 
@@ -112,38 +134,6 @@ router.post(
 );
 
 /* =========================
-   Student
-========================= */
-
-router.get(
-  "/available",
-  firebaseAuth,
-  attachUser,
-  roleGuard("student"),
-  getAvailableContests
-);
-
-router.get(
-  "/:id",
-  firebaseAuth,
-  attachUser,
-  roleGuard("student"),
-  getContestById
-);
-
-/* =========================
-   Questions
-========================= */
-
-router.get(
-  "/:contestId/questions",
-  firebaseAuth,
-  attachUser,
-  roleGuard("student", "instructor"),
-  getContestQuestionsForStudent
-);
-
-/* =========================
    Submit contest
 ========================= */
 
@@ -153,18 +143,6 @@ router.post(
   attachUser,
   roleGuard("student"),
   submitContestAnswers
-);
-
-/* =========================
-   Coding meta
-========================= */
-
-router.get(
-  "/questions/coding/:questionId/meta",
-  firebaseAuth,
-  attachUser,
-  roleGuard("student"),
-  getCodingQuestionMetaForStudent
 );
 
 /* =========================
@@ -185,6 +163,34 @@ router.get(
   attachUser,
   roleGuard("student", "instructor"),
   getContestLeaderboard
+);
+
+/* =========================
+   GENERIC ROUTES LAST (catch remaining /:id requests)
+========================= */
+
+router.delete(
+  "/:id",
+  firebaseAuth,
+  attachUser,
+  roleGuard("instructor"),
+  deleteContest
+);
+
+router.put(
+  "/:id",
+  firebaseAuth,
+  attachUser,
+  roleGuard("instructor"),
+  updateContest
+);
+
+router.get(
+  "/:id",
+  firebaseAuth,
+  attachUser,
+  roleGuard("student"),
+  getContestById
 );
 
 export default router;

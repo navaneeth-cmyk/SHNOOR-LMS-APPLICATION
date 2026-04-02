@@ -94,7 +94,7 @@ const ContestDetail = () => {
   const loadCodingMeta = async (questionId) => {
     try {
       const res = await api.get(
-        `/api/contests/questions/coding/${questionId}/meta`
+        `/api/contests/${contestId}/questions/coding/${questionId}/meta`
       );
 
       setCodingMeta((prev) => ({

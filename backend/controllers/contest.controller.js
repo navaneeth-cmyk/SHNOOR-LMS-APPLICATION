@@ -58,13 +58,12 @@ export const getMyContests = async (req, res) => {
       `
       SELECT 
         e.*,
-        COUNT(DISTINCT cs.student_id) AS participants_count
+        (SELECT COUNT(DISTINCT student_id) 
+         FROM contest_submissions 
+         WHERE contest_id = e.exam_id) AS participants_count
       FROM exams e
-      LEFT JOIN contest_submissions cs
-        ON cs.contest_id = e.exam_id
       WHERE e.instructor_id = $1
         AND e.exam_type = 'contest'
-      GROUP BY e.exam_id
       ORDER BY e.created_at DESC
       `,
       [req.user.id]
