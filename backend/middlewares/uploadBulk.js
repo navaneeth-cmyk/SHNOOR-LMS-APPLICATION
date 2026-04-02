@@ -45,23 +45,14 @@ const fileFilter = (req, file, cb) => {
         return cb(null, true);
     }
 
-    // Allow other resource types (Video, PDF, Text, Docs)
+    // Allow video and PDF files
     const allowedTypes = [
         "video/mp4", "video/webm", "video/quicktime", "video/x-matroska", "video/x-msvideo", "video/ogg",
-        "application/pdf",
-        "text/plain", "text/html",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "application/pdf"
     ];
     const allowedExts = [
         ".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg",
-        ".pdf",
-        ".txt", ".html", ".htm",
-        ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"
+        ".pdf"
     ];
 
     const ext = path.extname(file.originalname || "").toLowerCase();
@@ -69,7 +60,7 @@ const fileFilter = (req, file, cb) => {
         return cb(null, true);
     }
 
-    cb(new Error(`Invalid file type: ${file.originalname}. Allowed: PDF, DOCX, PPTX, XLS, XLSX, TXT, HTML, Video files`), false);
+    cb(new Error(`Invalid file type: ${file.originalname}. Only video and PDF files are allowed.`), false);
 };
 
 const upload = multer({

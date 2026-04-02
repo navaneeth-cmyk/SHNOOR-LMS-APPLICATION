@@ -39,39 +39,31 @@ export const addModules = async (req, res) => {
       let uploadProvider = null;
 
       if (pdf) {
-        // ✅ Upload document (PDF, DOCX, PPTX, TXT, etc.) to S3
+        // ✅ Upload PDF or video to S3
         const ext = pdf.originalname.slice(pdf.originalname.lastIndexOf('.')).toLowerCase();
+        const allowedVideoExts = [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"];
+        const isPdf = ext === ".pdf" || pdf.mimetype === "application/pdf";
+        const isVideo = pdf.mimetype.startsWith("video/") || allowedVideoExts.includes(ext);
         
-        // Allowed document extensions
-        const allowedDocExts = [".pdf", ".txt", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".csv", ".html"];
-        const allowedMimeTypes = [
-          "application/pdf", "text/plain", "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.ms-powerpoint",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "text/csv", "text/html"
-        ];
-
-        if (allowedDocExts.includes(ext) || allowedMimeTypes.includes(pdf.mimetype)) {
+        if (isPdf || isVideo) {
           try {
+            const folder = isPdf ? "pdfs" : "videos";
             const { url, objectPath } = await uploadLocalFileToS3(
               pdf.path,
               {
                 originalName: pdf.originalname,
                 mimeType: pdf.mimetype,
-                folder: "pdfs",
+                folder: folder,
               }
             );
             finalContentUrl = url;
             uploadProvider = "s3";
           } catch (uploadErr) {
-            console.error("Error uploading document to S3:", uploadErr.message);
+            console.error("Error uploading file to S3:", uploadErr.message);
             throw uploadErr;
           }
         } else {
-          throw new Error(`Unsupported file type: ${ext}. Allowed types: PDF, TXT, DOCX, PPTX, XLS, XLSX, CSV, HTML`);
+          throw new Error("Only PDF and video files are supported for module content.");
         }
       }
 

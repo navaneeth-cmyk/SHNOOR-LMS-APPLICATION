@@ -21,32 +21,18 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  // Allowed MIME types for documents
-  const allowedMimeTypes = [
-    "application/pdf",                                          // PDF
-    "text/plain",                                               // TXT
-    "application/msword",                                       // DOC
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
-    "application/vnd.ms-powerpoint",                            // PPT
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation", // PPTX
-    "application/vnd.ms-excel",                                 // XLS
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // XLSX
-    "text/csv",                                                 // CSV
-    "text/html"                                                 // HTML
-  ];
+  const ext = path.extname(file.originalname || "").toLowerCase();
+  
+  // Allow video and PDF files
+  const allowedVideoMimes = ["video/mp4", "video/webm", "video/quicktime", "video/x-matroska", "video/x-msvideo", "video/ogg"];
+  const allowedVideoExts = [".mp4", ".mkv", ".webm", ".mov", ".avi", ".ogg"];
+  const isPdf = ext === ".pdf" || file.mimetype === "application/pdf";
+  const isVideo = allowedVideoMimes.includes(file.mimetype) || allowedVideoExts.includes(ext);
 
-  // Allowed file extensions
-  const allowedExtensions = [
-    ".pdf", ".txt", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".csv", ".html"
-  ];
-
-  const fileExt = path.extname(file.originalname || "").toLowerCase();
-  const mimeType = file.mimetype || "";
-
-  if (allowedMimeTypes.includes(mimeType) || allowedExtensions.includes(fileExt)) {
+  if (isPdf || isVideo) {
     cb(null, true);
   } else {
-    cb(new Error(`Invalid file type: ${file.originalname}. Allowed types: PDF, TXT, DOCX, PPTX, XLS, XLSX, CSV, HTML`), false);
+    cb(new Error(`Only PDF and video files are allowed. Received: ${file.originalname}`), false);
   }
 };
 
