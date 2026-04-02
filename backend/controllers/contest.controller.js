@@ -338,7 +338,7 @@ export const getContestQuestionsForStudent = async (req, res) => {
       LEFT JOIN contest_coding_questions cq
         ON cq.question_id = q.question_id AND q.question_type = 'coding'
       WHERE q.exam_id = $1
-      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords, cq.coding_id, cq.title, cq.description, cq.language, cq.starter_code
+      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords, q.created_at, cq.coding_id, cq.title, cq.description, cq.language, cq.starter_code
       ORDER BY q.created_at
       `,
       [contestId]
