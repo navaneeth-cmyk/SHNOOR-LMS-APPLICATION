@@ -227,7 +227,7 @@ const StudentCourses = () => {
   const getDisplayCourses = () => {
     switch (activeTab) {
       case "my-learning":
-        return myCourses.filter((course) => course.is_enrolled && !course.is_completed);
+        return myCourses.filter((course) => course.is_enrolled);
 
       case "explore":
         return allCourses.filter(

@@ -481,6 +481,12 @@ const StudentCoursesView = ({
                           {course.difficulty || "All Levels"}
                         </span>
                       </div>
+                      {course.is_completed && (
+                        <div className="absolute bottom-4 left-4 px-3 py-1 rounded-lg text-[11px] font-extrabold uppercase shadow-lg border-2 bg-emerald-500 text-white border-emerald-600 flex items-center gap-1">
+                          <Check size={12} />
+                          Completed
+                        </div>
+                      )}
                       <div
                         className={`absolute bottom-4 right-4 px-3 py-1 rounded-lg text-[11px] font-extrabold uppercase shadow-lg border-2 ${
                           course.price_type === "paid"
@@ -513,12 +519,24 @@ const StudentCoursesView = ({
                         {isEnrolled ? (
                           <>
                             <button
-                              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3 px-4 rounded-xl text-sm transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10"
+                              className={`w-full font-extrabold py-3 px-4 rounded-xl text-sm transition-all transform flex items-center justify-center gap-2 shadow-lg ${
+                                course.is_completed
+                                  ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20 active:scale-95"
+                                  : "bg-slate-900 hover:bg-slate-800 text-white hover:scale-[1.02] active:scale-95 shadow-slate-900/10"
+                              }`}
                               onClick={() =>
                                 navigate(`/student/course/${course.courses_id}`)
                               }
                             >
-                              Resume Learning <ArrowRight size={16} />
+                              {course.is_completed ? (
+                                <>
+                                  <Check size={16} /> View Course
+                                </>
+                              ) : (
+                                <>
+                                  Resume Learning <ArrowRight size={16} />
+                                </>
+                              )}
                             </button>
                             <button
                               className={`w-full font-extrabold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2 border-2 ${

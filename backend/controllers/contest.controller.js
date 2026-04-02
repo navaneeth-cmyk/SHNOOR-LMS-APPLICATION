@@ -25,9 +25,9 @@ export const createContest = async (req, res) => {
       `
       INSERT INTO exams
         (title, description, course_id, instructor_id, duration,
-         validity_value, validity_unit, pass_percentage, exam_type)
+         validity_value, validity_unit, pass_percentage, exam_type, created_at)
       VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,'contest')
+        ($1,$2,$3,$4,$5,$6,$7,$8,'contest', NOW())
       RETURNING *
       `,
       [
@@ -328,7 +328,7 @@ export const getContestQuestionsForStudent = async (req, res) => {
       LEFT JOIN contest_options o
         ON o.question_id = q.question_id
       WHERE q.exam_id = $1
-      GROUP BY q.question_id
+      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords
       ORDER BY q.created_at
       `,
       [contestId]
