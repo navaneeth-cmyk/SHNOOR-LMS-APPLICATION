@@ -85,8 +85,8 @@ export const addCourseComment = async (req, res) => {
 
     const { rows } = await pool.query(
       `
-      INSERT INTO course_comments (course_id, user_id, comment_text, parent_comment_id)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO course_comments (course_id, user_id, comment_text, parent_comment_id, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, NOW(), NOW())
       RETURNING 
         comment_id,
         comment_text,

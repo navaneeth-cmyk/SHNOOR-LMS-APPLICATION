@@ -307,8 +307,7 @@ export const getContestQuestionsForStudent = async (req, res) => {
   try {
     const { contestId } = req.params;
 
-    // Fetch MCQ questions with their options
-    const mcqResult = await pool.query(
+    const result = await pool.query(
       `
       SELECT
         q.question_id,
@@ -316,74 +315,36 @@ export const getContestQuestionsForStudent = async (req, res) => {
         q.question_type,
         q.marks,
         q.keywords,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'option_id', o.option_id,
-              'option_text', o.option_text
-            )
-          ) FILTER (WHERE o.option_id IS NOT NULL),
-          '[]'
-        ) AS options
-      FROM contest_questions q
-      LEFT JOIN contest_options o
-        ON o.question_id = q.question_id
-      WHERE q.exam_id = $1 AND q.question_type = 'mcq'
-      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords
-      ORDER BY q.created_at
-      `,
-      [contestId]
-    );
-
-    // Fetch Descriptive questions
-    const descriptiveResult = await pool.query(
-      `
-      SELECT
-        q.question_id,
-        q.question_text,
-        q.question_type,
-        q.marks,
-        q.keywords,
-        '[]'::json AS options
-      FROM contest_questions q
-      WHERE q.exam_id = $1 AND q.question_type = 'descriptive'
-      ORDER BY q.created_at
-      `,
-      [contestId]
-    );
-
-    // Fetch Coding questions with their details
-    const codingResult = await pool.query(
-      `
-      SELECT
-        q.question_id,
-        q.question_text,
-        q.question_type,
-        q.marks,
-        q.keywords,
-        '[]'::json AS options,
+        CASE 
+          WHEN q.question_type = 'mcq' THEN COALESCE(
+            json_agg(
+              json_build_object(
+                'option_id', o.option_id,
+                'option_text', o.option_text
+              )
+            ) FILTER (WHERE o.option_id IS NOT NULL),
+            '[]'::json
+          )
+          ELSE '[]'::json
+        END AS options,
         cq.coding_id,
         cq.title AS coding_title,
         cq.description AS coding_description,
         cq.language,
         cq.starter_code
       FROM contest_questions q
+      LEFT JOIN contest_options o
+        ON o.question_id = q.question_id AND q.question_type = 'mcq'
       LEFT JOIN contest_coding_questions cq
-        ON cq.question_id = q.question_id
-      WHERE q.exam_id = $1 AND q.question_type = 'coding'
+        ON cq.question_id = q.question_id AND q.question_type = 'coding'
+      WHERE q.exam_id = $1
+      GROUP BY q.question_id, q.question_text, q.question_type, q.marks, q.keywords, cq.coding_id, cq.title, cq.description, cq.language, cq.starter_code
       ORDER BY q.created_at
       `,
       [contestId]
     );
 
-    // Combine all results
-    const allQuestions = [
-      ...mcqResult.rows,
-      ...descriptiveResult.rows,
-      ...codingResult.rows
-    ];
-
-    res.json(allQuestions);
+    res.json(result.rows);
   } catch (error) {
     console.error("getContestQuestionsForStudent error:", error.message);
     res.status(500).json({ message: error.message });
